@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+claude-agent-sdk
+
+# 참고:
+# claude-agent-sdk 는 Node.js 및 Claude Code CLI(`claude`)를 필요로 한다.
+# 폐쇄망에서는 사내에서 사용 가능한 패키지명/버전으로 대체한다.

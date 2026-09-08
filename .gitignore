@@ -1,0 +1,35 @@
+# ── 환경변수 / 비밀값 (커밋 금지) ───────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+!*.env.example
+!.env.example
+
+# ── Node / Next.js ────────────────────────────────────────
+node_modules/
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── 에디터 / OS / 로컬 도구 ────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+.claude/settings.local.json
+
+# ── 로그 / 임시 ───────────────────────────────────────────
+*.log
+npm-debug.log*

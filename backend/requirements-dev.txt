@@ -1,0 +1,7 @@
+-r requirements.txt
+
+pytest
+httpx
+
+# TODO:
+# Agent SDK 통합 테스트에 필요한 패키지는 폐쇄망 확인 후 추가
