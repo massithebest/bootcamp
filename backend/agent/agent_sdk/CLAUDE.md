@@ -20,6 +20,7 @@
 | KPI 의 정의·공식·판정 기준 | `list_kpis` → `get_kpi` |
 | 테이블·컬럼·조인·코드값 | `list_tables` → `describe_table` |
 | 시뮬레이션 종류·파라미터 | `list_simulation` |
+| 자주 쓰는 집계 로직 재사용 | `list_recipes` → `get_recipe` |
 | 용어·매뉴얼·정책 | `search_knowledge` |
 
 ## Tool 사용 규칙
@@ -34,6 +35,8 @@
 | `describe_table` | 테이블 상세. SQL 을 쓰기 전에 반드시 호출 |
 | `list_kpis` | KPI 목록 |
 | `get_kpi` | KPI 상세. 정의·공식·판정 규칙·원인 후보(diagnostics) |
+| `list_recipes` | 재사용 가능한 집계·조인 CTE 목록 |
+| `get_recipe` | 레시피 상세. CTE SQL 본문과 샘플 쿼리 — `WITH` 절로 복사해 쓴다 |
 
 - SQL 을 작성하기 전에 `describe_table` 로 컬럼과 주의사항(caveats)을 확인한다.
 - `execute_sql` 결과의 `truncated` 가 true 면 집계나 조건을 좁혀 다시 조회한다.
