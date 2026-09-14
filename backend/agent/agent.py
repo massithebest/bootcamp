@@ -32,7 +32,9 @@ def _build_options(resume_session_id: str | None) -> ClaudeAgentOptions:
         cwd=AGENT_SDK_CWD,
         setting_sources=["project"],  # CLAUDE.md / .claude/skills 로드
         mcp_servers={"planning": build_planning_mcp_server()},
-        allowed_tools=TOOL_NAMES,
+        # Skill: 프로젝트 Skills(.claude/skills/*)를 에이전트가 선택해 로드한다.
+        # 문자열 system_prompt 로도 Claude Code preset 의 Skill 도구가 유지된다 (Task 0 확인).
+        allowed_tools=TOOL_NAMES + ["Skill"],
         permission_mode="bypassPermissions",
         resume=resume_session_id,
         model=AGENT_MODEL,
