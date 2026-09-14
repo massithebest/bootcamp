@@ -75,3 +75,35 @@ def test_chat_endpoint_reports_error_gracefully(monkeypatch) -> None:
     assert events[-1]["type"] == "done"
     assert any(e["type"] == "error" for e in events)
     assert all("internal detail" not in (e.get("content") or "") for e in events)
+
+
+def test_knowledge_skills_endpoint() -> None:
+    response = client.get("/api/knowledge/skills")
+
+    assert response.status_code == 200
+    skills = response.json()
+    assert {skill["name"] for skill in skills} == {
+        "kpi-shortfall-analysis",
+        "sql-analysis",
+        "simulation",
+    }
+    assert all(set(skill) == {"name", "description", "status"} for skill in skills)
+    assert all(skill["description"] for skill in skills)
+
+
+def test_knowledge_catalog_endpoint() -> None:
+    response = client.get("/api/knowledge/catalog")
+
+    assert response.status_code == 200
+    tables = response.json()
+    assert len(tables) == 6
+    assert set(tables[0]) == {"table", "description", "grain", "tags", "verified"}
+
+
+def test_knowledge_kpis_endpoint() -> None:
+    response = client.get("/api/knowledge/kpis")
+
+    assert response.status_code == 200
+    kpis = response.json()
+    assert [kpi["kpi_id"] for kpi in kpis] == ["fgs_inbound"]
+    assert set(kpis[0]) == {"kpi_id", "name", "aliases", "verified"}

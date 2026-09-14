@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes_chat import router as chat_router
+from api.routes_knowledge import router as knowledge_router
 from core.config import CORS_ALLOW_ORIGINS
 
 
@@ -22,6 +23,11 @@ app.add_middleware(
 
 app.include_router(
     chat_router,
+    prefix="/api",
+)
+
+app.include_router(
+    knowledge_router,
     prefix="/api",
 )
 
