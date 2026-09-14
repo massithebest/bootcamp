@@ -43,19 +43,21 @@ src/
 │   ├── chat/                     3-pane 워크벤치
 │   │   ├── agent-progress.tsx    진행 단계 블록 (ChainOfThought 기반, 진행 중 펼침 · 완료 후 접힘)
 │   │   ├── app-sidebar.tsx       세션 목록 사이드바 (커스텀 구현 — shadcn sidebar 아님)
-│   │   ├── chat-window.tsx       전체 Chat 상태 · Streaming · AgentEvent 처리 · assistant-ui 런타임 배선, 3-pane 셸
+│   │   ├── chat-window.tsx       3-pane 셸 조립 · 패널 토글 · 세션 선택 (상태는 hooks/use-agent-chat.ts 로 이전)
 │   │   ├── connection-banner.tsx 백엔드 연결 실패 안내 · 재시도
 │   │   ├── context-inspector.tsx Skills(실 API) / Metadata / Prompt 탭
-│   │   ├── empty-state.tsx       대화 시작 전 예시 질문
+│   │   ├── empty-state.tsx       대화 시작 전 예시 질문 (ThreadPrimitive.Suggestion)
 │   │   ├── markdown-text.tsx     `@assistant-ui/react-markdown` 기반 마크다운 렌더러 (remark-gfm, 표/코드블록 등 스타일 슬롯)
-│   │   ├── thread-messages.tsx   `ThreadPrimitive.Messages`에 등록하는 UserMessage/AssistantMessage — 진행 블록·도구 카드 배치
-│   │   ├── message-input.tsx     입력창 (3단계에서 ComposerPrimitive로 교체 예정)
+│   │   ├── thread-messages.tsx   `ThreadPrimitive.Messages`에 등록하는 UserMessage/AssistantMessage — 진행 블록·도구 카드·복사 액션바 배치
+│   │   ├── message-input.tsx     입력창 (ComposerPrimitive — 전송/Enter/자동높이/취소 라이브러리 위임)
 │   │   ├── primitives.tsx        공용 UI 조각 (StatusDot 등, 직접 작성)
 │   │   ├── tool-result-card.tsx  AI Elements `Tool` 래퍼 안에서 tool_name 별 분기
 │   │   └── tool-results/         database / knowledge / catalog / simulation 전용 렌더러
-│   │   ※ markdown.tsx · message-bubble.tsx 는 assistant-ui 전환으로 더 이상 쓰이지 않는다 — 4단계 정리 전까지 파일은 남겨둔다.
 │   └── ui/                       shadcn/ui 컴포넌트 (자동 생성)
-├── hooks/                        use-controllable-state / use-mobile
+├── hooks/
+│   ├── use-agent-chat.ts         대화 상태 · SSE Streaming · AgentEvent 처리 · assistant-ui 런타임(useExternalStoreRuntime) 생성
+│   ├── use-controllable-state.ts AI Elements chain-of-thought 훅 의존 로컬 구현
+│   └── use-mobile.ts             shadcn sidebar 반응형 훅 (미사용 sidebar.tsx 부속)
 ├── lib/
 │   ├── chat-api.ts               POST /api/chat · SSE 파싱 · AbortController — 백엔드 통신 유일 창구
 │   ├── chat-runtime.ts           `ChatMessage` -> assistant-ui `ThreadMessageLike` 변환 (convertMessage)
