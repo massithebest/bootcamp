@@ -2,8 +2,6 @@
  * 좌측 사이드바 — 세션 목록.  시간 그룹핑 + 세션에서 쓰인 도구 흔적 표식.
  */
 
-"use client";
-
 import type { Session, ToolTrace } from "@/types/workspace";
 import { CURRENT_USER } from "@/lib/dummy";
 

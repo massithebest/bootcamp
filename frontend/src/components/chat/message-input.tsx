@@ -3,8 +3,6 @@
  * 실행 중 중복 전송 방지.
  */
 
-"use client";
-
 import { useRef, useState, type KeyboardEvent } from "react";
 
 export function MessageInput({

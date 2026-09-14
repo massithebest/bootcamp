@@ -1,5 +1,3 @@
-"use client";
-
 import { DataTable, Disclosure, StatusDot, type Tone } from "../primitives";
 import { asRecords, asRows, asStrings, str, toneOf } from "./shared";
 

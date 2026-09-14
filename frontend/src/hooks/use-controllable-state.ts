@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useState } from "react";
 
 /** controlled / uncontrolled 겸용 상태. `prop`이 주어지면 그 값을 따른다. */

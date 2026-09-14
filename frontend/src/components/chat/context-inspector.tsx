@@ -3,8 +3,6 @@
  * Skills 는 `GET /api/knowledge/skills` 에서 온다. 메타·프롬프트는 아직 더미.
  */
 
-"use client";
-
 import { useEffect, useState, type ReactNode } from "react";
 
 import { API_BASE_URL } from "@/lib/chat-api";

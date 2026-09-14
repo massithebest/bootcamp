@@ -1,5 +1,3 @@
-"use client";
-
 import { asRecords, num, str } from "./shared";
 
 /** 문서 검색 결과 → 출처 문서명 · 관련도 · 스니펫 인용 형태. */

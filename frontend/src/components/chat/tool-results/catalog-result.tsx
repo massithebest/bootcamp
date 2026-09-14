@@ -9,8 +9,6 @@
  * 구조화 지식이고, 분석 한 번에 4~6회 호출되므로 요약 위주로 얕게 보여준다.
  */
 
-"use client";
-
 import { DataTable } from "../primitives";
 import { asRecords, asStrings, str } from "./shared";
 

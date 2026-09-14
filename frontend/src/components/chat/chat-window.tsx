@@ -4,8 +4,6 @@
  * 상태관리는 React 기본(useState/useRef)만 사용한다.
  */
 
-"use client";
-
 import {
   useCallback,
   useEffect,

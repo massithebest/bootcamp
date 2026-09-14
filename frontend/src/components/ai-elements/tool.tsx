@@ -1,12 +1,9 @@
-"use client";
-
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import type { DynamicToolUIPart, ToolUIPart } from "ai";
 import {
   CheckCircleIcon,
   ChevronDownIcon,
@@ -29,15 +26,36 @@ export const Tool = ({ className, ...props }: ToolProps) => (
   />
 );
 
-export type ToolPart = ToolUIPart | DynamicToolUIPart;
+/**
+ * Vercel AI SDK(`ai`)의 `ToolUIPart` / `DynamicToolUIPart` 계약 중
+ * 이 컴포넌트가 실제로 쓰는 표면(`type`, `state`)만 옮겨 온 것.
+ * 타입 3개 때문에 `ai` + `@ai-sdk/*` 트리(~12.6MB, `@ai-sdk/gateway`에
+ * `https://ai-gateway.vercel.sh` 하드코딩)를 폐쇄망 반입 대상에 넣지 않기 위함.
+ * 원본 계약이 바뀌면 이 블록만 맞추면 된다.
+ */
+type ToolUIPartType = `tool-${string}`;
+type DynamicToolUIPartType = "dynamic-tool";
+
+type ToolUIPartState =
+  | "input-streaming"
+  | "input-available"
+  | "approval-requested"
+  | "approval-responded"
+  | "output-available"
+  | "output-error"
+  | "output-denied";
+
+export type ToolPart =
+  | { type: ToolUIPartType; state: ToolUIPartState }
+  | { type: DynamicToolUIPartType; state: ToolUIPartState };
 export type ToolState = ToolPart["state"];
 
 export type ToolHeaderProps = {
   title?: string;
   className?: string;
 } & (
-  | { type: ToolUIPart["type"]; state: ToolState; toolName?: never }
-  | { type: DynamicToolUIPart["type"]; state: ToolState; toolName: string }
+  | { type: ToolUIPartType; state: ToolState; toolName?: never }
+  | { type: DynamicToolUIPartType; state: ToolState; toolName: string }
 );
 
 const statusLabels: Record<ToolState, string> = {

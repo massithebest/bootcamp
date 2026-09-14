@@ -4,8 +4,6 @@
  * 마크업은 AI Elements `ChainOfThought`, 펼침 상태는 여기서 소유한다.
  */
 
-"use client";
-
 import { useEffect, useState } from "react";
 import {
   AlertCircleIcon,

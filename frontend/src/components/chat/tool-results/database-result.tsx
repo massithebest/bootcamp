@@ -1,5 +1,3 @@
-"use client";
-
 import { DataTable, Disclosure } from "../primitives";
 import { asRows, asStrings, str } from "./shared";
 

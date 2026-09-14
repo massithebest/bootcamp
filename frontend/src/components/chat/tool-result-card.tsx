@@ -9,8 +9,6 @@
  * 도구 목록은 Backend `agent/sdk_tools.py` 의 `TOOL_NAMES` 8개와 일치해야 한다.
  */
 
-"use client";
-
 import type { ToolResult } from "@/types/chat";
 import {
   Tool,

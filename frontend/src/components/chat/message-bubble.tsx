@@ -6,8 +6,6 @@
  * 텍스트는 Markdown 뷰어로 렌더한다 (원문 노출 X).
  */
 
-"use client";
-
 import type { ChatMessage } from "@/types/chat";
 import { AgentProgress } from "./agent-progress";
 import { Markdown } from "./markdown";

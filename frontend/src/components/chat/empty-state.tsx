@@ -2,8 +2,6 @@
  * 대화 시작 전 빈 상태.  이 도구로 무엇을 물어볼 수 있는지 실제 생산계획 용어로.
  */
 
-"use client";
-
 import { EXAMPLE_QUESTIONS } from "@/lib/dummy";
 
 export function EmptyState({

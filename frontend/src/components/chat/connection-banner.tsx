@@ -3,8 +3,6 @@
  * 무엇이 실패했고 무엇을 하면 되는지 알려준다.
  */
 
-"use client";
-
 import { API_BASE_URL } from "@/lib/chat-api";
 
 export function ConnectionBanner({

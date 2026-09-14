@@ -1,5 +1,3 @@
-"use client";
-
 import { Badge } from "@/components/ui/badge";
 import { useControllableState } from "@/hooks/use-controllable-state";
 import {

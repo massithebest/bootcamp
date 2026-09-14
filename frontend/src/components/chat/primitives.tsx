@@ -3,8 +3,6 @@
  * 구분은 카드가 아니라 1px 룰과 배경 톤으로 만든다.
  */
 
-"use client";
-
 import {
   useId,
   useState,
