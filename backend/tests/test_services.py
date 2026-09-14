@@ -2,17 +2,91 @@
 
 import asyncio
 
+import pytest
+
+from scripts.seed_sample_db import main as seed_main
 from services.mock import mock_rag_service
 from services.mock import mock_simulation_service
 from services.mock import mock_sql_service
 
 
-def test_mock_sql_service_contract() -> None:
-    result = asyncio.run(mock_sql_service.generate_and_query("생산 실적"))
+@pytest.fixture()
+def seeded_db(tmp_path, monkeypatch):
+    """시드 DB 를 tmp_path 에 만들고 `SAMPLE_DB_PATH` 를 그쪽으로 돌린다."""
+
+    db_path = seed_main(tmp_path / "sample.sqlite")
+    monkeypatch.setattr("core.config.SAMPLE_DB_PATH", db_path)
+    return db_path
+
+
+def test_mock_execute_sql_returns_table_payload(seeded_db) -> None:
+    result = asyncio.run(
+        mock_sql_service.execute_sql(
+            "SELECT line_cd, line_nm FROM LINE_MASTER ORDER BY line_cd",
+            purpose="라인 목록 확인",
+        )
+    )
 
     assert result["status"] == "ok"
-    assert "generated_sql" in result
-    assert isinstance(result["rows"], list)
+    assert result["kind"] == "database"
+    assert result["purpose"] == "라인 목록 확인"
+    assert result["table"]["columns"] == ["line_cd", "line_nm"]
+    assert result["table"]["rows"][0] == ["A", "1라인"]
+    assert result["row_count"] == 4
+    assert result["truncated"] is False
+
+
+def test_mock_execute_sql_truncates_over_max_rows(seeded_db) -> None:
+    result = asyncio.run(
+        mock_sql_service.execute_sql(
+            "SELECT * FROM FGS_INBOUND_RESULT", purpose="전체 실적"
+        )
+    )
+
+    assert result["truncated"] is True
+    assert result["row_count"] == 500
+
+
+def test_mock_execute_sql_rejects_write(seeded_db) -> None:
+    result = asyncio.run(
+        mock_sql_service.execute_sql(
+            "DELETE FROM FGS_INBOUND_RESULT", purpose="지우기"
+        )
+    )
+
+    assert result["status"] == "error"
+    assert result["kind"] == "database"
+
+
+def test_mock_execute_sql_unregistered_table_hints_list_tables(seeded_db) -> None:
+    result = asyncio.run(
+        mock_sql_service.execute_sql("SELECT * FROM SECRET", purpose="시도")
+    )
+
+    assert result["status"] == "error"
+    assert "list_tables" in result["message"]
+
+
+def test_mock_execute_sql_sqlite_error_is_reported(seeded_db) -> None:
+    result = asyncio.run(
+        mock_sql_service.execute_sql(
+            "SELECT no_such_column FROM LINE_MASTER", purpose="오타"
+        )
+    )
+
+    assert result["status"] == "error"
+    assert "SQL 실행 오류" in result["message"]
+
+
+def test_mock_execute_sql_without_seed_db_tells_how_to_seed(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("core.config.SAMPLE_DB_PATH", tmp_path / "missing.sqlite")
+
+    result = asyncio.run(
+        mock_sql_service.execute_sql("SELECT * FROM LINE_MASTER", purpose="확인")
+    )
+
+    assert result["status"] == "error"
+    assert "seed_sample_db" in result["message"]
 
 
 def test_mock_rag_service_contract() -> None:

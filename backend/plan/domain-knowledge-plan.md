@@ -834,3 +834,7 @@ description: 생산계획 Agent 전용. 시뮬레이션(실적 조회, MP 조회
 - 2026-09-14 Task 1: `Join` 에 `@model_validator(mode="before")` 로 boolean `True` 키를 `on` 으로 되돌리는 처리를 추가 — YAML 1.1 이 따옴표 없는 `on:` 을 boolean 으로 읽어 부록 A 의 모든 join 정의(`{to: ..., on: ...}`)가 검증에 실패했다. 부록 YAML 을 고치는 대신 로더에서 흡수해, 이후 카탈로그 작성자가 같은 함정에 빠지지 않게 했다.
 - 2026-09-14 Task 1: 계획에 없던 `list_glossary()`·`list_scenarios()`·`reset_store()` 를 추가 — 각각 용어집 로드 검증, Task 3 시드 스크립트, 테스트의 캐시 초기화에 필요하다.
 - 2026-09-14 Task 2: 테이블 추출 정규식에 `(?<![:\w.])` 를 앞에 붙임 — 계획이 지정한 `\b(?:FROM|JOIN)\s+(\w+)` 는 `BETWEEN :from AND :to` 의 `:from` 을 FROM 절로 읽어 `AND` 를 테이블명으로 잡는다. Task 4 의 `sql_guard.check_sql` 에도 같은 보정을 적용한다 (그쪽에선 정상 쿼리가 "등록되지 않은 테이블 AND" 로 거부되는 버그가 된다).
+- 2026-09-14 Task 4·5: `services/mock/_sqlite.py` 를 추가해 연결 helper 를 분리 — Task 6 의 mock 시뮬레이션이 같은 SQLite 를 봐야 하므로(설계 §6-1) 계획이 허용한 선택지를 택했다. `SAMPLE_DB_PATH` 는 import 시점이 아니라 호출 시점에 읽어 테스트 monkeypatch 가 듣게 했다.
+- 2026-09-14 Task 5: `sql_guard.check_sql` 이 CTE 이름(`WITH x AS (...)`)을 허용 테이블에 더하도록 함 — 계획은 CTE 를 언급하지 않았으나 `WITH … SELECT` 를 허용한 이상 CTE 참조가 "등록되지 않은 테이블"로 거부되면 안 된다.
+- 2026-09-14 Task 8 을 Task 5 직후로 앞당겨 실행 — `fake_runner` 가 삭제된 `query_database` 를 import 해 pytest 수집 자체가 실패했다. 실행 규칙 7("Task 마다 pytest 전부 통과")을 지키려면 순서를 바꿔야 했다. Task 6·7 은 Task 8 에 의존하지 않는다.
+

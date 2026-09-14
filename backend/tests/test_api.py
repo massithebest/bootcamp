@@ -48,7 +48,15 @@ def test_chat_endpoint_streams_agent_events(monkeypatch) -> None:
     assert {"text", "status", "tool_call", "tool_result"} <= set(types)
 
     tool_calls = [e["tool_name"] for e in events if e["type"] == "tool_call"]
-    assert "query_database" in tool_calls
+    assert tool_calls == ["get_kpi", "execute_sql", "run_simulation"]
+
+    # 프론트가 catalog / database 두 kind 를 모두 받아본다.
+    kinds = [
+        e["data"].get("kind")
+        for e in events
+        if e["type"] == "tool_result" and isinstance(e.get("data"), dict)
+    ]
+    assert kinds[:2] == ["catalog", "database"]
 
 
 def test_chat_endpoint_reports_error_gracefully(monkeypatch) -> None:

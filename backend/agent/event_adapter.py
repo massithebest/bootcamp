@@ -31,7 +31,7 @@ def _is_business_tool(name: str | None) -> bool:
 
 
 def _short_tool_name(name: str | None) -> str | None:
-    """`mcp__planning__query_database` -> `query_database`.
+    """`mcp__planning__execute_sql` -> `execute_sql`.
 
     Frontend 는 SDK 내부 MCP 네이밍 규칙을 알 필요가 없다.
     """
