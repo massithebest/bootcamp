@@ -42,6 +42,7 @@ backend/plan/domain-knowledge-plan.md 를 읽고 Task 0부터 순서대로 진�
 **파일**: `scripts/spike_skill_tool.py` (확인 후 삭제)
 
 **스펙**:
+
 - `_build_options`와 같은 옵션에 `allowed_tools=TOOL_NAMES + ["Skill"]`로 `query(prompt="사용 가능한 skill 이름만 나열해", options=...)`를 실행한다.
 - 첫 `SystemMessage`(subtype `init`)의 `data["tools"]`에 `Skill`이 있는지, 응답 텍스트에 `sql-analysis`가 언급되는지 출력한다.
 - 없으면 `system_prompt={"type": "preset", "preset": "claude_code", "append": SYSTEM_PROMPT}`로 바꿔 한 번 더 실행한다.
@@ -105,6 +106,7 @@ class GlossaryEntry(KnowledgeMeta):
 ```
 
 `KnowledgeStore`:
+
 - `KnowledgeStore.load(root: Path) -> KnowledgeStore` — `catalog/tables/*.yaml`, `kpi/*.yaml`, `simulations/*.yaml`, `glossary.yaml`(list) 을 읽어 검증. 잘못된 파일은 파일명을 포함한 `ValueError`.
 - `list_tables(keyword: str | None = None, tag: str | None = None) -> list[dict]` — `{table, description, grain, tags, verified}`. keyword는 table·description·tags·column name에 대소문자 무시 부분일치.
 - `describe_table(table: str) -> dict` — 모델 전체 + `verified`. 없으면 `{"status": "error", "message": "알 수 없는 테이블입니다: X. list_tables 로 확인하세요."}`.
@@ -132,6 +134,7 @@ pytest tests/test_knowledge.py -v
 **스펙**: 부록 A, B, C의 내용을 그대로 파일로 만든다. 전부 `status: draft`, `source: "설계 문서 자리표시자. 현업 확인 필요"`.
 
 정합성 테스트(`tests/test_knowledge_integrity.py`, 실제 `knowledge/` 디렉터리 대상):
+
 - 모든 YAML이 로드된다.
 - 모든 `Column.ref`가 `TABLE.column` 형태이고 대상이 존재한다.
 - 모든 `Join.to`가 존재하는 테이블이다.
@@ -167,6 +170,7 @@ class Scenario(BaseModel):
 ```
 
 `seed_sample_db.py`:
+
 1. `KnowledgeStore.load()`로 테이블 정의를 읽고, `Column.type`을 SQLite 타입으로 매핑(`date→TEXT(ISO)`, `varchar→TEXT`, `number→REAL`, `int→INTEGER`)해 `CREATE TABLE`.
 2. `random.seed(20260914)`, 기간 `2026-06-01`~`2026-09-30`.
 3. 마스터: 라인 `A,B,C,D` (line_nm "1라인".."4라인"), 품목 `P-1001`~`P-1008` (product_nm "품목1".."품목8", 기준 일일 계획량 200~600 사이 고정값).
@@ -179,6 +183,7 @@ class Scenario(BaseModel):
 10. `if __name__ == "__main__": main()`; `main(db_path: Path | None = None)`을 테스트에서 호출 가능하게.
 
 `tests/test_scenarios.py`:
+
 - `tmp_path`에 시드 후, 각 시나리오에 대해 KPI `sql_template`의 `:from`/`:to`를 시나리오 기간으로 치환해 실행 → 해당 `line_cd`의 `SUM(actual)/SUM(plan) < 0.9`.
 - 시나리오 기간 밖(예: 2026-07 전체) 같은 라인 달성률 `≥ 0.9`.
 - `MATERIAL_SHORTAGE`에 시나리오 기간 행이 존재하고, `MP_VERSION.changed`가 전부 0.
@@ -258,6 +263,7 @@ async def get_kpi(kpi_id: str) -> dict                     # catalog_type "kpi"
 ```
 
 `agent/sdk_tools.py`:
+
 - `@tool` 4개 추가. 입력 스키마: `list_tables {"keyword": str, "tag": str}`, `describe_table {"table": str}`, `list_kpis {"keyword": str}`, `get_kpi {"kpi_id": str}`. 선택 인자는 `args.get(...)`.
 - `query_database` @tool 삭제, `execute_sql` @tool 추가: 스키마 `{"sql": str, "purpose": str}`, 설명 "카탈로그에 등록된 테이블을 SELECT 로 조회한다. 테이블·컬럼은 describe_table 로 먼저 확인한다. purpose 에는 이 쿼리로 확인하려는 것을 한 줄로 쓴다."
 - `TOOL_NAMES` 순서: `execute_sql, search_knowledge, list_simulation, run_simulation, list_tables, describe_table, list_kpis, get_kpi`.
@@ -279,6 +285,7 @@ python -c "from agent.sdk_tools import TOOL_NAMES; print(len(TOOL_NAMES))"   # 8
 **파일**: `knowledge/simulations/{실적_조회,MP_최신조회,MP_확정조회,SWAP_결과조회}.yaml`, `services/simulation_registry.py`, `services/mock/mock_simulation_service.py`, `tests/test_services.py`, `CLAUDE.md`(아키텍처 절의 `SIMULATION_TYPES`/`PARAM_SCHEMA` 문장을 "`knowledge/simulations/*.yaml`에 정의, `simulation_registry.py`가 로드"로 수정)
 
 **스펙**:
+
 - 부록 D의 YAML 4개 생성.
 - `simulation_registry.py`: `SIMULATION_TYPES`·`PARAM_SCHEMA` dict 삭제. `list_simulation_types()`는 `get_store().list_simulations()`를 반환하되 각 항목이 `{type, name, aliases, when_to_use, params: {name: {required, description, example}}, output_schema, follows, verified}`. `validate_simulation_request(simulation_type, params)`는 시그니처·반환 메시지 그대로 유지하고 `params[name].required`로 검사.
 - `mock_simulation_service.py`:
@@ -303,6 +310,7 @@ Task 2의 integrity 테스트가 이제 `Diagnostic.ref → 시뮬레이션 type
 **파일**: `agent/system_prompt.py`, `agent/agent.py`, `agent/agent_sdk/CLAUDE.md`, `agent/agent_sdk/.claude/skills/{sql-analysis,simulation,kpi-shortfall-analysis}/SKILL.md`, `agent/agent_sdk/.claude/skills/production-planning/` 삭제, `tests/test_prompt_consistency.py`
 
 **스펙**:
+
 - `system_prompt.py`: 부록 E. 30줄 이내, 도구 이름을 나열하지 않는다.
 - `agent.py`: `allowed_tools=TOOL_NAMES + ["Skill"]`. Task 0 결과가 "preset+append"면 `system_prompt={"type": "preset", "preset": "claude_code", "append": SYSTEM_PROMPT}`.
 - `CLAUDE.md`: 부록 F.
@@ -310,6 +318,7 @@ Task 2의 integrity 테스트가 이제 `Diagnostic.ref → 시뮬레이션 type
 - `production-planning/` 디렉터리 삭제.
 
 `tests/test_prompt_consistency.py`:
+
 - `SYSTEM_PROMPT.strip().count("\n") < 30`, 그리고 `TOOL_NAMES`의 어떤 짧은 이름(`execute_sql` 등)도 SYSTEM_PROMPT에 없다.
 - CLAUDE.md 도구 표의 백틱 이름 집합 == `TOOL_NAMES`의 짧은 이름 집합.
 - 각 SKILL.md에 `get_store().table_names()`의 테이블명이 등장하지 않는다 (절차만, 스키마 복사 금지).
@@ -344,6 +353,7 @@ PLANNING_AGENT_FAKE=1 uvicorn main:app --port 8000 &  # 프론트에서 확인 �
 **파일**: `tests/test_e2e_scenario.py`, `pytest.ini`(`markers = e2e`)
 
 **스펙**:
+
 - `@pytest.mark.e2e`. `ANTHROPIC_API_KEY`도 `OPENROUTER_API_KEY`도 없으면 `pytest.skip`.
 - 시드 후 `run_agent("FGS 입고 실적이 부진한 원인을 찾아줘. 기간은 2026년 9월.")`를 실행해 이벤트를 모은다.
 - 단언: (a) `tool_call` 이름 순서에 `get_kpi`가 `execute_sql`보다 먼저 나온다. (b) `execute_sql`이 2회 이상. (c) 마지막 `text`들을 이어붙인 문자열에 시나리오 `expected_diagnosis`("자재 부족")가 포함된다. (d) `error` 이벤트 없음.
@@ -362,6 +372,7 @@ python -m scripts.seed_sample_db && pytest -m e2e -s tests/test_e2e_scenario.py
 **파일**: `api/routes_knowledge.py`, `main.py`, `tests/test_api.py`
 
 **스펙**:
+
 - `GET /api/knowledge/skills` → `[{name, description, status}]`. `agent/agent_sdk/.claude/skills/*/SKILL.md` frontmatter 파싱. `status`는 `"active"`.
 - `GET /api/knowledge/catalog` → `get_store().list_tables()`.
 - `GET /api/knowledge/kpis` → `get_store().list_kpis()`.
@@ -385,6 +396,25 @@ pytest -v                      # e2e 제외 전부 통과
 pytest -m e2e -s               # 키가 있을 때
 git status                     # data/ 가 보이지 않음
 ```
+
+## Phase 1 이후 확장: 재사용 CTE("레시피") 지식 종류 (2026-09-14)
+
+Phase 1 완료 후 별도 요청으로 추가한 지식 종류. 자세한 설계 배경과 결정 사항은
+`/home/bsy/.claude/plans/with-serialized-truffle.md` 참고(세션 로컬 계획 파일).
+
+- `knowledge/recipes/*.yaml` — `KnowledgeRecipe`(재사용 가능 CTE) 신규 지식 종류.
+  `docs/domain-knowledge.md`가 `recipes/<slug>.md`로 설계했으나 미구현 상태였던
+  것을 순수 YAML로 구현해 대체했다 (다른 지식 종류와 동일한 저장 패턴 유지).
+- 실행 연결은 자동 치환이 아니라 **에이전트가 `cte_sql`을 읽어 직접 `WITH` 절로
+  조합**하는 방식 — `sql_guard.py`는 변경하지 않았다(이미 즉석 CTE를 허용).
+- `TOOL_NAMES` 8개 → 10개 (`list_recipes`, `get_recipe` 추가).
+- 시드 예시 `plan_vs_actual` 1개 — `fgs_inbound` KPI의 조인 로직을 추출.
+- 부수 수정: `test_diagnostics_refs_resolve`가 `.md` 확장자·파일시스템 직접
+  탐색을 가정하던 버그를 `store.recipes` 조회로 수정. `test_kpi_sql_template_
+  tables_are_declared_sources`와 신규 레시피 테스트가 테이블 추출 정규식을
+  `_referenced_tables()` 헬퍼로 공유하도록 정리.
+- 검증: `pytest -q` 109 passed (5 e2e deselected). 실제 시드 SQLite에서
+  `cte_sql`과 샘플 쿼리 2개 모두 수동 실행 확인(B라인 자재 결품 구간 정상 검출).
 
 ---
 
@@ -841,4 +871,3 @@ description: 생산계획 Agent 전용. 시뮬레이션(실적 조회, MP 조회
 - 2026-09-14 Task 9: E2E 단언에 라인·품목 특정과 기각 가설(MP) 언급 확인을 추가하고, 원인 문구는 결품/부족 둘 다 허용 — 한 문구 완전일치로 묶으면 지식이 아니라 표현을 맞추는 테스트가 된다.
 - 2026-09-14 Task 9: `pytest.ini` 에 `addopts = -m "not e2e"` 를 넣어 기본 실행에서 e2e 를 제외 — 계획은 marker 등록만 지시했으나, 그것만으로는 `pytest` 가 매번 실제 LLM 을 호출해 비용이 든다.
 - 2026-09-14 Task 10: 검증용 uvicorn 을 8123 포트로 띄움 — 8000·8010 을 이미 다른 프로세스가 점유 중이었다. 기본 포트 설정은 바꾸지 않았다.
-
