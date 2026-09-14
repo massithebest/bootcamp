@@ -1,0 +1,21 @@
+table: PRODUCTION_PLAN
+description: 일별 라인·품목 생산 계획 수량 (확정 MP 기준)
+grain: [work_date, line_cd, product_id]
+time_column: work_date
+tags: [계획, MP]
+columns:
+  - {name: work_date, type: date, desc: 작업일 (YYYY-MM-DD)}
+  - {name: line_cd, type: varchar, desc: 라인 코드, ref: LINE_MASTER.line_cd}
+  - {name: product_id, type: varchar, desc: 품목 ID, ref: PRODUCT_MASTER.product_id}
+  - {name: plan_qty, type: int, desc: 계획 수량}
+  - {name: mp_version, type: varchar, desc: 계획을 낸 MP 버전, ref: MP_VERSION.version}
+joins:
+  - {to: FGS_INBOUND_RESULT, on: [work_date, line_cd, product_id], kind: one-to-one, note: 계획 대비 실적 비교}
+  - {to: LINE_MASTER, on: line_cd, kind: many-to-one}
+caveats:
+  - 주말은 계획이 없다
+sample_sql: SELECT work_date, line_cd, SUM(plan_qty) FROM PRODUCTION_PLAN GROUP BY 1,2
+status: draft
+owner: ""
+updated: 2026-09-14
+source: "설계 문서 자리표시자. 현업 확인 필요"

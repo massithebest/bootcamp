@@ -1,0 +1,103 @@
+"""실제 `knowledge/` 디렉터리의 정합성 검사. (설계 §6 "정합성 검사")
+
+지식은 개발 중 계속 늘어난다. 여기서 막는 것은 서로를 가리키는 참조가
+끊기는 경우 — 카탈로그에 없는 테이블을 KPI 가 원천으로 적거나,
+diagnostics 가 존재하지 않는 시뮬레이션을 가리키는 상황이다.
+"""
+
+import re
+
+import pytest
+
+from core.config import KNOWLEDGE_DIR
+from services.knowledge_service import KnowledgeStore
+
+
+@pytest.fixture(scope="module")
+def store() -> KnowledgeStore:
+    return KnowledgeStore.load(KNOWLEDGE_DIR)
+
+
+def _table_columns(store: KnowledgeStore, table: str) -> set[str]:
+    return {column.name for column in store.tables[table].columns}
+
+
+def test_all_yaml_loads(store: KnowledgeStore) -> None:
+    assert store.tables, "카탈로그 테이블이 하나도 로드되지 않았다"
+    assert store.kpis, "KPI 가 하나도 로드되지 않았다"
+
+
+def test_column_refs_point_to_existing_table_column(store: KnowledgeStore) -> None:
+    for table in store.tables.values():
+        for column in table.columns:
+            if column.ref is None:
+                continue
+            assert re.fullmatch(r"\w+\.\w+", column.ref), (
+                f"{table.table}.{column.name}.ref 는 TABLE.column 형태여야 한다: {column.ref}"
+            )
+            target_table, target_column = column.ref.split(".")
+            assert target_table in store.tables, (
+                f"{table.table}.{column.name} 이 없는 테이블을 참조: {target_table}"
+            )
+            assert target_column in _table_columns(store, target_table), (
+                f"{table.table}.{column.name} 이 없는 컬럼을 참조: {column.ref}"
+            )
+
+
+def test_joins_point_to_existing_tables(store: KnowledgeStore) -> None:
+    for table in store.tables.values():
+        for join in table.joins:
+            assert join.to in store.tables, f"{table.table} 의 join 대상이 없다: {join.to}"
+
+
+def test_kpi_sources_exist(store: KnowledgeStore) -> None:
+    for kpi in store.kpis.values():
+        for source in kpi.sources:
+            assert source in store.tables, f"KPI {kpi.kpi_id} 의 원천 테이블이 없다: {source}"
+
+
+def test_kpi_sql_template_tables_are_declared_sources(store: KnowledgeStore) -> None:
+    for kpi in store.kpis.values():
+        used = {
+            name.upper()
+            # (?<![:\w.]) : `BETWEEN :from AND :to` 의 `:from` 을 FROM 절로 오인하지 않게 한다.
+            for name in re.findall(
+                r"(?<![:\w.])\b(?:FROM|JOIN)\s+([A-Za-z_][A-Za-z0-9_]*)",
+                kpi.sql_template,
+                re.I,
+            )
+        }
+        declared = {source.upper() for source in kpi.sources}
+        assert used <= declared, (
+            f"KPI {kpi.kpi_id} 의 sql_template 이 sources 에 없는 테이블을 쓴다: {used - declared}"
+        )
+
+
+def test_diagnostics_refs_resolve(store: KnowledgeStore) -> None:
+    recipes_dir = KNOWLEDGE_DIR / "recipes"
+
+    for kpi in store.kpis.values():
+        for diagnostic in kpi.diagnostics:
+            ref = diagnostic.ref
+            if diagnostic.how == "simulation":
+                if not store.simulations:
+                    pytest.skip("simulations/ 가 비어 있다 (Task 6 이전)")
+                assert ref in store.simulations, (
+                    f"KPI {kpi.kpi_id} diagnostics 가 없는 시뮬레이션을 가리킨다: {ref}"
+                )
+            else:
+                is_table = ref in store.tables
+                is_recipe = ref.startswith("recipes/") and (
+                    recipes_dir / f"{ref.removeprefix('recipes/')}.md"
+                ).exists()
+                assert is_table or is_recipe, (
+                    f"KPI {kpi.kpi_id} diagnostics 가 테이블도 레시피도 아닌 것을 가리킨다: {ref}"
+                )
+
+
+def test_glossary_links_resolve(store: KnowledgeStore) -> None:
+    for entry in store.glossary:
+        for table in entry.related_tables:
+            assert table in store.tables, f"용어 {entry.term} 이 없는 테이블을 참조: {table}"
+        for kpi_id in entry.related_kpis:
+            assert kpi_id in store.kpis, f"용어 {entry.term} 이 없는 KPI 를 참조: {kpi_id}"

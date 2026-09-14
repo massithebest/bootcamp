@@ -1,0 +1,15 @@
+table: LINE_MASTER
+description: 생산 라인 마스터
+grain: [line_cd]
+tags: [마스터, 라인]
+columns:
+  - {name: line_cd, type: varchar, desc: 라인 코드 (A~D)}
+  - {name: line_nm, type: varchar, desc: 라인명}
+  - {name: plant_cd, type: varchar, desc: 공장 코드}
+joins: []
+caveats: []
+sample_sql: SELECT line_cd, line_nm FROM LINE_MASTER
+status: draft
+owner: ""
+updated: 2026-09-14
+source: "설계 문서 자리표시자. 현업 확인 필요"

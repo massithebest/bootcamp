@@ -1,0 +1,11 @@
+- name: 계획 대비 실적
+  from: PRODUCTION_PLAN
+  to: FGS_INBOUND_RESULT
+  on: [work_date, line_cd, product_id]
+  note: 실적은 status_cd <> 'X' 로 필터
+- name: 실적에 결품 붙이기
+  from: FGS_INBOUND_RESULT
+  to: MATERIAL_SHORTAGE
+  on: [work_date, product_id]
+  kind: left
+  note: 결품 행이 없는 날은 NULL

@@ -1,0 +1,18 @@
+table: MP_VERSION
+description: 월별 확정 MP(Master Plan) 버전과 변경 여부
+grain: [plan_month]
+time_column: plan_month
+tags: [MP, 계획, 버전]
+columns:
+  - {name: plan_month, type: varchar, desc: 계획월 (yyyyMM)}
+  - {name: version, type: varchar, desc: 확정 MP 버전}
+  - {name: fixed_at, type: date, desc: 확정일}
+  - {name: changed, type: int, desc: "확정 후 변경 여부 (0: 없음, 1: 있음)"}
+joins: []
+caveats:
+  - changed = 1 이면 PRODUCTION_PLAN 과 실제 운영 계획이 다를 수 있다
+sample_sql: SELECT plan_month, version, changed FROM MP_VERSION
+status: draft
+owner: ""
+updated: 2026-09-14
+source: "설계 문서 자리표시자. 현업 확인 필요"

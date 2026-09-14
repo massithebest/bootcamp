@@ -1,0 +1,28 @@
+kpi_id: fgs_inbound
+name: FGS 입고 실적
+aliases: [입고 실적, FGS 입고량, 완제품 입고, 입고 달성률]
+definition: 기간 내 FGS 창고에 입고 완료된 수량. 계획 수량 대비 달성률로 부진 여부를 판단한다.
+formula: SUM(inbound_qty) WHERE status_cd <> 'X'
+sources: [FGS_INBOUND_RESULT, PRODUCTION_PLAN]
+grain: [work_date, line_cd, product_id]
+baseline: PRODUCTION_PLAN.plan_qty
+shortfall_rule: 달성률(actual/plan) < 0.9 이면 부진. 3 영업일 연속이면 구조적 부진으로 본다.
+sql_template: |
+  SELECT r.work_date, r.line_cd,
+         SUM(r.inbound_qty) AS actual, SUM(p.plan_qty) AS plan,
+         ROUND(1.0 * SUM(r.inbound_qty) / NULLIF(SUM(p.plan_qty), 0), 3) AS rate
+  FROM FGS_INBOUND_RESULT r
+  JOIN PRODUCTION_PLAN p
+    ON p.work_date = r.work_date AND p.line_cd = r.line_cd AND p.product_id = r.product_id
+  WHERE r.status_cd <> 'X' AND r.work_date BETWEEN :from AND :to
+  GROUP BY r.work_date, r.line_cd
+  ORDER BY r.work_date, r.line_cd
+diagnostics:
+  - {hypothesis: 확정 MP 가 변경돼 계획 자체가 달라짐, how: simulation, ref: MP_확정조회}
+  - {hypothesis: 특정 라인·품목에 부진이 집중됨, how: sql, ref: FGS_INBOUND_RESULT}
+  - {hypothesis: 자재 결품으로 생산이 막힘, how: sql, ref: MATERIAL_SHORTAGE}
+  - {hypothesis: 생산 실적 자체가 부족함, how: simulation, ref: 실적_조회}
+status: draft
+owner: ""
+updated: 2026-09-14
+source: "설계 문서 자리표시자. 현업 확인 필요"

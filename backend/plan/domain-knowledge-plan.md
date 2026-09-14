@@ -833,3 +833,4 @@ description: 생산계획 Agent 전용. 시뮬레이션(실적 조회, MP 조회
 - 2026-09-14 Task 0: 에이전트가 개발자의 user-level skill(`dataviz`, `code-review` 등)까지 나열했다 — 설계 §6 "알려진 부작용" 의 반대 방향. Skill description 첫 구절 `생산계획 Agent 전용.` (Task 7) 이 이 혼선도 줄이는 역할을 한다.
 - 2026-09-14 Task 1: `Join` 에 `@model_validator(mode="before")` 로 boolean `True` 키를 `on` 으로 되돌리는 처리를 추가 — YAML 1.1 이 따옴표 없는 `on:` 을 boolean 으로 읽어 부록 A 의 모든 join 정의(`{to: ..., on: ...}`)가 검증에 실패했다. 부록 YAML 을 고치는 대신 로더에서 흡수해, 이후 카탈로그 작성자가 같은 함정에 빠지지 않게 했다.
 - 2026-09-14 Task 1: 계획에 없던 `list_glossary()`·`list_scenarios()`·`reset_store()` 를 추가 — 각각 용어집 로드 검증, Task 3 시드 스크립트, 테스트의 캐시 초기화에 필요하다.
+- 2026-09-14 Task 2: 테이블 추출 정규식에 `(?<![:\w.])` 를 앞에 붙임 — 계획이 지정한 `\b(?:FROM|JOIN)\s+(\w+)` 는 `BETWEEN :from AND :to` 의 `:from` 을 FROM 절로 읽어 `AND` 를 테이블명으로 잡는다. Task 4 의 `sql_guard.check_sql` 에도 같은 보정을 적용한다 (그쪽에선 정상 쿼리가 "등록되지 않은 테이블 AND" 로 거부되는 버그가 된다).
