@@ -11,6 +11,12 @@ import {
   useState,
 } from "react";
 
+import {
+  AssistantRuntimeProvider,
+  useExternalStoreRuntime,
+  type AppendMessage,
+} from "@assistant-ui/react";
+
 import type {
   AgentEvent,
   ChatMessage,
@@ -19,6 +25,7 @@ import type {
   ToolResult,
 } from "@/types/chat";
 import { createConversationId, sendChatMessage } from "@/lib/chat-api";
+import { convertMessage } from "@/lib/chat-runtime";
 import { SEED_CONVERSATION, SESSIONS } from "@/lib/dummy";
 import { AppSidebar } from "./app-sidebar";
 import { ContextInspector } from "./context-inspector";
@@ -249,11 +256,35 @@ export function ChatWindow() {
     [handleStop],
   );
 
+  /* ---- assistant-ui 런타임 (1단계: 병행 상태, 렌더링은 아직 MessageBubble) ---- */
+
+  const handleNew = useCallback(
+    async (message: AppendMessage) => {
+      const text = appendMessageText(message);
+      if (text) await runTurn(text);
+    },
+    [runTurn],
+  );
+
+  const handleCancel = useCallback(async () => {
+    handleStop();
+  }, [handleStop]);
+
+  const runtime = useExternalStoreRuntime<ChatMessage>({
+    messages,
+    isRunning: streaming,
+    convertMessage,
+    setMessages: (next) => setMessages(next as ChatMessage[]),
+    onNew: handleNew,
+    onCancel: handleCancel,
+  });
+
   const activeSession =
     SESSIONS.find((s) => s.id === activeSessionId) ?? null;
   const isEmpty = messages.length === 0;
 
   return (
+    <AssistantRuntimeProvider runtime={runtime}>
     <div className="grid h-screen w-full grid-cols-[auto_1fr_auto] overflow-hidden bg-canvas text-ink">
       {/* 좌측 사이드바 */}
       <aside
@@ -349,7 +380,17 @@ export function ChatWindow() {
         </div>
       </aside>
     </div>
+    </AssistantRuntimeProvider>
   );
+}
+
+/** `AppendMessage` 의 content 에서 사용자 입력 텍스트만 꺼낸다. */
+function appendMessageText(message: AppendMessage): string {
+  return message.content
+    .filter((part): part is { type: "text"; text: string } => part.type === "text")
+    .map((part) => part.text)
+    .join("")
+    .trim();
 }
 
 function IconButton({
