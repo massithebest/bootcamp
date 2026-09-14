@@ -8,7 +8,6 @@ import type {
   CurrentUser,
   Session,
   SessionMetadata,
-  Skill,
   SystemPromptState,
 } from "@/types/workspace";
 
@@ -66,44 +65,6 @@ export const SESSIONS: Session[] = [
     lastActivity: "1개월 전",
     group: "earlier",
     traces: ["document", "simulation"],
-  },
-];
-
-export const SKILLS: Skill[] = [
-  {
-    toolName: "query_database",
-    label: "생산 실적 조회",
-    description: "MES · ERP 생산 실적, 가동률, 재고, 소요량을 조회",
-    enabled: true,
-    lastCalledAt: "오늘 14:21",
-  },
-  {
-    toolName: "search_knowledge",
-    label: "공정 문서 검색",
-    description: "공정 표준서, 작업 지시, 품질 기준 문서 검색",
-    enabled: true,
-    lastCalledAt: "어제 17:40",
-  },
-  {
-    toolName: "simulate_line_capacity",
-    label: "라인 생산량 시뮬레이션",
-    description: "공정별 처리량 · 가동 시간 기준 최대 생산 가능 수량 산출",
-    enabled: true,
-    lastCalledAt: "오늘 14:22",
-  },
-  {
-    toolName: "simulate_material_constraint",
-    label: "자재 제약 시뮬레이션",
-    description: "자재 재고 · 입고 예정 기준 생산 가능 수량과 부족분 산출",
-    enabled: true,
-    lastCalledAt: "3일 전",
-  },
-  {
-    toolName: "simulate_line_comparison",
-    label: "라인 비교 시뮬레이션",
-    description: "복수 라인 · 시나리오의 달성률과 리드타임 비교",
-    enabled: false,
-    lastCalledAt: "1주 전",
   },
 ];
 

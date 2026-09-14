@@ -57,7 +57,7 @@ async def run_fake_agent(
     yield AgentEvent(type="tool_result", tool_name="execute_sql", data=sql_result)
     yield AgentEvent(
         type="status",
-        data={"step": "execute_sql", "status": "completed", "label": purpose},
+        data={"step": "execute_sql", "status": "completed", "label": "계획 대비 달성률 조회"},
     )
 
     # 3) 첫 번째 가설: 확정 MP 가 바뀌었는가
@@ -66,7 +66,12 @@ async def run_fake_agent(
     yield AgentEvent(type="tool_result", tool_name="run_simulation", data=sim_result)
     yield AgentEvent(
         type="status",
-        data={"step": "simulation", "status": "completed", "label": "확정 MP 변경 확인"},
+        data={"step": "run_simulation", "status": "completed", "label": "확정 MP 변경 확인"},
+    )
+
+    yield AgentEvent(
+        type="status",
+        data={"step": "plan", "status": "completed", "label": "질의 분석"},
     )
 
     # 4) 사용자 답변 스트리밍

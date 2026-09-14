@@ -139,9 +139,14 @@ export function ChatWindow() {
             data: event.data ?? null,
             content: event.content ?? null,
           };
+          // `execute_sql` 의 purpose 는 결과에 실려 온다. 진행 표시의 해당 단계에 붙인다.
+          const purpose = asString(result.data?.purpose);
           updateAssistant(assistantId, (m) => ({
             ...m,
             parts: [...m.parts, { kind: "tool", id: result.id, result }],
+            statuses: purpose
+              ? annotateStatus(m.statuses, result.toolName, purpose)
+              : m.statuses,
           }));
           return;
         }
@@ -408,6 +413,19 @@ function readStatusStep(
     asString(data.label) ?? asString(data.title) ?? event.content ?? step;
   const status = normalizeStatus(asString(data.status)) ?? defaultStatus;
   return { step, label, status };
+}
+
+/** 이미 만들어진 진행 단계에 부가 설명을 붙인다. 해당 step 이 없으면 그대로 둔다. */
+function annotateStatus(
+  statuses: StatusStep[],
+  step: string,
+  detail: string,
+): StatusStep[] {
+  const idx = statuses.findIndex((s) => s.step === step);
+  if (idx === -1) return statuses;
+  const next = statuses.slice();
+  next[idx] = { ...next[idx], detail };
+  return next;
 }
 
 function upsertStatus(statuses: StatusStep[], incoming: StatusStep) {

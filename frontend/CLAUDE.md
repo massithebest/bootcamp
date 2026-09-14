@@ -44,15 +44,16 @@ src/
 │   │   ├── agent-progress.tsx    진행 단계 블록 (ChainOfThought 기반, 펼침 상태는 여기서 소유)
 │   │   ├── app-sidebar.tsx       세션 목록 사이드바 (커스텀 구현 — shadcn sidebar 아님, 아래 참고)
 │   │   ├── chat-window.tsx       전체 Chat 상태 · Streaming · AgentEvent 처리, 3-pane 셸
-│   │   ├── context-inspector.tsx Skills / Metadata / Prompt 탭
+│   │   ├── context-inspector.tsx Skills(실 API) / Metadata / Prompt 탭
 │   │   ├── message-bubble.tsx    메시지 표현 (parts 배열 렌더링)
 │   │   ├── message-input.tsx     입력창
 │   │   ├── markdown.tsx          자체 구현 마크다운 뷰어 (외부 라이브러리 미사용)
 │   │   ├── tool-result-card.tsx  Tool 결과 — AI Elements `Tool` 래퍼 안에서 tool_name 별 분기
-│   │   └── tool-results/         DB/지식/시뮬레이션 결과 전용 컴포넌트
+│   │   └── tool-results/         DB/지식(RAG)/카탈로그/시뮬레이션 결과 전용 컴포넌트
 │   └── ui/                       shadcn/ui 컴포넌트 (자동 생성, 직접 로직 추가 지양)
 ├── lib/
 │   ├── chat-api.ts                POST /api/chat · SSE 파싱 · AbortController — 백엔드 통신 유일 창구
+│   ├── knowledge-api.ts           GET /api/knowledge/* (Skills 목록 등) 읽기 전용 조회
 │   ├── dummy.ts                   사이드바/인스펙터/시드 대화용 하드코딩 더미 데이터 (실제 제조 용어, lorem 금지)
 │   └── utils.ts                   shadcn 표준 `cn()` 헬퍼
 └── types/chat.ts                 Backend `api/schemas.py` AgentEvent 와 동일 Contract
@@ -61,6 +62,7 @@ src/
 ## 중요한 구현 디테일
 
 - **메시지 구조**: 어시스턴트 메시지는 `parts: MessagePart[]` (text/tool, 도착 순서)를 쓴다. 단일 `content` 문자열이 아니다 — 도구 호출 전 내레이션과 최종 답변이 하나로 뭉개지지 않게 하기 위함. `content`는 사용자 메시지 전용.
+- **tool_result `kind`**: `database`(표) / `knowledge`(RAG 인용) / `catalog`(카탈로그·KPI, **기본 접힘**) / `simulation`. `catalog` 는 분석 한 번에 4~6회 오므로 헤더 한 줄로만 보여준다. `execute_sql` 결과는 컬럼·행이 `data.table.{columns,rows}` 아래에 온다.
 - **AgentEvent 계약**: `text` / `status` / `tool_call` / `tool_result` / `error` / `done`. `status` 이벤트의 data는 `{ step, label?, status }` 형태를 가정하며 같은 `step`은 갱신된다. 이 계약을 바꾸려면 `backend/agent/event_adapter.py`와 함께 맞춰야 한다.
 - **flexbox 스크롤**: `chat-window.tsx`에서 중앙 `<section>`은 `min-h-0 overflow-hidden`, 스크롤 div는 `min-h-0`, 입력창 wrapper는 `shrink-0`이 반드시 필요하다. 하나라도 빠지면 긴 스트리밍 응답이 입력창을 화면 밖으로 밀어낸다.
 - **shadcn `sidebar.tsx`는 아직 미사용**: `components/ui/sidebar.tsx`(+ `sheet.tsx`, `use-mobile.ts`)가 설치는 되어 있지만, 실제 3-pane 레이아웃은 커스텀 `app-sidebar.tsx`를 쓴다. 두 사이드바 구현을 통합/교체하기 전에 `--sidebar-*` 변수와 `SidebarProvider` 구조가 기존 커스텀 구현과 충돌하지 않는지 확인할 것 ([docs/decisions.md#열린-이슈](docs/decisions.md#열린-이슈)).

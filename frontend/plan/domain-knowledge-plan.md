@@ -1,6 +1,6 @@
 # 도메인 지식 연동 계획 (프론트엔드)
 
-**상태: 대기. 백엔드 Phase 1 완료 전 착수하지 않는다.** 설계는 [docs/domain-knowledge.md](../../docs/domain-knowledge.md) §7, 백엔드 실행 계획은 [backend/plan/domain-knowledge-plan.md](../../backend/plan/domain-knowledge-plan.md).
+**상태: 완료 (2026-09-14).** 백엔드 Phase 1 완료 후 작업 1~4 전부 실행. 설계는 [docs/domain-knowledge.md](../../docs/domain-knowledge.md) §7, 백엔드 실행 계획은 [backend/plan/domain-knowledge-plan.md](../../backend/plan/domain-knowledge-plan.md).
 
 ## 왜 기다리나
 
@@ -77,3 +77,17 @@ cd frontend && npm run lint && npm run build
 ## 이후
 
 백엔드 Phase 2에서 시나리오가 늘어나도 프론트 계약은 바뀌지 않는다. `catalog`·`kpis` 엔드포인트를 쓰는 지식 브라우저 UI는 필요가 확인되면 별도 문서로 결정한다.
+
+## 실행 기록 (2026-09-14)
+
+- 작업 1~4 완료. `npm run lint` · `npm run build` 통과, 폭 400px 가로 넘침 0px, 콘솔 에러 없음.
+- **계획에 없던 수정 — `database-result.tsx` payload 형태**: 백엔드 `execute_sql` 은 컬럼·행을
+  `data.table.{columns,rows}` 에 담는데 기존 컴포넌트는 최상위 `data.columns`/`data.rows` 를
+  읽고 있었다. 계획 2번의 "형태가 같은지 확인만 한다"는 확인 결과 **달랐고**, 그대로 두면 표가
+  비어 렌더된다. `table` 우선, 없으면 최상위로 폴백하게 고쳤다. `truncated` 안내도 함께 추가.
+- **`purpose` 중복 표시 방지**: `detail` 이 step `label` 과 같은 문구면 반복 출력하지 않는다.
+  fake_runner 가 purpose 를 label 로도 쓰고 있어 "계획 대비 입고 달성률"이 두 번 보였다.
+- **백엔드 `fake_runner` step 키 정리(프론트 검증 중 발견)**: 완료 `status` 이벤트의 `step` 이
+  `tool_call` 이 만든 항목 키(`run_simulation`)와 달라(`simulation`) 진행 표시에 완료되지 않는
+  단계가 남았다. `plan` 단계도 완료 이벤트가 없었다. 둘 다 백엔드에서 수정.
+- Skills 탭 토글 UI 제거, `dummy.ts` 의 `SKILLS` 삭제. `catalog`·`kpis` 엔드포인트는 계획대로 미사용.

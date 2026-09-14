@@ -110,10 +110,15 @@ export function AgentProgress({
                 status={view.status}
                 icon={view.icon}
                 label={
-                  <span className="flex items-center gap-2 text-2xs">
+                  <span className="flex flex-wrap items-baseline gap-x-2 text-2xs">
                     <span className={s.status === "pending" ? "text-ink-3" : "text-ink-2"}>
                       {s.label}
                     </span>
+                    {/* execute_sql 의 purpose — 무엇을 확인하려는 쿼리였는지.
+                        label 과 같은 문구면 반복하지 않는다. */}
+                    {s.detail && s.detail !== s.label && (
+                      <span className="min-w-0 text-ink-3">{s.detail}</span>
+                    )}
                     <span className="ml-auto font-mono text-[0.625rem] text-ink-3">
                       {view.word}
                     </span>

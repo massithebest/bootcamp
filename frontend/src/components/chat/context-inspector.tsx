@@ -1,17 +1,15 @@
 /**
  * 우측 컨텍스트 인스펙터 — Skills / Metadata / Prompt.
- * 모든 값은 더미. 향후 Skills API / Session Metadata / Prompt 편집 API 와 연결.
+ * Skills 는 `GET /api/knowledge/skills` 에서 온다. 메타·프롬프트는 아직 더미.
  */
 
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
-import {
-  SESSION_METADATA,
-  SKILLS,
-  SYSTEM_PROMPT,
-} from "@/lib/dummy";
+import { API_BASE_URL } from "@/lib/chat-api";
+import { SESSION_METADATA, SYSTEM_PROMPT } from "@/lib/dummy";
+import { fetchKnowledgeSkills } from "@/lib/knowledge-api";
 import { Disclosure, StatusDot, type Tone } from "./primitives";
 import type { Skill } from "@/types/workspace";
 
@@ -74,44 +72,53 @@ export function ContextInspector({ onCollapse }: { onCollapse: () => void }) {
 }
 
 function SkillsPanel() {
-  const [skills, setSkills] = useState<Skill[]>(SKILLS);
-  const toggle = (toolName: string) =>
-    setSkills((prev) =>
-      prev.map((s) =>
-        s.toolName === toolName ? { ...s, enabled: !s.enabled } : s,
-      ),
+  const [skills, setSkills] = useState<Skill[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchKnowledgeSkills(controller.signal)
+      .then(setSkills)
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setFailed(true);
+      });
+    return () => controller.abort();
+  }, []);
+
+  if (failed) {
+    return (
+      <div className="border-l-2 border-warn-ink bg-warn-weak px-3 py-2.5">
+        <p className="text-ui font-medium text-ink">
+          Skill 목록을 불러오지 못했습니다
+        </p>
+        <p className="mt-1 text-2xs leading-relaxed text-ink-2">
+          백엔드(<span className="font-mono">{API_BASE_URL}</span>)가 실행 중인지
+          확인하세요.
+        </p>
+      </div>
     );
+  }
+
+  if (skills === null) {
+    return <p className="text-2xs text-ink-3">불러오는 중…</p>;
+  }
+
+  if (skills.length === 0) {
+    return <p className="text-2xs text-ink-3">등록된 Skill 이 없습니다.</p>;
+  }
 
   return (
     <ul className="flex flex-col gap-2.5">
       {skills.map((s) => (
-        <li key={s.toolName} className="flex gap-2.5">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={s.enabled}
-            aria-label={`${s.label} ${s.enabled ? "비활성화" : "활성화"}`}
-            onClick={() => toggle(s.toolName)}
-            className={`mt-0.5 flex h-4 w-7 shrink-0 items-center rounded-full px-0.5 transition-colors ${
-              s.enabled ? "justify-end bg-accent" : "justify-start bg-line-strong"
-            }`}
-          >
-            <span className="h-3 w-3 rounded-full bg-canvas" />
-          </button>
-          <div className="min-w-0 flex-1">
-            <p
-              className={`text-ui font-medium ${
-                s.enabled ? "text-ink" : "text-ink-3"
-              }`}
-            >
-              {s.label}
-            </p>
-            <p className="text-2xs leading-snug text-ink-3">{s.description}</p>
-            <p className="mt-0.5 font-mono text-[0.625rem] text-ink-3">
-              {s.toolName}
-              {s.lastCalledAt ? ` · 마지막 호출 ${s.lastCalledAt}` : " · 호출 없음"}
-            </p>
+        <li key={s.name} className="flex flex-col gap-0.5">
+          <div className="flex items-baseline gap-2">
+            <span className="font-mono text-data font-medium text-ink">
+              {s.name}
+            </span>
+            <StatusDot tone={s.status === "active" ? "ok" : "neutral"} />
           </div>
+          <p className="text-2xs leading-snug text-ink-3">{s.description}</p>
         </li>
       ))}
     </ul>

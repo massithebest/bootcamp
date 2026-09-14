@@ -18,14 +18,16 @@ export interface Session {
   traces: ToolTrace[];
 }
 
-/** 에이전트가 보유한 능력. */
+/**
+ * 에이전트가 선택해 쓰는 Skill. `GET /api/knowledge/skills` 응답 형태다.
+ *
+ * 활성/비활성 토글은 두지 않는다 — 끄는 것이 `allowed_tools` 제한인지 Skill
+ * 비활성화인지 아직 정해지지 않았다 (docs/domain-knowledge.md §7).
+ */
 export interface Skill {
-  /** Backend tool_name 과 매핑되는 식별자. */
-  toolName: string;
-  label: string;
+  name: string;
   description: string;
-  enabled: boolean;
-  lastCalledAt: string | null;
+  status: string;
 }
 
 /** 현재 세션의 실행 정보. */

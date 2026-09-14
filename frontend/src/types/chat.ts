@@ -38,6 +38,8 @@ export interface StatusStep {
   step: string;
   label: string;
   status: StepStatus;
+  /** 부가 설명 한 줄. `execute_sql` 의 `purpose` 처럼 무엇을 확인하려는 호출인지. */
+  detail?: string;
 }
 
 /** tool_result Event 로부터 만들어지는 Tool 결과 항목. */
