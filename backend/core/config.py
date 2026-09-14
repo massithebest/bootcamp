@@ -27,6 +27,9 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 #: 도메인 지식 YAML(카탈로그·KPI·시뮬레이션·용어집·시나리오) 루트.
 KNOWLEDGE_DIR = Path(os.getenv("KNOWLEDGE_DIR") or BACKEND_DIR / "knowledge")
 
+#: 합성 시드 SQLite 경로. `python -m scripts.seed_sample_db` 산출물이며 git 추적 대상이 아니다.
+SAMPLE_DB_PATH = Path(os.getenv("SAMPLE_DB_PATH") or BACKEND_DIR / "data" / "sample.sqlite")
+
 #: CORS 허용 Origin 목록. 개발 환경의 Frontend dev 서버만 허용한다.
 #: 콤마로 구분해 환경변수(CORS_ALLOW_ORIGINS)로 재정의할 수 있다.
 CORS_ALLOW_ORIGINS = [

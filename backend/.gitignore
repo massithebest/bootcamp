@@ -3,6 +3,9 @@
 .env.local
 .env.*.local
 
+# 시드 스크립트 산출물 (합성 SQLite)
+data/
+
 # Python
 __pycache__/
 *.py[cod]

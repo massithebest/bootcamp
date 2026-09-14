@@ -1,0 +1,9 @@
+name: fgs_line_b_material_shortage
+description: 9월 3주차 B라인 P-1002 입고가 자재 결품으로 40% 부족
+period: [2026-09-15, 2026-09-21]
+line_cd: B
+product_id: P-1002
+drop_ratio: 0.4
+cause: material_shortage
+unchanged: [MP_VERSION]
+expected_diagnosis: 자재 부족
