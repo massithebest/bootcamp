@@ -15,7 +15,7 @@ production-planning-agent/
 cd backend
 pip install -r requirements.txt
 cp .env.example .env        # 값 채우기
-uvicorn main:app --reload --port 8010
+uvicorn main:app --reload --port 8000
 ```
 
 **Frontend** (`frontend/README.md` 참고)
@@ -37,3 +37,9 @@ Frontend → POST /api/chat → FastAPI → Claude Agent SDK
 ```
 
 비밀값은 `backend/.env`, `frontend/.env.local` 에만 두며 커밋하지 않는다.
+
+assistant-ui/react : 0.15.15
+react-langgraph 0.14.24
+react-markdwon : 0.14.11
+langgraph-sdk : 1.9.0
+redux : 5.0.1

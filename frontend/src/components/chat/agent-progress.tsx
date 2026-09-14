@@ -1,27 +1,55 @@
 /**
  * 에이전트가 도구를 호출하는 과정. 이 제품의 핵심 — 답변과 같은 위계로 응답에 붙되,
  * 완료 후에는 접혀서 밀도를 유지한다. 진행 중에는 펼쳐진다.
+ * 마크업은 AI Elements `ChainOfThought`, 펼침 상태는 여기서 소유한다.
  */
 
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  AlertCircleIcon,
+  CheckIcon,
+  CircleIcon,
+  LoaderIcon,
+  type LucideIcon,
+} from "lucide-react";
 
 import type { StatusStep, StepStatus } from "@/types/chat";
-import { Chevron, StatusDot, type Tone } from "./primitives";
+import {
+  ChainOfThought,
+  ChainOfThoughtContent,
+  ChainOfThoughtHeader,
+  ChainOfThoughtStep,
+  type StepIcon,
+} from "@/components/ai-elements/chain-of-thought";
+import { StatusDot } from "./primitives";
 
-const STEP_TONE: Record<StepStatus, Tone> = {
-  pending: "neutral",
-  running: "accent",
-  completed: "ok",
-  error: "block",
+type CotStatus = "complete" | "active" | "pending";
+
+// ChainOfThoughtStep 은 icon 에 고정 className 을 주므로, 색은 아이콘 쪽에서 미리 입힌다.
+const tinted = (Icon: LucideIcon, cls: string): StepIcon => {
+  const Tinted = () => <Icon className={`size-3.5 ${cls}`} />;
+  Tinted.displayName = `Tinted(${Icon.displayName ?? "Icon"})`;
+  return Tinted;
 };
 
-const STEP_WORD: Record<StepStatus, string> = {
-  pending: "대기",
-  running: "진행",
-  completed: "완료",
-  error: "오류",
+const STEP_VIEW: Record<
+  StepStatus,
+  { status: CotStatus; icon: StepIcon; word: string }
+> = {
+  pending: { status: "pending", icon: tinted(CircleIcon, "text-ink-3"), word: "대기" },
+  running: {
+    status: "active",
+    icon: tinted(LoaderIcon, "text-accent motion-safe:animate-spin"),
+    word: "진행",
+  },
+  completed: { status: "complete", icon: tinted(CheckIcon, "text-ok-ink"), word: "완료" },
+  error: {
+    status: "complete",
+    icon: tinted(AlertCircleIcon, "text-block-ink"),
+    word: "오류",
+  },
 };
 
 export function AgentProgress({
@@ -51,54 +79,52 @@ export function AgentProgress({
       : `도구 ${statuses.length}단계 실행`;
 
   return (
-    <div className="rounded border border-line bg-surface/60">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => {
-          setOpen((v) => !v);
-          setTouched(true);
-        }}
-        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left"
-      >
-        <Chevron open={open} />
-        <StatusDot
-          tone={hasError ? "block" : active ? "accent" : "ok"}
-          pulse={active}
-        />
-        <span className="flex-1 text-2xs font-medium text-ink-2">
+    <ChainOfThought
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        setTouched(true);
+      }}
+      className="space-y-0 rounded border border-line bg-surface/60"
+    >
+      <ChainOfThoughtHeader className="gap-2 px-2.5 py-1.5 text-2xs font-medium text-ink-2 hover:text-ink [&>svg:first-child]:hidden">
+        <span className="flex items-center gap-2">
+          <StatusDot
+            tone={hasError ? "block" : active ? "accent" : "ok"}
+            pulse={active}
+          />
           {summary}
+          {!active && !hasError && statuses.length > 0 && (
+            <span className="font-normal text-ink-3">근거 보기</span>
+          )}
         </span>
-        {!active && !hasError && statuses.length > 0 && (
-          <span className="text-2xs text-ink-3">근거 보기</span>
-        )}
-      </button>
+      </ChainOfThoughtHeader>
 
-      {open && statuses.length > 0 && (
-        <ol className="border-t border-line px-2.5 py-2">
-          {statuses.map((s) => (
-            <li
-              key={s.step}
-              className="flex items-center gap-2 py-[3px] text-2xs"
-            >
-              <StatusDot
-                tone={STEP_TONE[s.status]}
-                pulse={s.status === "running"}
-              />
-              <span
-                className={
-                  s.status === "pending" ? "text-ink-3" : "text-ink-2"
+      {statuses.length > 0 && (
+        <ChainOfThoughtContent className="mt-0 space-y-1 border-t border-line px-2.5 py-2">
+          {statuses.map((s) => {
+            const view = STEP_VIEW[s.status];
+            return (
+              <ChainOfThoughtStep
+                key={s.step}
+                status={view.status}
+                icon={view.icon}
+                label={
+                  <span className="flex items-center gap-2 text-2xs">
+                    <span className={s.status === "pending" ? "text-ink-3" : "text-ink-2"}>
+                      {s.label}
+                    </span>
+                    <span className="ml-auto font-mono text-[0.625rem] text-ink-3">
+                      {view.word}
+                    </span>
+                  </span>
                 }
-              >
-                {s.label}
-              </span>
-              <span className="ml-auto font-mono text-[0.625rem] text-ink-3">
-                {STEP_WORD[s.status]}
-              </span>
-            </li>
-          ))}
-        </ol>
+                className="gap-2 text-2xs [&>div:first-child>div]:hidden"
+              />
+            );
+          })}
+        </ChainOfThoughtContent>
       )}
-    </div>
+    </ChainOfThought>
   );
 }

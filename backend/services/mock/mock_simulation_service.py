@@ -1,71 +1,80 @@
-"""Mock production planning simulation services."""
+"""Mock production planning simulation service."""
+
+from services.simulation_registry import (
+    list_simulation_types,
+    validate_simulation_request,
+)
 
 
-async def run_line_capacity(
-    line: str,
-    period: str,
-    target_qty: int,
-) -> dict:
-    """Return mock line capacity result."""
+def _mock_result(simulation_type: str, params: dict) -> dict:
+    if simulation_type == "실적_조회":
+        return {
+            "status": "ok",
+            "simulation_type": simulation_type,
+            "workMonthFrom": params["workMonthFrom"],
+            "workMonthTo": params["workMonthTo"],
+            "results": [
+                {"line": "A", "workMonth": params["workMonthFrom"], "qty": 950},
+            ],
+        }
+
+    if simulation_type == "MP_최신조회":
+        return {
+            "status": "ok",
+            "simulation_type": simulation_type,
+            "mpVersion": "MP-2026-09-LATEST",
+            "updatedAt": "2026-09-01T00:00:00",
+        }
+
+    if simulation_type == "MP_확정조회":
+        fixed_plan_month = params.get("fixedPlanMonth", "202609")
+        return {
+            "status": "ok",
+            "simulation_type": simulation_type,
+            "fixedPlanMonth": fixed_plan_month,
+            "mpVersion": f"MP-{fixed_plan_month}-FIXED",
+        }
+
+    if simulation_type == "SWAP_결과조회":
+        return {
+            "status": "ok",
+            "simulation_type": simulation_type,
+            "productId": params["productId"],
+            "planYm": params.get("planYm", "202609"),
+            "requiredQty": 500,
+            "actualQty": 480,
+        }
 
     return {
-        "status": "ok",
-        "line": line,
-        "period": period,
-        "target_qty": target_qty,
-        "achievable_qty": 950,
-        "achievement_rate": 0.95,
-        "bottleneck": "설비 가동률",
+        "status": "error",
+        "message": f"알 수 없는 simulation_type 입니다: {simulation_type}",
     }
 
 
-async def run_material_constraint(
-    line: str,
-    period: str,
-    materials: list[dict],
-) -> dict:
-    """Return mock material constraint result."""
+class MockSimulationService:
+    """RealSimulationService 와 동일한 인터페이스를 갖는 mock 구현."""
 
-    return {
-        "status": "ok",
-        "line": line,
-        "period": period,
-        "max_producible_qty": 780,
-        "limiting_material": (
-            materials[0]["material_id"]
-            if materials
-            else None
-        ),
-        "material_usage": [
-            {
-                "material_id": material["material_id"],
-                "required": 200,
-                "available": material["available_qty"],
-            }
-            for material in materials
-        ],
-    }
+    async def list_simulation(self) -> dict:
+        """Return mock simulation type list."""
+
+        return {"status": "ok", "simulations": list_simulation_types()}
+
+    async def run_simulation(self, simulation_type: str, params: dict) -> dict:
+        """Return mock simulation result for the given type."""
+
+        error = validate_simulation_request(simulation_type, params)
+        if error is not None:
+            return {"status": "error", "message": error}
+
+        return _mock_result(simulation_type, params)
 
 
-async def run_line_comparison(
-    lines: list[str],
-    period_start: str,
-    period_end: str,
-    metric: str,
-) -> dict:
-    """Return mock line comparison result."""
+_service = MockSimulationService()
 
-    return {
-        "status": "ok",
-        "period_start": period_start,
-        "period_end": period_end,
-        "metric": metric,
-        "ranking": [
-            {
-                "line": line,
-                "score": 0.9 - index * 0.05,
-                "rank": index + 1,
-            }
-            for index, line in enumerate(lines)
-        ],
-    }
+
+async def list_simulation() -> dict:
+    return await _service.list_simulation()
+
+
+async def run_simulation(simulation_type: str, params: dict) -> dict:
+    return await _service.run_simulation(simulation_type=simulation_type, params=params)

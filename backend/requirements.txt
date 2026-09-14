@@ -1,8 +1,14 @@
-fastapi
-uvicorn
-pydantic
-python-dotenv
-claude-agent-sdk
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.5
+python-dotenv==1.2.3
+PyYAML==6.0.2
+claude-agent-sdk==0.2.152
+langchain==1.4.0
+langchain-openai==1.6.1
+pymilvus==3.0.1
+pandas==3.0.5
+requests==2.34.2
 
 # 참고:
 # claude-agent-sdk 는 Node.js 및 Claude Code CLI(`claude`)를 필요로 한다.

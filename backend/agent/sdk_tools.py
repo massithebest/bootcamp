@@ -12,13 +12,8 @@ from typing import Any
 
 from claude_agent_sdk import create_sdk_mcp_server, tool
 
-from tools.line_capacity_tool import simulate_line_capacity
-from tools.line_comparison_tool import simulate_line_comparison
-from tools.material_constraint_tool import (
-    MaterialConstraint,
-    simulate_material_constraint,
-)
 from tools.rag_tool import search_knowledge
+from tools.simulation_tool import list_simulation, run_simulation
 from tools.sql_tool import query_database
 
 
@@ -28,9 +23,8 @@ MCP_SERVER_NAME = "planning"
 TOOL_NAMES = [
     f"mcp__{MCP_SERVER_NAME}__query_database",
     f"mcp__{MCP_SERVER_NAME}__search_knowledge",
-    f"mcp__{MCP_SERVER_NAME}__simulate_line_capacity",
-    f"mcp__{MCP_SERVER_NAME}__simulate_material_constraint",
-    f"mcp__{MCP_SERVER_NAME}__simulate_line_comparison",
+    f"mcp__{MCP_SERVER_NAME}__list_simulation",
+    f"mcp__{MCP_SERVER_NAME}__run_simulation",
 ]
 
 
@@ -70,60 +64,25 @@ async def _search_knowledge(args: dict[str, Any]) -> dict[str, Any]:
 
 
 @tool(
-    "simulate_line_capacity",
-    "특정 라인/기간에 목표 수량 생산이 가능한지 시뮬레이션한다.",
-    {"line": str, "period": str, "target_qty": int},
+    "list_simulation",
+    "사용 가능한 시뮬레이션 종류와 각 종류가 요구하는 파라미터 목록을 조회한다.",
+    {},
 )
-async def _simulate_line_capacity(args: dict[str, Any]) -> dict[str, Any]:
-    return _ok(
-        await simulate_line_capacity(
-            line=args["line"],
-            period=args["period"],
-            target_qty=int(args["target_qty"]),
-        )
-    )
+async def _list_simulation(args: dict[str, Any]) -> dict[str, Any]:
+    return _ok(await list_simulation())
 
 
 @tool(
-    "simulate_material_constraint",
-    "자재 가용량 제약 하에서 최대 생산 가능 수량을 시뮬레이션한다.",
-    {
-        "line": str,
-        "period": str,
-        # materials: [{"material_id": str, "available_qty": int}, ...]
-        "materials": list,
-    },
+    "run_simulation",
+    "지정한 simulation_type 을 params 로 실행한다. "
+    "종류/파라미터를 모르면 list_simulation 을 먼저 호출한다.",
+    {"simulation_type": str, "params": dict},
 )
-async def _simulate_material_constraint(args: dict[str, Any]) -> dict[str, Any]:
-    materials = [
-        MaterialConstraint(**item) for item in args.get("materials", [])
-    ]
+async def _run_simulation(args: dict[str, Any]) -> dict[str, Any]:
     return _ok(
-        await simulate_material_constraint(
-            line=args["line"],
-            period=args["period"],
-            materials=materials,
-        )
-    )
-
-
-@tool(
-    "simulate_line_comparison",
-    "여러 라인을 기간·지표 기준으로 비교한다.",
-    {
-        "lines": list,
-        "period_start": str,
-        "period_end": str,
-        "metric": str,
-    },
-)
-async def _simulate_line_comparison(args: dict[str, Any]) -> dict[str, Any]:
-    return _ok(
-        await simulate_line_comparison(
-            lines=list(args["lines"]),
-            period_start=args["period_start"],
-            period_end=args["period_end"],
-            metric=args.get("metric", "efficiency"),
+        await run_simulation(
+            simulation_type=args["simulation_type"],
+            params=args.get("params", {}),
         )
     )
 
@@ -137,8 +96,7 @@ def build_planning_mcp_server():
         tools=[
             _query_database,
             _search_knowledge,
-            _simulate_line_capacity,
-            _simulate_material_constraint,
-            _simulate_line_comparison,
+            _list_simulation,
+            _run_simulation,
         ],
     )

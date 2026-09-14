@@ -10,6 +10,12 @@
 "use client";
 
 import type { ToolResult } from "@/types/chat";
+import {
+  Tool,
+  ToolContent,
+  ToolHeader,
+  ToolOutput,
+} from "@/components/ai-elements/tool";
 import { DatabaseResult } from "./tool-results/database-result";
 import { KnowledgeResult } from "./tool-results/knowledge-result";
 import { SimulationResult } from "./tool-results/simulation-result";
@@ -47,18 +53,29 @@ function resolveKind(result: ToolResult): { label: string; kind: Kind } {
 export function ToolResultCard({ result }: { result: ToolResult }) {
   const { label, kind } = resolveKind(result);
   const data = result.data ?? {};
+  const errorText = str(data.error);
 
   return (
-    <section className="border-l border-line-strong pl-3">
-      <header className="mb-2 flex items-baseline gap-2">
-        <h3 className="text-2xs font-semibold text-ink-2">{label}</h3>
-        <span className="font-mono text-2xs text-ink-3">{result.toolName}</span>
-      </header>
-      {kind === "database" && <DatabaseResult data={data} />}
-      {kind === "knowledge" && <KnowledgeResult data={data} />}
-      {kind === "simulation" && <SimulationResult data={data} />}
-      {kind === "generic" && <GenericResult result={result} />}
-    </section>
+    <Tool defaultOpen className="border-l border-line-strong pl-3">
+      <ToolHeader
+        type={`tool-${result.toolName}`}
+        state={errorText ? "output-error" : "output-available"}
+        title={label}
+      />
+      <ToolContent>
+        <ToolOutput
+          errorText={errorText}
+          output={
+            <>
+              {kind === "database" && <DatabaseResult data={data} />}
+              {kind === "knowledge" && <KnowledgeResult data={data} />}
+              {kind === "simulation" && <SimulationResult data={data} />}
+              {kind === "generic" && <GenericResult result={result} />}
+            </>
+          }
+        />
+      </ToolContent>
+    </Tool>
   );
 }
 

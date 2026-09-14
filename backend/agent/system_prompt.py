@@ -13,9 +13,8 @@ SYSTEM_PROMPT = """
 사용 가능한 주요 Tool:
 - query_database
 - search_knowledge
-- simulate_line_capacity
-- simulate_material_constraint
-- simulate_line_comparison
+- list_simulation
+- run_simulation
 
 상세한 생산계획 업무 절차와 Tool 사용 방법은
 CLAUDE.md 및 Skills의 지침을 따른다.

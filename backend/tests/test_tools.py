@@ -3,13 +3,8 @@
 import asyncio
 import inspect
 
-from tools.line_capacity_tool import simulate_line_capacity
-from tools.line_comparison_tool import simulate_line_comparison
-from tools.material_constraint_tool import (
-    MaterialConstraint,
-    simulate_material_constraint,
-)
 from tools.rag_tool import search_knowledge
+from tools.simulation_tool import list_simulation, run_simulation
 from tools.sql_tool import query_database
 
 
@@ -17,9 +12,8 @@ def test_all_tools_are_async() -> None:
     for tool in (
         query_database,
         search_knowledge,
-        simulate_line_capacity,
-        simulate_material_constraint,
-        simulate_line_comparison,
+        list_simulation,
+        run_simulation,
     ):
         assert inspect.iscoroutinefunction(tool)
 
@@ -34,33 +28,18 @@ def test_search_knowledge_returns_dict() -> None:
     assert isinstance(result, dict)
 
 
-def test_simulate_line_capacity_returns_dict() -> None:
-    result = asyncio.run(
-        simulate_line_capacity(line="A", period="2026-09", target_qty=1000)
-    )
+def test_list_simulation_returns_dict() -> None:
+    result = asyncio.run(list_simulation())
     assert isinstance(result, dict)
+    assert isinstance(result["simulations"], list)
 
 
-def test_simulate_material_constraint_accepts_pydantic_input() -> None:
+def test_run_simulation_returns_dict() -> None:
     result = asyncio.run(
-        simulate_material_constraint(
-            line="A",
-            period="2026-09",
-            materials=[
-                MaterialConstraint(material_id="X", available_qty=500),
-                MaterialConstraint(material_id="Y", available_qty=300),
-            ],
+        run_simulation(
+            simulation_type="실적_조회",
+            params={"workMonthFrom": "202608", "workMonthTo": "202608"},
         )
     )
     assert isinstance(result, dict)
-
-
-def test_simulate_line_comparison_returns_dict() -> None:
-    result = asyncio.run(
-        simulate_line_comparison(
-            lines=["A", "B"],
-            period_start="2026-10-01",
-            period_end="2026-10-31",
-        )
-    )
-    assert isinstance(result, dict)
+    assert result["status"] == "ok"

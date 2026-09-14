@@ -11,7 +11,7 @@ TODO:
 from collections.abc import AsyncIterator
 
 from api.schemas import AgentEvent
-from tools.line_capacity_tool import simulate_line_capacity
+from tools.simulation_tool import run_simulation
 from tools.sql_tool import query_database
 
 
@@ -43,16 +43,15 @@ async def run_fake_agent(
         },
     )
 
-    # 2) 라인 capacity 시뮬레이션
-    yield AgentEvent(type="tool_call", tool_name="simulate_line_capacity")
-    sim_result = await simulate_line_capacity(
-        line="A",
-        period="2026-09",
-        target_qty=1000,
+    # 2) 실적 조회 시뮬레이션
+    yield AgentEvent(type="tool_call", tool_name="run_simulation")
+    sim_result = await run_simulation(
+        simulation_type="실적_조회",
+        params={"workMonthFrom": "202609", "workMonthTo": "202609"},
     )
     yield AgentEvent(
         type="tool_result",
-        tool_name="simulate_line_capacity",
+        tool_name="run_simulation",
         data=sim_result,
     )
     yield AgentEvent(
@@ -65,10 +64,10 @@ async def run_fake_agent(
     )
 
     # 3) 사용자 답변 스트리밍
-    achievable = sim_result.get("achievable_qty")
+    results = sim_result.get("results")
     for chunk in (
         "조회 결과를 종합하면, ",
-        f"해당 조건에서 예상 생산 가능 수량은 약 {achievable}개입니다. ",
+        f"해당 조건의 실적 조회 결과는 {results} 입니다. ",
         "(Fake Runner 응답)",
     ):
         yield AgentEvent(type="text", content=chunk)

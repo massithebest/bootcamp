@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+@config "../../tailwind.config.ts";
 
 /*
  * 폐쇄망 원칙: 외부 Font(next/font/google, CDN) 미사용. System Font 만 사용한다.
@@ -93,4 +93,55 @@ body {
   border-radius: 9px;
   border: 2px solid transparent;
   background-clip: content-box;
+}
+/*
+ * shadcn/ui 컴포넌트 전용 토큰. 프로젝트 고유 토큰(canvas/surface/ink/accent 등)과
+ * 이름이 겹치지 않도록 `--shadcn-` 프리픽스로 네임스페이스를 분리한다.
+ * 이 프로젝트는 라이트 테마만 쓰므로 .dark 블록은 두지 않는다.
+ */
+:root {
+  --shadcn-background: var(--canvas);
+  --shadcn-foreground: var(--ink);
+  --shadcn-card: var(--canvas);
+  --shadcn-card-foreground: var(--ink);
+  --shadcn-popover: var(--canvas);
+  --shadcn-popover-foreground: var(--ink);
+  --shadcn-primary: var(--accent);
+  --shadcn-primary-foreground: var(--accent-ink);
+  --shadcn-secondary: var(--surface-2);
+  --shadcn-secondary-foreground: var(--ink);
+  --shadcn-muted: var(--surface);
+  --shadcn-muted-foreground: var(--ink-2);
+  --shadcn-accent: var(--accent-weak);
+  --shadcn-accent-foreground: var(--accent);
+  --shadcn-destructive: var(--block-ink);
+  --shadcn-border: var(--line);
+  --shadcn-input: var(--line);
+  --shadcn-ring: var(--accent);
+  --shadcn-radius: 0.3125rem;
+}
+
+@theme inline {
+  --color-background: var(--shadcn-background);
+  --color-foreground: var(--shadcn-foreground);
+  --color-card: var(--shadcn-card);
+  --color-card-foreground: var(--shadcn-card-foreground);
+  --color-popover: var(--shadcn-popover);
+  --color-popover-foreground: var(--shadcn-popover-foreground);
+  --color-primary: var(--shadcn-primary);
+  --color-primary-foreground: var(--shadcn-primary-foreground);
+  --color-secondary: var(--shadcn-secondary);
+  --color-secondary-foreground: var(--shadcn-secondary-foreground);
+  --color-muted: var(--shadcn-muted);
+  --color-muted-foreground: var(--shadcn-muted-foreground);
+  --color-accent: var(--shadcn-accent);
+  --color-accent-foreground: var(--shadcn-accent-foreground);
+  --color-destructive: var(--shadcn-destructive);
+  --color-border: var(--shadcn-border);
+  --color-input: var(--shadcn-input);
+  --color-ring: var(--shadcn-ring);
+  --radius-sm: calc(var(--shadcn-radius) - 4px);
+  --radius-md: calc(var(--shadcn-radius) - 2px);
+  --radius-lg: var(--shadcn-radius);
+  --radius-xl: calc(var(--shadcn-radius) + 4px);
 }
