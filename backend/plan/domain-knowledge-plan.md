@@ -1,6 +1,6 @@
 # 도메인 지식 Phase 1 실행 계획 (백엔드)
 
-**상태: 착수 대기.** 설계는 [docs/domain-knowledge.md](../../docs/domain-knowledge.md)에 있다. 이 문서는 그 설계의 Phase 1을 **저비용 모델 세션이 순서대로 실행**할 수 있게 쓴 작업 목록이다. 설계 판단은 여기서 다시 하지 않는다.
+**상태: 완료 (2026-09-14).** Task 0~10 전부 실행하고 E2E 통과. 설계는 [docs/domain-knowledge.md](../../docs/domain-knowledge.md)에 있다. 이 문서는 그 설계의 Phase 1을 **저비용 모델 세션이 순서대로 실행**할 수 있게 쓴 작업 목록이다. 설계 판단은 여기서 다시 하지 않는다.
 
 ## 실행 세션 시작 방법
 
@@ -837,4 +837,8 @@ description: 생산계획 Agent 전용. 시뮬레이션(실적 조회, MP 조회
 - 2026-09-14 Task 4·5: `services/mock/_sqlite.py` 를 추가해 연결 helper 를 분리 — Task 6 의 mock 시뮬레이션이 같은 SQLite 를 봐야 하므로(설계 §6-1) 계획이 허용한 선택지를 택했다. `SAMPLE_DB_PATH` 는 import 시점이 아니라 호출 시점에 읽어 테스트 monkeypatch 가 듣게 했다.
 - 2026-09-14 Task 5: `sql_guard.check_sql` 이 CTE 이름(`WITH x AS (...)`)을 허용 테이블에 더하도록 함 — 계획은 CTE 를 언급하지 않았으나 `WITH … SELECT` 를 허용한 이상 CTE 참조가 "등록되지 않은 테이블"로 거부되면 안 된다.
 - 2026-09-14 Task 8 을 Task 5 직후로 앞당겨 실행 — `fake_runner` 가 삭제된 `query_database` 를 import 해 pytest 수집 자체가 실패했다. 실행 규칙 7("Task 마다 pytest 전부 통과")을 지키려면 순서를 바꿔야 했다. Task 6·7 은 Task 8 에 의존하지 않는다.
+- 2026-09-14 Task 9: 시나리오의 `expected_diagnosis` 를 `자재 부족` → `자재 결품` 으로 수정 — 에이전트는 원인을 정확히 찾았지만(B라인 P-1002, SUPPLIER_DELAY, 부족분 900 일치) 카탈로그·KPI diagnostics 가 일관되게 쓰는 "결품" 으로 답했다. 지식이 가르치지 않는 문구를 정답으로 둔 쪽이 틀렸다. 시나리오 `description` 도 원래 "자재 결품"이라 파일 내부에서도 어긋나 있었다.
+- 2026-09-14 Task 9: E2E 단언에 라인·품목 특정과 기각 가설(MP) 언급 확인을 추가하고, 원인 문구는 결품/부족 둘 다 허용 — 한 문구 완전일치로 묶으면 지식이 아니라 표현을 맞추는 테스트가 된다.
+- 2026-09-14 Task 9: `pytest.ini` 에 `addopts = -m "not e2e"` 를 넣어 기본 실행에서 e2e 를 제외 — 계획은 marker 등록만 지시했으나, 그것만으로는 `pytest` 가 매번 실제 LLM 을 호출해 비용이 든다.
+- 2026-09-14 Task 10: 검증용 uvicorn 을 8123 포트로 띄움 — 8000·8010 을 이미 다른 프로세스가 점유 중이었다. 기본 포트 설정은 바꾸지 않았다.
 

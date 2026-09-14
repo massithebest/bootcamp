@@ -6,4 +6,6 @@ product_id: P-1002
 drop_ratio: 0.4
 cause: material_shortage
 unchanged: [MP_VERSION]
-expected_diagnosis: 자재 부족
+# E2E 테스트가 에이전트 답변에서 찾는 문구. 카탈로그·KPI diagnostics 가 쓰는 용어와
+# 같아야 한다 (MATERIAL_SHORTAGE = "자재 결품").
+expected_diagnosis: 자재 결품
