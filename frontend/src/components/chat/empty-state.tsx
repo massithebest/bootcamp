@@ -1,14 +1,15 @@
 /**
  * 대화 시작 전 빈 상태.  이 도구로 무엇을 물어볼 수 있는지 실제 생산계획 용어로.
+ *
+ * 예시 질문 버튼은 `ThreadPrimitive.Suggestion` 으로 런타임에 직접 전송한다
+ * (send) — `onPick`/`handleSend` prop 드릴링이 필요 없다.
  */
+
+import { ThreadPrimitive } from "@assistant-ui/react";
 
 import { EXAMPLE_QUESTIONS } from "@/lib/dummy";
 
-export function EmptyState({
-  onPick,
-}: {
-  onPick: (question: string) => void;
-}) {
+export function EmptyState() {
   return (
     <div className="mx-auto flex max-w-reading flex-col gap-5 py-14">
       <div>
@@ -24,13 +25,13 @@ export function EmptyState({
       <ul className="flex flex-col divide-y divide-line border-y border-line">
         {EXAMPLE_QUESTIONS.map((q) => (
           <li key={q}>
-            <button
-              type="button"
-              onClick={() => onPick(q)}
+            <ThreadPrimitive.Suggestion
+              prompt={q}
+              send
               className="w-full py-2.5 text-left text-ui text-ink-2 transition-colors hover:text-ink"
             >
               {q}
-            </button>
+            </ThreadPrimitive.Suggestion>
           </li>
         ))}
       </ul>

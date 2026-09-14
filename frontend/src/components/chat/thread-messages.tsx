@@ -6,7 +6,10 @@
  * 도메인 렌더러(`AgentProgress`, `ToolResultCard`)는 무수정으로 재사용한다.
  */
 
+import { CheckIcon, CopyIcon } from "lucide-react";
+
 import {
+  ActionBarPrimitive,
   MessagePrimitive,
   MessagePartPrimitive,
   useAuiState,
@@ -75,8 +78,35 @@ export function AssistantMessage() {
             {meta.error}
           </div>
         )}
+
+        <ActionBarPrimitive.Root
+          hideWhenRunning
+          autohide="not-last"
+          autohideFloat="single-branch"
+          className="flex items-center"
+        >
+          <CopyButton />
+        </ActionBarPrimitive.Root>
       </div>
     </MessagePrimitive.Root>
+  );
+}
+
+/** 복사 버튼. `data-copied` 대신 `message.isCopied` 를 직접 읽어 아이콘/라벨을 바꾼다. */
+function CopyButton() {
+  const isCopied = useAuiState((s) => s.message.isCopied);
+  return (
+    <ActionBarPrimitive.Copy className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-2xs text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink-2 disabled:pointer-events-none disabled:opacity-0">
+      {isCopied ? (
+        <>
+          <CheckIcon className="size-3" /> 복사됨
+        </>
+      ) : (
+        <>
+          <CopyIcon className="size-3" /> 복사
+        </>
+      )}
+    </ActionBarPrimitive.Copy>
   );
 }
 

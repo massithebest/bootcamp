@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { ChevronDownIcon } from "lucide-react";
 
 import {
   AssistantRuntimeProvider,
@@ -222,8 +223,6 @@ export function ChatWindow() {
     [streaming, applyEvent, updateAssistant],
   );
 
-  const handleSend = useCallback((text: string) => runTurn(text), [runTurn]);
-
   const handleRetry = useCallback(() => {
     if (retryPrompt) runTurn(retryPrompt);
   }, [retryPrompt, runTurn]);
@@ -344,10 +343,10 @@ export function ChatWindow() {
           )}
         </header>
 
-        <ThreadPrimitive.Root className="flex min-h-0 flex-1 flex-col">
+        <ThreadPrimitive.Root className="relative flex min-h-0 flex-1 flex-col">
           <ThreadPrimitive.Viewport className="thin-scroll min-h-0 flex-1 overflow-y-auto px-4">
             {isEmpty ? (
-              <EmptyState onPick={handleSend} />
+              <EmptyState />
             ) : (
               <div className="mx-auto flex max-w-reading flex-col gap-6 py-6">
                 <ThreadPrimitive.Messages
@@ -362,10 +361,17 @@ export function ChatWindow() {
               </div>
             )}
           </ThreadPrimitive.Viewport>
+
+          <ThreadPrimitive.ScrollToBottom
+            aria-label="맨 아래로 이동"
+            className="absolute bottom-3 left-1/2 grid h-8 w-8 -translate-x-1/2 place-items-center rounded-full border border-line-strong bg-canvas text-ink-2 shadow-sm transition-opacity hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-0"
+          >
+            <ChevronDownIcon className="size-4" />
+          </ThreadPrimitive.ScrollToBottom>
         </ThreadPrimitive.Root>
 
         <div className="shrink-0">
-          <MessageInput disabled={streaming} onSend={handleSend} />
+          <MessageInput />
         </div>
       </section>
 
