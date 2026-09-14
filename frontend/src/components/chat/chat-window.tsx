@@ -13,6 +13,7 @@ import {
 
 import {
   AssistantRuntimeProvider,
+  ThreadPrimitive,
   useExternalStoreRuntime,
   type AppendMessage,
 } from "@assistant-ui/react";
@@ -31,8 +32,8 @@ import { AppSidebar } from "./app-sidebar";
 import { ContextInspector } from "./context-inspector";
 import { ConnectionBanner } from "./connection-banner";
 import { EmptyState } from "./empty-state";
-import { MessageBubble } from "./message-bubble";
 import { MessageInput } from "./message-input";
+import { AssistantMessage, UserMessage } from "./thread-messages";
 
 let idCounter = 0;
 const nextId = (p: string) => `${p}-${Date.now()}-${(idCounter += 1)}`;
@@ -256,7 +257,7 @@ export function ChatWindow() {
     [handleStop],
   );
 
-  /* ---- assistant-ui 런타임 (1단계: 병행 상태, 렌더링은 아직 MessageBubble) ---- */
+  /* ---- assistant-ui 런타임 ---- */
 
   const handleNew = useCallback(
     async (message: AppendMessage) => {
@@ -343,26 +344,25 @@ export function ChatWindow() {
           )}
         </header>
 
-        <div
-          ref={scrollRef}
-          className="thin-scroll min-h-0 flex-1 overflow-y-auto px-4"
-        >
-          {isEmpty ? (
-            <EmptyState onPick={handleSend} />
-          ) : (
-            <div className="mx-auto flex max-w-reading flex-col gap-6 py-6">
-              {messages.map((m) => (
-                <MessageBubble key={m.id} message={m} />
-              ))}
-            </div>
-          )}
+        <ThreadPrimitive.Root className="flex min-h-0 flex-1 flex-col">
+          <ThreadPrimitive.Viewport className="thin-scroll min-h-0 flex-1 overflow-y-auto px-4">
+            {isEmpty ? (
+              <EmptyState onPick={handleSend} />
+            ) : (
+              <div className="mx-auto flex max-w-reading flex-col gap-6 py-6">
+                <ThreadPrimitive.Messages
+                  components={{ UserMessage, AssistantMessage }}
+                />
+              </div>
+            )}
 
-          {retryPrompt && (
-            <div className="mx-auto max-w-reading pb-4">
-              <ConnectionBanner onRetry={handleRetry} retrying={streaming} />
-            </div>
-          )}
-        </div>
+            {retryPrompt && (
+              <div className="mx-auto max-w-reading pb-4">
+                <ConnectionBanner onRetry={handleRetry} retrying={streaming} />
+              </div>
+            )}
+          </ThreadPrimitive.Viewport>
+        </ThreadPrimitive.Root>
 
         <div className="shrink-0">
           <MessageInput disabled={streaming} onSend={handleSend} />

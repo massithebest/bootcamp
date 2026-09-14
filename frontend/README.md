@@ -7,6 +7,7 @@ Claude Agent SDK 기반 Backend와 통신하는 질의응답형 3-pane 에이전
 - Vite 7 (SPA, App Router 아님) · React 18 · TypeScript (2026-09-14 Next.js 14에서 이관 — [docs/decisions.md#nextjs--vite-이관](docs/decisions.md#nextjs--vite-이관))
 - Tailwind CSS **v4** + shadcn/ui 컴포넌트 (2026-09-11 도입, `@tailwindcss/vite` 플러그인 경유)
 - **AI Elements** (2026-09-14 채택) — `src/components/ai-elements/`에 소스로 복사해 우리 코드로 관리한다(`chain-of-thought` / `tool` / `task`). 컴포넌트만 쓰고 `useChat`·`@ai-sdk/react`·`streamdown`은 도입하지 않는다.
+- **assistant-ui** (2026-09-14 도입 진행 중, 이전 결정을 뒤집음) — `@assistant-ui/react` + `@assistant-ui/react-markdown` + `remark-gfm`을 **상태·UI 플럼빙 계층**으로 쓴다. 메시지 상태 소유권은 `useExternalStoreRuntime`으로 계속 우리(`chat-window.tsx`)가 갖는다. `@ai-sdk/react`·`useChat`·AI SDK 데이터 스트림 프로토콜은 도입하지 않는다 — 백엔드가 그 포맷을 쓰지 않는다. 자세한 배경·설계 결정은 [docs/decisions.md](docs/decisions.md) 참고.
 - 아이콘은 `lucide-react` (npm 번들, 외부 CDN 아님)
 - 상태관리: React 기본(`useState`/`useRef`)만 사용
 - Vercel AI SDK(`ai`)는 도입하지 않는다. AI Elements `tool.tsx`가 예전엔 `ToolUIPart` 타입만 import했지만 Vite 이관 때 로컬 타입 선언으로 대체하고 의존성 자체를 제거했다. 프론트는 외부 LLM provider를 직접 호출하지 않고 항상 사내 백엔드(`src/lib/chat-api.ts`)를 경유한다.
@@ -42,20 +43,22 @@ src/
 │   ├── chat/                     3-pane 워크벤치
 │   │   ├── agent-progress.tsx    진행 단계 블록 (ChainOfThought 기반, 진행 중 펼침 · 완료 후 접힘)
 │   │   ├── app-sidebar.tsx       세션 목록 사이드바 (커스텀 구현 — shadcn sidebar 아님)
-│   │   ├── chat-window.tsx       전체 Chat 상태 · Streaming · AgentEvent 처리, 3-pane 셸
+│   │   ├── chat-window.tsx       전체 Chat 상태 · Streaming · AgentEvent 처리 · assistant-ui 런타임 배선, 3-pane 셸
 │   │   ├── connection-banner.tsx 백엔드 연결 실패 안내 · 재시도
 │   │   ├── context-inspector.tsx Skills(실 API) / Metadata / Prompt 탭
 │   │   ├── empty-state.tsx       대화 시작 전 예시 질문
-│   │   ├── markdown.tsx          자체 구현 마크다운 뷰어 (외부 라이브러리 미사용)
-│   │   ├── message-bubble.tsx    메시지 표현 (parts 배열 렌더링)
-│   │   ├── message-input.tsx     입력창
+│   │   ├── markdown-text.tsx     `@assistant-ui/react-markdown` 기반 마크다운 렌더러 (remark-gfm, 표/코드블록 등 스타일 슬롯)
+│   │   ├── thread-messages.tsx   `ThreadPrimitive.Messages`에 등록하는 UserMessage/AssistantMessage — 진행 블록·도구 카드 배치
+│   │   ├── message-input.tsx     입력창 (3단계에서 ComposerPrimitive로 교체 예정)
 │   │   ├── primitives.tsx        공용 UI 조각 (StatusDot 등, 직접 작성)
 │   │   ├── tool-result-card.tsx  AI Elements `Tool` 래퍼 안에서 tool_name 별 분기
 │   │   └── tool-results/         database / knowledge / catalog / simulation 전용 렌더러
+│   │   ※ markdown.tsx · message-bubble.tsx 는 assistant-ui 전환으로 더 이상 쓰이지 않는다 — 4단계 정리 전까지 파일은 남겨둔다.
 │   └── ui/                       shadcn/ui 컴포넌트 (자동 생성)
 ├── hooks/                        use-controllable-state / use-mobile
 ├── lib/
 │   ├── chat-api.ts               POST /api/chat · SSE 파싱 · AbortController — 백엔드 통신 유일 창구
+│   ├── chat-runtime.ts           `ChatMessage` -> assistant-ui `ThreadMessageLike` 변환 (convertMessage)
 │   ├── knowledge-api.ts          GET /api/knowledge/* 읽기 전용 조회
 │   ├── dummy.ts                  사이드바/인스펙터/시드 대화용 더미 데이터
 │   └── utils.ts                  shadcn 표준 `cn()` 헬퍼
@@ -81,7 +84,7 @@ src/
 
 - `status` Event는 `data: { step, label?, status }` 형태를 가정하며 같은 `step`은 갱신된다.
 - `tool_result`는 `data.kind`로 렌더러가 갈린다 — `database`(표) / `knowledge`(RAG 인용) / `catalog`(카탈로그·KPI, **기본 접힘**) / `simulation`. `execute_sql` 결과의 컬럼·행은 `data.table.{columns,rows}` 아래에 온다.
-- 어시스턴트 메시지는 단일 `content` 문자열이 아니라 `parts: MessagePart[]` (text/tool, 도착 순서)로 표현한다 — 도구 호출 전 내레이션과 최종 답변이 하나로 뭉개지지 않게 하기 위함.
+- 어시스턴트 메시지는 단일 `content` 문자열이 아니라 `parts: MessagePart[]` (text/tool, 도착 순서)로 표현한다 — 도구 호출 전 내레이션과 최종 답변이 하나로 뭉개지지 않게 하기 위함. `lib/chat-runtime.ts`가 이 배열을 그대로 assistant-ui `ThreadMessageLike.content`로 옮긴다(순서 보존).
 
 ## 폐쇄망 원칙
 
@@ -89,7 +92,7 @@ src/
 
 ## 문서
 
-- [docs/decisions.md](docs/decisions.md) — 아키텍처 결정과 그 배경 (워크벤치 리디자인 · shadcn 도입/Tailwind v4 · AI Elements 채택 · Next.js → Vite 이관)
+- [docs/decisions.md](docs/decisions.md) — 아키텍처 결정과 그 배경 (워크벤치 리디자인 · shadcn 도입/Tailwind v4 · AI Elements 채택 · Next.js → Vite 이관 · assistant-ui 도입)
 - [docs/closed-network.md](docs/closed-network.md) — 폐쇄망 원칙과 의존성 검증 체크리스트
 - [plan/](plan/) — 실행 계획 문서
 - [CLAUDE.md](CLAUDE.md) — Claude Code로 이 디렉토리에서 작업할 때의 규칙
