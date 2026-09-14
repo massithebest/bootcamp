@@ -12,7 +12,14 @@ from typing import Any
 
 from claude_agent_sdk import create_sdk_mcp_server, tool
 
-from tools.knowledge_tool import describe_table, get_kpi, list_kpis, list_tables
+from tools.knowledge_tool import (
+    describe_table,
+    get_kpi,
+    get_recipe,
+    list_kpis,
+    list_recipes,
+    list_tables,
+)
 from tools.rag_tool import search_knowledge
 from tools.simulation_tool import list_simulation, run_simulation
 from tools.sql_tool import execute_sql
@@ -30,6 +37,8 @@ TOOL_NAMES = [
     f"mcp__{MCP_SERVER_NAME}__describe_table",
     f"mcp__{MCP_SERVER_NAME}__list_kpis",
     f"mcp__{MCP_SERVER_NAME}__get_kpi",
+    f"mcp__{MCP_SERVER_NAME}__list_recipes",
+    f"mcp__{MCP_SERVER_NAME}__get_recipe",
 ]
 
 
@@ -133,6 +142,26 @@ async def _get_kpi(args: dict[str, Any]) -> dict[str, Any]:
     return _ok(await get_kpi(kpi_id=args["kpi_id"]))
 
 
+@tool(
+    "list_recipes",
+    "자주 쓰는 집계·조인 패턴을 담은 재사용 CTE 목록을 조회한다. "
+    "keyword 로 이름·설명을 부분일치 검색한다.",
+    {"keyword": str},
+)
+async def _list_recipes(args: dict[str, Any]) -> dict[str, Any]:
+    return _ok(await list_recipes(keyword=args.get("keyword")))
+
+
+@tool(
+    "get_recipe",
+    "레시피 하나의 CTE SQL 본문·원천 테이블·샘플 쿼리를 조회한다. "
+    "cte_sql 을 WITH 절로 복사해 execute_sql 에 조합해 쓴다 (자동 치환 없음).",
+    {"recipe_id": str},
+)
+async def _get_recipe(args: dict[str, Any]) -> dict[str, Any]:
+    return _ok(await get_recipe(recipe_id=args["recipe_id"]))
+
+
 def build_planning_mcp_server():
     """생산계획 Tool 을 담은 in-process MCP Server 를 생성한다."""
 
@@ -148,5 +177,7 @@ def build_planning_mcp_server():
             _describe_table,
             _list_kpis,
             _get_kpi,
+            _list_recipes,
+            _get_recipe,
         ],
     )

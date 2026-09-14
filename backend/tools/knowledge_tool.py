@@ -62,3 +62,27 @@ async def get_kpi(kpi_id: str) -> dict:
         return kpi
 
     return _catalog("kpi", kpi, verified=kpi["verified"])
+
+
+async def list_recipes(keyword: str | None = None) -> dict:
+    """List reusable CTE recipes, optionally filtered by keyword.
+
+    Returns a summary only. Call `get_recipe` for the CTE SQL body
+    and sample queries.
+    """
+
+    return _catalog("recipe_list", get_store().list_recipes(keyword))
+
+
+async def get_recipe(recipe_id: str) -> dict:
+    """Get one recipe: CTE alias, SQL body, source tables, sample queries.
+
+    Copy `cte_sql` into your own `WITH <cte_name> AS (...)` clause when
+    writing `execute_sql` — this is not auto-substituted.
+    """
+
+    recipe = get_store().get_recipe(recipe_id)
+    if recipe.get("status") == "error":
+        return recipe
+
+    return _catalog("recipe", recipe, verified=recipe["verified"])

@@ -7,7 +7,14 @@ import pytest
 
 from agent.sdk_tools import TOOL_NAMES
 from scripts.seed_sample_db import main as seed_main
-from tools.knowledge_tool import describe_table, get_kpi, list_kpis, list_tables
+from tools.knowledge_tool import (
+    describe_table,
+    get_kpi,
+    get_recipe,
+    list_kpis,
+    list_recipes,
+    list_tables,
+)
 from tools.rag_tool import search_knowledge
 from tools.simulation_tool import list_simulation, run_simulation
 from tools.sql_tool import execute_sql
@@ -22,6 +29,8 @@ ALL_TOOLS = (
     describe_table,
     list_kpis,
     get_kpi,
+    list_recipes,
+    get_recipe,
 )
 
 
@@ -82,6 +91,8 @@ def test_run_simulation_returns_dict(seeded_db) -> None:
         (lambda: describe_table("FGS_INBOUND_RESULT"), "table"),
         (lambda: list_kpis(), "kpi_list"),
         (lambda: get_kpi("fgs_inbound"), "kpi"),
+        (lambda: list_recipes(), "recipe_list"),
+        (lambda: get_recipe("plan_vs_actual"), "recipe"),
     ],
 )
 def test_knowledge_tools_use_catalog_kind(call, catalog_type: str) -> None:
