@@ -7,7 +7,7 @@ Claude Agent SDK 기반 Backend와 통신하는 질의응답형 3-pane 에이전
 - Vite 7 (SPA, App Router 아님) · React 18 · TypeScript (2026-09-14 Next.js 14에서 이관 — [docs/decisions.md#nextjs--vite-이관](docs/decisions.md#nextjs--vite-이관))
 - Tailwind CSS **v4** + shadcn/ui 컴포넌트 (2026-09-11 도입, `@tailwindcss/vite` 플러그인 경유)
 - **AI Elements** (2026-09-14 채택) — `src/components/ai-elements/`에 소스로 복사해 우리 코드로 관리한다(`chain-of-thought` / `tool` / `task`). 컴포넌트만 쓰고 `useChat`·`@ai-sdk/react`·`streamdown`은 도입하지 않는다.
-- **assistant-ui** (2026-09-14 도입 진행 중, 이전 결정을 뒤집음) — `@assistant-ui/react` + `@assistant-ui/react-markdown` + `remark-gfm`을 **상태·UI 플럼빙 계층**으로 쓴다. 메시지 상태 소유권은 `useExternalStoreRuntime`으로 계속 우리(`chat-window.tsx`)가 갖는다. `@ai-sdk/react`·`useChat`·AI SDK 데이터 스트림 프로토콜은 도입하지 않는다 — 백엔드가 그 포맷을 쓰지 않는다. 자세한 배경·설계 결정은 [docs/decisions.md](docs/decisions.md) 참고.
+- **assistant-ui** (2026-09-14 도입, 이전 기각 결정을 뒤집음) — `@assistant-ui/react` + `@assistant-ui/react-markdown` + `remark-gfm`을 **상태·UI 플럼빙 계층**으로 쓴다. 메시지 상태 소유권은 `useExternalStoreRuntime`으로 계속 우리(`hooks/use-agent-chat.ts`)가 갖는다. `@ai-sdk/react`·`useChat`·AI SDK 데이터 스트림 프로토콜은 도입하지 않는다 — 백엔드가 그 포맷을 쓰지 않는다. 자동 스크롤 앵커링·취소·복사·재생성·편집(백엔드 세션 포크, 실제 Claude CLI로 검증)까지 전부 구현 완료. 자세한 배경·설계 결정은 [docs/decisions.md#assistant-ui-도입](docs/decisions.md#assistant-ui-도입) 참고.
 - 아이콘은 `lucide-react` (npm 번들, 외부 CDN 아님)
 - 상태관리: React 기본(`useState`/`useRef`)만 사용
 - Vercel AI SDK(`ai`)는 도입하지 않는다. AI Elements `tool.tsx`가 예전엔 `ToolUIPart` 타입만 import했지만 Vite 이관 때 로컬 타입 선언으로 대체하고 의존성 자체를 제거했다. 프론트는 외부 LLM provider를 직접 호출하지 않고 항상 사내 백엔드(`src/lib/chat-api.ts`)를 경유한다.
@@ -48,14 +48,14 @@ src/
 │   │   ├── context-inspector.tsx Skills(실 API) / Metadata / Prompt 탭
 │   │   ├── empty-state.tsx       대화 시작 전 예시 질문 (ThreadPrimitive.Suggestion)
 │   │   ├── markdown-text.tsx     `@assistant-ui/react-markdown` 기반 마크다운 렌더러 (remark-gfm, 표/코드블록 등 스타일 슬롯)
-│   │   ├── thread-messages.tsx   `ThreadPrimitive.Messages`에 등록하는 UserMessage/AssistantMessage — 진행 블록·도구 카드·복사 액션바 배치
+│   │   ├── thread-messages.tsx   `ThreadPrimitive.Messages`에 등록하는 UserMessage/AssistantMessage/UserEditComposer — 진행 블록·도구 카드·복사/재생성/편집 액션바 배치
 │   │   ├── message-input.tsx     입력창 (ComposerPrimitive — 전송/Enter/자동높이/취소 라이브러리 위임)
 │   │   ├── primitives.tsx        공용 UI 조각 (StatusDot 등, 직접 작성)
 │   │   ├── tool-result-card.tsx  AI Elements `Tool` 래퍼 안에서 tool_name 별 분기
 │   │   └── tool-results/         database / knowledge / catalog / simulation 전용 렌더러
 │   └── ui/                       shadcn/ui 컴포넌트 (자동 생성)
 ├── hooks/
-│   ├── use-agent-chat.ts         대화 상태 · SSE Streaming · AgentEvent 처리 · assistant-ui 런타임(useExternalStoreRuntime) 생성
+│   ├── use-agent-chat.ts         대화 상태 · SSE Streaming · AgentEvent 처리 · assistant-ui 런타임(useExternalStoreRuntime) 생성 · 편집/재생성 포크
 │   ├── use-controllable-state.ts AI Elements chain-of-thought 훅 의존 로컬 구현
 │   └── use-mobile.ts             shadcn sidebar 반응형 훅 (미사용 sidebar.tsx 부속)
 ├── lib/
@@ -86,6 +86,7 @@ src/
 
 - `status` Event는 `data: { step, label?, status }` 형태를 가정하며 같은 `step`은 갱신된다.
 - `tool_result`는 `data.kind`로 렌더러가 갈린다 — `database`(표) / `knowledge`(RAG 인용) / `catalog`(카탈로그·KPI, **기본 접힘**) / `simulation`. `execute_sql` 결과의 컬럼·행은 `data.table.{columns,rows}` 아래에 온다.
+- `done` Event는 `data: { turn_id }`를 싣는다 — 그 턴이 끝난 시점의 백엔드 포크 지점. `ChatMessage.turnId`에 저장해뒀다가 편집/재생성 시 `ChatRequestBody.fork_from_turn_id`로 되돌려 보낸다(`hooks/use-agent-chat.ts`).
 - 어시스턴트 메시지는 단일 `content` 문자열이 아니라 `parts: MessagePart[]` (text/tool, 도착 순서)로 표현한다 — 도구 호출 전 내레이션과 최종 답변이 하나로 뭉개지지 않게 하기 위함. `lib/chat-runtime.ts`가 이 배열을 그대로 assistant-ui `ThreadMessageLike.content`로 옮긴다(순서 보존).
 
 ## 폐쇄망 원칙

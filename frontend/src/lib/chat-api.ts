@@ -22,6 +22,8 @@ export const API_BASE_URL =
 export interface SendChatMessageOptions {
   message: string;
   conversationId?: string;
+  /** 편집/재생성 포크 지점. `ChatRequestBody.fork_from_turn_id` 로 그대로 전달한다. */
+  forkFromTurnId?: string;
   /** 각 AgentEvent 를 순서대로 전달받는다. */
   onEvent: (event: AgentEvent) => void;
   /** Streaming 취소용. 초기 UI 에 Stop 버튼이 없어도 구조는 유지한다. */
@@ -106,10 +108,11 @@ function parseAgentEvent(payload: string): AgentEvent | null {
 export async function sendChatMessage(
   options: SendChatMessageOptions,
 ): Promise<void> {
-  const { message, conversationId, onEvent, signal } = options;
+  const { message, conversationId, forkFromTurnId, onEvent, signal } = options;
 
   const body: ChatRequestBody = { message };
   if (conversationId) body.conversation_id = conversationId;
+  if (forkFromTurnId !== undefined) body.fork_from_turn_id = forkFromTurnId;
 
   let response: Response;
   try {

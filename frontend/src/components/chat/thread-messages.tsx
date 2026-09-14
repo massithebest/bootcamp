@@ -6,10 +6,11 @@
  * 도메인 렌더러(`AgentProgress`, `ToolResultCard`)는 무수정으로 재사용한다.
  */
 
-import { CheckIcon, CopyIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, PencilIcon, RotateCcwIcon } from "lucide-react";
 
 import {
   ActionBarPrimitive,
+  ComposerPrimitive,
   MessagePrimitive,
   MessagePartPrimitive,
   useAuiState,
@@ -31,12 +32,48 @@ export function UserMessage() {
 
   return (
     <MessagePrimitive.Root>
-      <div className="flex justify-end">
+      <div className="flex flex-col items-end gap-1">
         <div className="max-w-[85%] whitespace-pre-wrap break-words rounded border border-line-strong bg-surface px-3 py-2 text-ui text-ink">
           {text}
         </div>
+        <ActionBarPrimitive.Root
+          hideWhenRunning
+          autohide="not-last"
+          className="flex items-center"
+        >
+          <ActionBarPrimitive.Edit className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-2xs text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink-2 disabled:pointer-events-none disabled:opacity-0">
+            <PencilIcon className="size-3" /> 편집
+          </ActionBarPrimitive.Edit>
+        </ActionBarPrimitive.Root>
       </div>
     </MessagePrimitive.Root>
+  );
+}
+
+/**
+ * 사용자 메시지 편집 모드. `ActionBarPrimitive.Edit` 클릭 시
+ * `ThreadPrimitive.Messages` 의 `UserEditComposer` 슬롯으로 교체 렌더된다.
+ * `ComposerPrimitive` 는 편집 컨텍스트에서도 그대로 동작한다 — 현재 텍스트로
+ * 미리 채워지고, Send 는 onEdit(편집 저장 + 포크 재실행)을 부른다.
+ */
+export function UserEditComposer() {
+  return (
+    <div className="flex justify-end">
+      <ComposerPrimitive.Root className="flex w-full max-w-[85%] flex-col gap-1.5 rounded border border-accent bg-surface px-3 py-2">
+        <ComposerPrimitive.Input
+          className="resize-none bg-transparent text-ui text-ink outline-none"
+          autoFocus
+        />
+        <div className="flex justify-end gap-1.5">
+          <ComposerPrimitive.Cancel className="rounded px-2 py-1 text-2xs text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink-2">
+            취소
+          </ComposerPrimitive.Cancel>
+          <ComposerPrimitive.Send className="rounded bg-accent px-2.5 py-1 text-2xs font-medium text-accent-ink transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-3">
+            저장하고 다시 실행
+          </ComposerPrimitive.Send>
+        </div>
+      </ComposerPrimitive.Root>
+    </div>
   );
 }
 
@@ -83,9 +120,12 @@ export function AssistantMessage() {
           hideWhenRunning
           autohide="not-last"
           autohideFloat="single-branch"
-          className="flex items-center"
+          className="flex items-center gap-1"
         >
           <CopyButton />
+          <ActionBarPrimitive.Reload className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-2xs text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink-2 disabled:pointer-events-none disabled:opacity-0">
+            <RotateCcwIcon className="size-3" /> 재생성
+          </ActionBarPrimitive.Reload>
         </ActionBarPrimitive.Root>
       </div>
     </MessagePrimitive.Root>

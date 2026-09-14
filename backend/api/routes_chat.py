@@ -19,6 +19,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
             async for event in run_agent(
                 message=request.message,
                 conversation_id=request.conversation_id,
+                fork_from_turn_id=request.fork_from_turn_id,
             ):
                 yield f"data: {event.model_dump_json()}\n\n"
 

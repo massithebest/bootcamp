@@ -17,7 +17,7 @@ import { ContextInspector } from "./context-inspector";
 import { ConnectionBanner } from "./connection-banner";
 import { EmptyState } from "./empty-state";
 import { MessageInput } from "./message-input";
-import { AssistantMessage, UserMessage } from "./thread-messages";
+import { AssistantMessage, UserEditComposer, UserMessage } from "./thread-messages";
 
 const SEED_SESSION_ID = SESSIONS[0]?.id ?? null;
 
@@ -124,7 +124,7 @@ export function ChatWindow() {
             ) : (
               <div className="mx-auto flex max-w-reading flex-col gap-6 py-6">
                 <ThreadPrimitive.Messages
-                  components={{ UserMessage, AssistantMessage }}
+                  components={{ UserMessage, AssistantMessage, UserEditComposer }}
                 />
               </div>
             )}

@@ -8,6 +8,7 @@ Claude 모델은 호출하지 않고, Mock Service 를 실제로 거쳐 전체 �
 확인)을 따른다 — 프론트가 `catalog` / `database` 두 kind 를 모두 받아본다.
 """
 
+import uuid
 from collections.abc import AsyncIterator
 
 from api.schemas import AgentEvent
@@ -83,4 +84,7 @@ async def run_fake_agent(
     ):
         yield AgentEvent(type="text", content=chunk)
 
-    yield AgentEvent(type="done")
+    # 실제 경로와 응답 형태를 맞춘다(편집/재생성이 참조하는 turn_id).
+    # Fake Runner 는 진짜 SDK 세션이 없으므로 포크 자체는 지원하지 않는다 —
+    # 매번 같은 고정 시나리오를 재생하므로 편집/재생성해도 결과가 달라지지 않는다.
+    yield AgentEvent(type="done", data={"turn_id": str(uuid.uuid4())})

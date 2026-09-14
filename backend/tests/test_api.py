@@ -4,6 +4,7 @@ import json
 
 from fastapi.testclient import TestClient
 
+from api.schemas import AgentEvent
 from main import app
 
 
@@ -59,6 +60,24 @@ def test_chat_endpoint_streams_agent_events(monkeypatch) -> None:
     assert kinds[:2] == ["catalog", "database"]
 
 
+def test_chat_endpoint_done_event_carries_turn_id(monkeypatch) -> None:
+    """편집/재생성이 다음 요청의 `fork_from_turn_id` 로 돌려보낼 값."""
+
+    monkeypatch.setenv("PLANNING_AGENT_FAKE", "1")
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "hi", "conversation_id": "conv-1"},
+    )
+
+    events = _parse_sse(response.text)
+    done = events[-1]
+
+    assert done["type"] == "done"
+    assert isinstance(done["data"]["turn_id"], str)
+    assert done["data"]["turn_id"]
+
+
 def test_chat_endpoint_reports_error_gracefully(monkeypatch) -> None:
     """run_agent 내부 오류가 상세 노출 없이 error/done 으로 전달된다."""
 
@@ -75,6 +94,37 @@ def test_chat_endpoint_reports_error_gracefully(monkeypatch) -> None:
     assert events[-1]["type"] == "done"
     assert any(e["type"] == "error" for e in events)
     assert all("internal detail" not in (e.get("content") or "") for e in events)
+
+
+def test_chat_endpoint_passes_fork_from_turn_id_through(monkeypatch) -> None:
+    """`fork_from_turn_id` 가 요청 바디에서 run_agent 까지 그대로 전달된다."""
+
+    captured: dict[str, object] = {}
+
+    async def fake_run_agent(*, message, conversation_id, fork_from_turn_id):
+        captured["fork_from_turn_id"] = fork_from_turn_id
+        yield AgentEvent(type="done", data={"turn_id": "new-turn"})
+
+    monkeypatch.setattr("api.routes_chat.run_agent", fake_run_agent)
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "message": "다시 답해줘",
+            "conversation_id": "conv-1",
+            "fork_from_turn_id": "turn-1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["fork_from_turn_id"] == "turn-1"
+
+
+def test_chat_request_fork_from_turn_id_defaults_to_none() -> None:
+    from api.schemas import ChatRequest
+
+    request = ChatRequest(message="hi")
+    assert request.fork_from_turn_id is None
 
 
 def test_knowledge_skills_endpoint() -> None:

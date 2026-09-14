@@ -125,3 +125,53 @@ def test_result_message_error_becomes_error_event_and_tracks_session() -> None:
 
     assert [e.type for e in events] == ["error"]
     assert adapter.session_id == "sess-123"
+
+
+def test_last_entry_uuid_tracks_most_recent_assistant_or_user_message() -> None:
+    """편집/재생성의 포크 지점(resume_session_at) — 마지막으로 본 entry 의 uuid.
+
+    AssistantMessage/UserMessage 만 대상이다. ResultMessage 는 uuid 필드가
+    있어도 실제 Transcript(JSONL)에는 적히지 않는 프로토콜 프레임이라
+    `resume_session_at` 후보에서 제외한다 — 포함시키면 실제 Claude CLI 가
+    "No message found with message.uuid of: ..." 로 거부한다(직접 재현 확인).
+    """
+
+    adapter = AgentEventAdapter()
+    assert adapter.last_entry_uuid is None
+
+    adapter.convert(
+        AssistantMessage(content=[TextBlock(text="진행 중")], model="x", uuid="a-1")
+    )
+    assert adapter.last_entry_uuid == "a-1"
+
+    adapter.convert(
+        UserMessage(
+            content=[ToolResultBlock(tool_use_id="t1", content="ok")],
+            uuid="u-1",
+        )
+    )
+    assert adapter.last_entry_uuid == "u-1"
+
+    # ResultMessage 는 last_entry_uuid 를 갱신하지 않는다 — 마지막 값은
+    # 여전히 방금 본 UserMessage("u-1") 여야 한다.
+    adapter.convert(
+        ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="sess-123",
+            uuid="r-1",
+        )
+    )
+    assert adapter.last_entry_uuid == "u-1"
+
+
+def test_last_entry_uuid_stays_none_when_sdk_events_omit_it() -> None:
+    """uuid 를 안 채운(테스트 더블 등) 이벤트는 조용히 무시한다."""
+
+    adapter = AgentEventAdapter()
+    adapter.convert(AssistantMessage(content=[TextBlock(text="x")], model="x"))
+
+    assert adapter.last_entry_uuid is None

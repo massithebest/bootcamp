@@ -20,6 +20,11 @@ class ChatRequest(BaseModel):
 
     message: str
     conversation_id: str | None = None
+    #: 편집/재생성 포크 지점. `AgentEvent(type="done").data.turn_id` 로 받은 값을
+    #: 그대로 돌려준다. 빈 문자열이면 이 대화를 처음부터 다시 시작한다(직전 turn
+    #: 이 없거나 turn_id 가 없는 메시지를 편집/재생성할 때). `None`(생략)이면
+    #: 평범한 다음 턴 — 대화의 현재 세션을 이어서 실행한다.
+    fork_from_turn_id: str | None = None
 
 
 class AgentEvent(BaseModel):

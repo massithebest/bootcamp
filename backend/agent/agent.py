@@ -1,6 +1,7 @@
 """Claude Agent SDK initialization and execution."""
 
 import os
+import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -9,7 +10,12 @@ from claude_agent_sdk import ClaudeAgentOptions, query
 from agent.event_adapter import AgentEventAdapter
 from agent.fake_runner import run_fake_agent
 from agent.sdk_tools import TOOL_NAMES, build_planning_mcp_server
-from agent.session_store import bind_session_id, get_session_id
+from agent.session_store import (
+    bind_session_id,
+    get_session_id,
+    get_turn_anchor,
+    record_turn_anchor,
+)
 from agent.system_prompt import SYSTEM_PROMPT
 from api.schemas import AgentEvent
 from core.config import AGENT_MODEL, CLAUDE_CLI_PATH, agent_provider_env
@@ -24,8 +30,17 @@ def _use_fake_runner() -> bool:
     return os.getenv("PLANNING_AGENT_FAKE", "").lower() in {"1", "true", "yes"}
 
 
-def _build_options(resume_session_id: str | None) -> ClaudeAgentOptions:
-    """Claude Agent SDK 실행 옵션을 구성한다."""
+def _build_options(
+    resume_session_id: str | None,
+    resume_session_at: str | None = None,
+) -> ClaudeAgentOptions:
+    """Claude Agent SDK 실행 옵션을 구성한다.
+
+    `resume_session_at` 이 주어지면(편집/재생성 포크) `fork_session=True` 로
+    새 session_id 를 받는다 — 원본 session 파일을 그 자리에서 잘라내지 않고
+    그 지점까지만 복사해 새 세션으로 이어간다. 평범한 다음 턴(`resume_session_at`
+    없음)은 지금까지와 동일하게 같은 session_id 에 계속 이어 쓴다.
+    """
 
     return ClaudeAgentOptions(
         system_prompt=SYSTEM_PROMPT,
@@ -37,6 +52,8 @@ def _build_options(resume_session_id: str | None) -> ClaudeAgentOptions:
         allowed_tools=TOOL_NAMES + ["Skill"],
         permission_mode="bypassPermissions",
         resume=resume_session_id,
+        fork_session=resume_session_at is not None,
+        resume_session_at=resume_session_at,
         model=AGENT_MODEL,
         # LLM_PROVIDER=openrouter 이면 base URL / 토큰을 주입한다. (기본: {})
         env=agent_provider_env() or None,
@@ -45,9 +62,41 @@ def _build_options(resume_session_id: str | None) -> ClaudeAgentOptions:
     )
 
 
+def _resolve_resume(
+    conversation_id: str | None,
+    fork_from_turn_id: str | None,
+) -> tuple[str | None, str | None, AgentEvent | None]:
+    """`resume`/`resume_session_at` 에 넘길 값을 계산한다.
+
+    Returns:
+        (resume_session_id, resume_session_at, warning_event).
+        `warning_event` 는 알 수 없는 turn_id 로 새 대화로 폴백했을 때만 채워진다.
+    """
+
+    if fork_from_turn_id is None:
+        # 평범한 다음 턴 — 대화의 현재 세션을 이어서 실행한다. (기존 동작)
+        return get_session_id(conversation_id), None, None
+
+    if fork_from_turn_id == "":
+        # 이 대화를 처음부터 다시 시작한다 (직전 turn 이 없거나, turn_id 가
+        # 없는 메시지 — 예: 더미 시드 대화 — 를 편집/재생성할 때).
+        return None, None, None
+
+    anchor = get_turn_anchor(fork_from_turn_id)
+    if anchor is None:
+        warning = AgentEvent(
+            type="error",
+            content="이전 응답 지점을 찾을 수 없어 새 대화로 시작합니다.",
+        )
+        return None, None, warning
+
+    return anchor.session_id, anchor.last_entry_uuid, None
+
+
 async def run_agent(
     message: str,
     conversation_id: str | None = None,
+    fork_from_turn_id: str | None = None,
 ) -> AsyncIterator[AgentEvent]:
     """Run the production planning agent.
 
@@ -59,6 +108,11 @@ async def run_agent(
             Frontend conversation identifier.
             It is intentionally separated from an Agent SDK internal
             session identifier.
+
+        fork_from_turn_id:
+            편집/재생성 포크 지점 — 이전 `done` 이벤트의 `data.turn_id`.
+            `None` 이면 평범한 다음 턴, 빈 문자열이면 처음부터 새로 시작,
+            알 수 없는 값이면 `error` 이벤트를 하나 내보내고 새로 시작한다.
 
     Yields:
         AgentEvent:
@@ -75,9 +129,15 @@ async def run_agent(
             yield event
         return
 
+    turn_id = str(uuid.uuid4())
+    resume_session_id, resume_session_at, warning = _resolve_resume(
+        conversation_id, fork_from_turn_id
+    )
+    if warning is not None:
+        yield warning
+
     adapter = AgentEventAdapter()
-    resume_session_id = get_session_id(conversation_id)
-    options = _build_options(resume_session_id)
+    options = _build_options(resume_session_id, resume_session_at)
 
     try:
         async for raw_event in query(prompt=message, options=options):
@@ -86,5 +146,7 @@ async def run_agent(
     finally:
         # SDK session_id 를 사용자 대화에 연결해 후속 turn 에서 이어서 실행한다.
         bind_session_id(conversation_id, adapter.session_id)
+        if adapter.session_id:
+            record_turn_anchor(turn_id, adapter.session_id, adapter.last_entry_uuid)
 
-    yield AgentEvent(type="done")
+    yield AgentEvent(type="done", data={"turn_id": turn_id})

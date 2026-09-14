@@ -82,6 +82,7 @@ class AgentEventAdapter:
     def __init__(self) -> None:
         self._tool_name_by_id: dict[str, str] = {}
         self._last_session_id: str | None = None
+        self._last_entry_uuid: str | None = None
 
     @property
     def session_id(self) -> str | None:
@@ -89,8 +90,28 @@ class AgentEventAdapter:
 
         return self._last_session_id
 
+    @property
+    def last_entry_uuid(self) -> str | None:
+        """가장 최근에 관측된 Transcript Entry uuid.
+
+        AssistantMessage/UserMessage 만 대상이다. `ResultMessage.uuid` 도
+        필드는 있지만 실제 Transcript(JSONL)에는 적히지 않는 프로토콜
+        프레임이라 `resume_session_at` 에 넘기면 CLI 가
+        "No message found with message.uuid of: ..." 로 거부한다 — 실제
+        Claude CLI 로 직접 재현해 확인했다. 이 턴이 끝난 시점의 마지막
+        AssistantMessage/UserMessage 값이 편집/재생성의 포크 지점
+        (`ClaudeAgentOptions.resume_session_at`)이 된다.
+        """
+
+        return self._last_entry_uuid
+
     def convert(self, raw_event: object) -> list[AgentEvent]:
         """SDK 이벤트 1개를 0개 이상의 `AgentEvent` 로 변환한다."""
+
+        if isinstance(raw_event, (AssistantMessage, UserMessage)):
+            uuid = getattr(raw_event, "uuid", None)
+            if isinstance(uuid, str):
+                self._last_entry_uuid = uuid
 
         if isinstance(raw_event, AssistantMessage):
             return self._convert_assistant(raw_event)

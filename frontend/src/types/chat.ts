@@ -77,9 +77,20 @@ export interface ChatMessage {
   streaming: boolean;
   /** 사용자에게 보여줄 오류 메시지. */
   error?: string | null;
+  /**
+   * `done` Event 의 `data.turn_id` — 이 턴이 끝난 시점의 백엔드 포크 지점.
+   * assistant 메시지에만 있다. 편집/재생성이 "이 턴 직전까지" 를 계산할 때
+   * (바로 앞 assistant 메시지의 turnId 를) 쓴다. 더미 시드 대화처럼 실제
+   * 백엔드 턴이 없었던 메시지는 이 필드가 없다 — 그 경우 편집/재생성은
+   * 이 대화를 처음부터 새로 시작한다(hooks/use-agent-chat.ts 참고).
+   */
+  turnId?: string;
 }
 
 export interface ChatRequestBody {
   message: string;
   conversation_id?: string;
+  /** 편집/재생성 포크 지점. 생략하면 평범한 다음 턴. 자세한 의미는
+   *  백엔드 `api/schemas.py` ChatRequest.fork_from_turn_id 참고. */
+  fork_from_turn_id?: string;
 }

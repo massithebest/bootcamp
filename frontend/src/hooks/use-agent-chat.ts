@@ -6,6 +6,13 @@
  * assistant-ui 런타임 생성을 모두 갖는다. `useExternalStoreRuntime`을 쓰지만
  * 메시지 상태는 계속 우리가 소유한다 — assistant-ui는 상태/UI 플럼빙
  * 계층일 뿐이다.
+ *
+ * 편집/재생성(onEdit/onReload)은 백엔드 세션 포크가 필요해서(docs/decisions.md
+ * Q5) `turnId`(백엔드 `done` Event 의 `data.turn_id`)를 assistant 메시지에
+ * 실어두고, 그 직전 turnId 를 포크 지점으로 다시 보낸다. 더미 시드 대화처럼
+ * turnId 가 없는 메시지를 편집/재생성하면 그 대화를 처음부터 새로 시작한다
+ * (`fork_from_turn_id: ""`) — 애초에 백엔드에 보낸 적이 없어 포크할 지점이
+ * 없기 때문이다.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -39,6 +46,24 @@ const emptyAssistant = (id: string): ChatMessage => ({
   error: null,
 });
 
+const freshUser = (text: string): ChatMessage => ({
+  id: nextId("user"),
+  role: "user",
+  content: text,
+  parts: [],
+  statuses: [],
+  streaming: false,
+  error: null,
+});
+
+/** 실패 시 재시도에 필요한 만큼만 기억한다. 편집/재생성 실패 후 "다시 시도"가
+ *  포크 지점을 잃지 않도록 — 평범한 턴 실패는 이 값이 없다(runTurn 참고). */
+interface RetryContext {
+  text: string;
+  forkFromTurnId: string;
+  prefix: ChatMessage[];
+}
+
 export interface UseAgentChatResult {
   runtime: AssistantRuntime;
   messages: ChatMessage[];
@@ -59,6 +84,7 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
   const conversationIdRef = useRef<string>("");
   const abortRef = useRef<AbortController | null>(null);
   const turnHadOutputRef = useRef(false);
+  const retryContextRef = useRef<RetryContext | null>(null);
 
   useEffect(() => {
     conversationIdRef.current = createConversationId();
@@ -143,7 +169,13 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
           return;
         }
         case "done": {
-          updateAssistant(assistantId, (m) => ({ ...m, streaming: false }));
+          // turn_id 는 이 턴의 포크 지점 — 편집/재생성이 나중에 참조한다.
+          const turnId = asString(event.data?.turn_id);
+          updateAssistant(assistantId, (m) => ({
+            ...m,
+            streaming: false,
+            turnId: turnId ?? m.turnId,
+          }));
           return;
         }
       }
@@ -151,29 +183,17 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
     [updateAssistant],
   );
 
-  const runTurn = useCallback(
-    async (text: string, opts?: { retryOf?: string }) => {
-      if (streaming) return;
-      setRetryPrompt(null);
-
-      const assistantId = nextId("assistant");
-      setMessages((prev) => {
-        const base = opts?.retryOf
-          ? prev.filter((m) => m.id !== opts.retryOf)
-          : [
-              ...prev,
-              {
-                id: nextId("user"),
-                role: "user" as const,
-                content: text,
-                parts: [],
-                statuses: [],
-                streaming: false,
-                error: null,
-              },
-            ];
-        return [...base, emptyAssistant(assistantId)];
-      });
+  /**
+   * 스트리밍 실행 공통부. 호출 측이 `messages` 를 원하는 형태로 미리
+   * 세팅해두고(새 user 메시지 + emptyAssistant 까지 포함) 호출한다.
+   * 반환값이 `true` 면 무출력 실패 — 호출 측이 배너/재시도 컨텍스트를 정리한다.
+   */
+  const streamTurn = useCallback(
+    async (
+      assistantId: string,
+      text: string,
+      forkFromTurnId?: string,
+    ): Promise<boolean> => {
       setStreaming(true);
       turnHadOutputRef.current = false;
 
@@ -183,6 +203,7 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
       await sendChatMessage({
         message: text,
         conversationId: conversationIdRef.current || undefined,
+        forkFromTurnId,
         signal: controller.signal,
         onEvent: (event) => applyEvent(assistantId, event),
       });
@@ -191,18 +212,71 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
       setStreaming(false);
       abortRef.current = null;
 
+      return !turnHadOutputRef.current && !controller.signal.aborted;
+    },
+    [applyEvent, updateAssistant],
+  );
+
+  const runTurn = useCallback(
+    async (text: string, opts?: { retryOf?: string }) => {
+      if (streaming) return;
+      setRetryPrompt(null);
+      retryContextRef.current = null;
+
+      const assistantId = nextId("assistant");
+      setMessages((prev) => {
+        const base = opts?.retryOf
+          ? prev.filter((m) => m.id !== opts.retryOf)
+          : [...prev, freshUser(text)];
+        return [...base, emptyAssistant(assistantId)];
+      });
+
+      const failed = await streamTurn(assistantId, text);
+
       // 출력이 하나도 없었으면 연결 실패로 간주하고 배너를 띄운다.
-      if (!turnHadOutputRef.current && !controller.signal.aborted) {
+      if (failed) {
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));
         setRetryPrompt(text);
       }
     },
-    [streaming, applyEvent, updateAssistant],
+    [streaming, streamTurn],
+  );
+
+  /**
+   * 편집/재생성 저수준 실행부. `prefix` 이후를 새 user 메시지 + 응답으로
+   * 갈아 끼우고, `forkFromTurnId` 로 그 지점부터 백엔드 세션을 포크한다.
+   */
+  const runFromPrefix = useCallback(
+    async (prefix: ChatMessage[], text: string, forkFromTurnId: string) => {
+      if (streaming) return;
+      setRetryPrompt(null);
+
+      const assistantId = nextId("assistant");
+      const userMessage = freshUser(text);
+      setMessages([...prefix, userMessage, emptyAssistant(assistantId)]);
+
+      const failed = await streamTurn(assistantId, text, forkFromTurnId);
+
+      if (failed) {
+        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        setRetryPrompt(text);
+        retryContextRef.current = { text, forkFromTurnId, prefix };
+      } else {
+        retryContextRef.current = null;
+      }
+    },
+    [streaming, streamTurn],
   );
 
   const handleRetry = useCallback(() => {
-    if (retryPrompt) runTurn(retryPrompt);
-  }, [retryPrompt, runTurn]);
+    if (!retryPrompt) return;
+    const ctx = retryContextRef.current;
+    if (ctx) {
+      runFromPrefix(ctx.prefix, ctx.text, ctx.forkFromTurnId);
+    } else {
+      runTurn(retryPrompt);
+    }
+  }, [retryPrompt, runTurn, runFromPrefix]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
@@ -218,6 +292,7 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
       handleStop();
       setMessages(seed);
       setRetryPrompt(null);
+      retryContextRef.current = null;
       conversationIdRef.current = createConversationId();
     },
     [handleStop],
@@ -237,6 +312,33 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
     handleStop();
   }, [handleStop]);
 
+  /** 재생성 — `parentId`(직전 user 메시지)는 그대로 재사용하고 응답만 새로 받는다. */
+  const handleReload = useCallback(
+    async (parentId: string | null) => {
+      if (!parentId) return;
+      const idx = messages.findIndex((m) => m.id === parentId && m.role === "user");
+      if (idx === -1) return;
+      const prefix = messages.slice(0, idx);
+      await runFromPrefix(prefix, messages[idx].content, anchorTurnIdBefore(messages, idx));
+    },
+    [messages, runFromPrefix],
+  );
+
+  /** 편집 — `sourceId`(편집된 user 메시지)와 그 이후를 전부 새 턴으로 교체한다. */
+  const handleEdit = useCallback(
+    async (message: AppendMessage) => {
+      const sourceId = message.sourceId;
+      if (!sourceId) return;
+      const idx = messages.findIndex((m) => m.id === sourceId);
+      if (idx === -1) return;
+      const text = appendMessageText(message);
+      if (!text) return;
+      const prefix = messages.slice(0, idx);
+      await runFromPrefix(prefix, text, anchorTurnIdBefore(messages, idx));
+    },
+    [messages, runFromPrefix],
+  );
+
   const runtime = useExternalStoreRuntime<ChatMessage>({
     messages,
     isRunning: streaming,
@@ -244,6 +346,8 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
     setMessages: (next) => setMessages(next as ChatMessage[]),
     onNew: handleNew,
     onCancel: handleCancel,
+    onEdit: handleEdit,
+    onReload: handleReload,
   });
 
   return {
@@ -255,6 +359,17 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
     handleStop,
     resetConversation,
   };
+}
+
+/**
+ * `idx` 바로 앞 메시지(assistant)의 `turnId` — 편집/재생성의 포크 지점.
+ * 그 assistant 메시지가 없거나 turnId 가 없으면(첫 턴이거나, 실제 백엔드
+ * 턴을 거친 적 없는 더미 시드 메시지) 빈 문자열 — 대화를 처음부터 새로
+ * 시작한다는 뜻이다(백엔드 `fork_from_turn_id: ""`, agent/agent.py 참고).
+ */
+function anchorTurnIdBefore(messages: ChatMessage[], idx: number): string {
+  const prev = messages[idx - 1];
+  return prev?.role === "assistant" && prev.turnId ? prev.turnId : "";
 }
 
 /** `AppendMessage` 의 content 에서 사용자 입력 텍스트만 꺼낸다. */

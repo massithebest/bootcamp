@@ -24,6 +24,7 @@ Frontend → FastAPI(/api/chat, SSE) → Agent Runner → Claude Agent SDK
 | Services | `services/{mock,real}/*` | 실제 I/O (DB / Milvus / Simulation MCP) |
 
 - `conversation_id`(사용자 대화)와 SDK `session_id`는 `agent/session_store.py`에서 매핑한다.
+- **편집/재생성 포크** (2026-09-14, 프론트 assistant-ui 도입에 맞춰 추가): 매 턴마다 `turn_id`(uuid4)를 발급해 `AgentEvent(type="done").data.turn_id`로 프론트에 돌려주고, `session_store.py`가 `turn_id -> TurnAnchor{session_id, last_entry_uuid}`를 기록한다. 프론트가 이후 요청에 `ChatRequest.fork_from_turn_id`로 그 `turn_id`를 보내면 `agent.py`가 `resume=<anchor.session_id>, fork_session=True, resume_session_at=<anchor.last_entry_uuid>`로 그 지점부터 새 세션을 포크한다(`agent.py:_resolve_resume`). `last_entry_uuid`는 **AssistantMessage/UserMessage 의 uuid만** 대상이다 — `ResultMessage.uuid`는 필드는 있어도 실제 Transcript(JSONL)에 없는 프로토콜 프레임이라 `resume_session_at`에 넘기면 CLI가 `No message found with message.uuid of: ...`로 거부한다(실제 Claude CLI로 재현해 확인, `event_adapter.py` 참고). `fork_from_turn_id`가 빈 문자열이면 대화를 처음부터 새로 시작하고, 알 수 없는 값이면 `error` Event 하나를 내보내고 새 대화로 폴백한다.
 - 시뮬레이션 종류·파라미터 스키마는 `knowledge/simulations/*.yaml`에 정의하고
   `services/simulation_registry.py`가 로드해 mock/real 공용으로 제공한다.
   새 시뮬레이션 종류를 추가할 때는 YAML 파일 하나만 추가하면 된다.
@@ -103,8 +104,10 @@ python -m pytest -q
 - `tests/test_scenarios.py` — 시드 DB가 시나리오대로 이상치를 만들었는지
 - `tests/test_prompt_consistency.py` — SYSTEM_PROMPT/CLAUDE.md/Skills와 `TOOL_NAMES` 드리프트 방지
 - `pytest -m e2e` — 실제 에이전트를 호출하는 시나리오 테스트 (API 키 필요, 기본 실행에서 제외)
-- `tests/test_event_adapter.py` — SDK 이벤트 → `AgentEvent` 변환 테스트
+- `tests/test_event_adapter.py` — SDK 이벤트 → `AgentEvent` 변환 테스트 (last_entry_uuid 추적 포함)
 - `tests/test_api.py` — `/api/chat` 엔드포인트 통합 테스트 (Fake Runner 사용)
+- `tests/test_session_store.py` — conversation_id/session_id 매핑, turn_id/TurnAnchor
+- `tests/test_agent.py` — 편집/재생성 포크 분기(`_resolve_resume`/`_build_options`/`run_agent`). `query()`를 monkeypatch 로 대체 — 실제 CLI 검증은 별도로 수동 수행함(2026-09-14, `resume_session_at`에 ResultMessage.uuid를 넘기면 거부되는 걸 이렇게 발견했다)
 - 새 Tool/Service를 추가하면 mock 구현 기준으로 테스트를 먼저 작성한다.
 
 ## 명령어
@@ -131,7 +134,9 @@ python -m pytest -q
 - `AgentEvent` 계약(`text`/`status`/`tool_call`/`tool_result`/`error`/`done`,
   `api/schemas.py`)을 바꾸면 프론트 `frontend/src/types/chat.ts`와
   반드시 함께 맞춘다. `status` 이벤트의 data는 `{ step, label?, status }`
-  형태를 가정하며 같은 `step`은 갱신된다.
+  형태를 가정하며 같은 `step`은 갱신된다. `done` 이벤트의 data는
+  `{ turn_id }`를 싣는다 — 편집/재생성 포크 지점(위 "편집/재생성 포크"
+  참고). `ChatRequest.fork_from_turn_id`도 이 계약의 일부다.
 
 ## 문서
 

@@ -10,6 +10,7 @@ Production Planning Agent의 Vite + React SPA 프론트엔드 (2026-09-14 Next.j
 - 상태관리: React 기본(`useState`/`useRef`)만 사용, 외부 상태관리 라이브러리 없음
 - **AI Elements** (2026-09-14 채택) — `src/components/ai-elements/`에 shadcn CLI로 복사된 소스(`chain-of-thought`, `tool`, `task`). **컴포넌트만 쓰고 `useChat`/`@ai-sdk/react`/`streamdown`은 도입하지 않는다.** 복사된 소스는 우리 코드로 취급해 토큰·한국어 라벨로 다듬었고, `code-block`(shiki)·radix 훅 의존은 제거했다(로컬 `hooks/use-controllable-state.ts`). 배경과 assistant-ui 비교는 [docs/decisions.md#ai-sdk-및-채팅-ui-라이브러리-도입-검토](docs/decisions.md#ai-sdk-및-채팅-ui-라이브러리-도입-검토).
 - **Vercel AI SDK(`ai`)는 도입하지 않는다.** AI Elements `tool.tsx`가 예전엔 `ToolUIPart`/`DynamicToolUIPart` 타입만 import했지만, Vite 이관(2026-09-14) 때 실제로 쓰는 표면(`type`/`state`)만 로컬 타입으로 옮기고 `ai` 의존성 자체를 제거했다 (`ai` + `@ai-sdk/*` 트리 ~12.6MB, `@ai-sdk/gateway`에 외부 URL 하드코딩 — 폐쇄망 반입 대상에서 뺐다). **외부 LLM provider(OpenAI/Anthropic 등)를 프론트에서 직접 호출하지 않는다** — 반드시 사내 백엔드(`lib/chat-api.ts`)를 경유한다.
+- **assistant-ui**(`@assistant-ui/react` + `@assistant-ui/react-markdown`, 2026-09-14 도입)는 **상태·UI 플럼빙 계층으로만** 쓴다. `useExternalStoreRuntime`으로 메시지 상태 소유권은 계속 우리(`hooks/use-agent-chat.ts`)가 갖는다. **`@ai-sdk/react`/`useChat`/AI SDK 데이터 스트림 프로토콜은 도입하지 않는다** — 백엔드가 그 포맷을 쓰지 않는다. 범용 채팅 UI 기능(스크롤 앵커링·컴포저·액션바·마크다운)은 assistant-ui 프리미티브에 위임하고, 도메인 렌더링(`tool-results/*`, `AgentEvent` 처리)은 계속 자체 구현한다. 새 assistant-ui API를 쓰기 전에 `node_modules/@assistant-ui/*/dist/**/*.d.ts`를 직접 읽을 것 — 문서·기억에 의존하지 말 것(실제로 독스트링과 다르게 동작하는 API가 있었다, `resume_session_at` 사례는 [docs/decisions.md#assistant-ui-도입](docs/decisions.md#assistant-ui-도입) Q5 참고). 배경·설계 결정 전체는 [docs/decisions.md#assistant-ui-도입](docs/decisions.md#assistant-ui-도입).
 
 ## 최우선 원칙: 폐쇄망(closed-network)
 
@@ -48,16 +49,22 @@ src/
 │   ├── chat/                     3-pane 워크벤치 (사이드바 / 대화 / 인스펙터)
 │   │   ├── agent-progress.tsx    진행 단계 블록 (ChainOfThought 기반, 펼침 상태는 여기서 소유)
 │   │   ├── app-sidebar.tsx       세션 목록 사이드바 (커스텀 구현 — shadcn sidebar 아님, 아래 참고)
-│   │   ├── chat-window.tsx       전체 Chat 상태 · Streaming · AgentEvent 처리, 3-pane 셸
+│   │   ├── chat-window.tsx       3-pane 셸 조립 · 패널 토글 · 세션 선택 (상태는 hooks/use-agent-chat.ts 로 이전)
 │   │   ├── context-inspector.tsx Skills(실 API) / Metadata / Prompt 탭
-│   │   ├── message-bubble.tsx    메시지 표현 (parts 배열 렌더링)
-│   │   ├── message-input.tsx     입력창
-│   │   ├── markdown.tsx          자체 구현 마크다운 뷰어 (외부 라이브러리 미사용)
+│   │   ├── empty-state.tsx       대화 시작 전 예시 질문 (ThreadPrimitive.Suggestion)
+│   │   ├── markdown-text.tsx     `@assistant-ui/react-markdown` 기반 마크다운 렌더러 (remark-gfm)
+│   │   ├── thread-messages.tsx   ThreadPrimitive.Messages 에 등록하는 User/AssistantMessage · UserEditComposer · ActionBar(복사/재생성/편집)
+│   │   ├── message-input.tsx     입력창 (ComposerPrimitive — 전송/Enter/자동높이/취소 라이브러리 위임)
 │   │   ├── tool-result-card.tsx  Tool 결과 — AI Elements `Tool` 래퍼 안에서 tool_name 별 분기
 │   │   └── tool-results/         DB/지식(RAG)/카탈로그/시뮬레이션 결과 전용 컴포넌트
 │   └── ui/                       shadcn/ui 컴포넌트 (자동 생성, 직접 로직 추가 지양)
+├── hooks/
+│   ├── use-agent-chat.ts         대화 상태 · SSE Streaming · AgentEvent 처리 · assistant-ui 런타임(useExternalStoreRuntime) 생성 · 편집/재생성 포크
+│   ├── use-controllable-state.ts AI Elements chain-of-thought 훅 의존 로컬 구현
+│   └── use-mobile.ts             shadcn sidebar 반응형 훅 (미사용 sidebar.tsx 부속)
 ├── lib/
 │   ├── chat-api.ts                POST /api/chat · SSE 파싱 · AbortController — 백엔드 통신 유일 창구
+│   ├── chat-runtime.ts            `ChatMessage` -> assistant-ui `ThreadMessageLike` 변환 (convertMessage)
 │   ├── knowledge-api.ts           GET /api/knowledge/* (Skills 목록 등) 읽기 전용 조회
 │   ├── dummy.ts                   사이드바/인스펙터/시드 대화용 하드코딩 더미 데이터 (실제 제조 용어, lorem 금지)
 │   └── utils.ts                   shadcn 표준 `cn()` 헬퍼
@@ -70,8 +77,8 @@ src/
 
 - **메시지 구조**: 어시스턴트 메시지는 `parts: MessagePart[]` (text/tool, 도착 순서)를 쓴다. 단일 `content` 문자열이 아니다 — 도구 호출 전 내레이션과 최종 답변이 하나로 뭉개지지 않게 하기 위함. `content`는 사용자 메시지 전용.
 - **tool_result `kind`**: `database`(표) / `knowledge`(RAG 인용) / `catalog`(카탈로그·KPI, **기본 접힘**) / `simulation`. `catalog` 는 분석 한 번에 4~6회 오므로 헤더 한 줄로만 보여준다. `execute_sql` 결과는 컬럼·행이 `data.table.{columns,rows}` 아래에 온다.
-- **AgentEvent 계약**: `text` / `status` / `tool_call` / `tool_result` / `error` / `done`. `status` 이벤트의 data는 `{ step, label?, status }` 형태를 가정하며 같은 `step`은 갱신된다. 이 계약을 바꾸려면 `backend/agent/event_adapter.py`와 함께 맞춰야 한다.
-- **flexbox 스크롤**: `chat-window.tsx`에서 중앙 `<section>`은 `min-h-0 overflow-hidden`, 스크롤 div는 `min-h-0`, 입력창 wrapper는 `shrink-0`이 반드시 필요하다. 하나라도 빠지면 긴 스트리밍 응답이 입력창을 화면 밖으로 밀어낸다.
+- **AgentEvent 계약**: `text` / `status` / `tool_call` / `tool_result` / `error` / `done`. `status` 이벤트의 data는 `{ step, label?, status }` 형태를 가정하며 같은 `step`은 갱신된다. `done` 이벤트의 data는 `{ turn_id }`를 싣는다 — 편집/재생성이 이 값을 `ChatRequestBody.fork_from_turn_id`로 되돌려 보내 백엔드 세션을 그 지점에서 포크한다(`hooks/use-agent-chat.ts`의 `anchorTurnIdBefore`). 이 계약을 바꾸려면 `backend/agent/event_adapter.py`·`backend/agent/agent.py`와 함께 맞춰야 한다.
+- **flexbox 스크롤**: `ThreadPrimitive.Viewport`가 스크롤을 담당한다 — 여전히 중앙 `<section>`은 `min-h-0 overflow-hidden`, `ThreadPrimitive.Root`/`Viewport`는 `min-h-0`, 입력창 wrapper는 `shrink-0`이 필요하다(assistant-ui 도입 이후에도 이 flexbox 규칙 자체는 안 바뀜). 하나라도 빠지면 긴 스트리밍 응답이 입력창을 화면 밖으로 밀어낸다.
 - **shadcn `sidebar.tsx`는 아직 미사용**: `components/ui/sidebar.tsx`(+ `sheet.tsx`, `use-mobile.ts`)가 설치는 되어 있지만, 실제 3-pane 레이아웃은 커스텀 `app-sidebar.tsx`를 쓴다. 두 사이드바 구현을 통합/교체하기 전에 `--sidebar-*` 변수와 `SidebarProvider` 구조가 기존 커스텀 구현과 충돌하지 않는지 확인할 것 ([docs/decisions.md#열린-이슈](docs/decisions.md#열린-이슈)).
 
 ## 백엔드 연동
