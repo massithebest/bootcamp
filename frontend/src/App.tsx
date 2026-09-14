@@ -1,5 +1,5 @@
 import { ChatWindow } from "@/components/chat/chat-window";
 
-export default function Page() {
+export default function App() {
   return <ChatWindow />;
 }
