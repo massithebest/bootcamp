@@ -1,0 +1,12 @@
+type: MP_확정조회
+name: 확정 MP 조회
+aliases: [확정 MP, 확정된 버전, 확정 MP 버전]
+when_to_use: 계획 수량이 확정 후 바뀌었는지 확인할 때. 실적 부진 원인 분석에서 첫 번째로 검증하는 가설.
+params:
+  fixedPlanMonth: {required: false, description: "확정 MP 조회 연월 (yyyyMM), 누락시 당월", example: "202609"}
+output_schema:
+  mpVersion: {type: string, desc: 확정 MP 버전}
+  fixedAt: {type: string, desc: 확정일}
+  changed: {type: int, desc: "확정 후 변경 여부 (0: 없음, 1: 있음)"}
+follows: []
+status: verified

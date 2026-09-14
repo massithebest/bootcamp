@@ -1,22 +1,85 @@
-"""Mock production planning simulation service."""
+"""Mock production planning simulation service.
 
+`실적_조회`·`MP_확정조회` 는 합성 시드 SQLite 를 읽는다 (설계 §6-1) —
+SQL 결과와 시뮬레이션 결과가 모순되면 에이전트가 잘못된 가설을 채택하므로,
+두 경로가 같은 데이터를 봐야 한다.
+"""
+
+from __future__ import annotations
+
+from services.mock._sqlite import MISSING_DB_MESSAGE, SampleDbMissingError, connect
 from services.simulation_registry import (
     list_simulation_types,
     validate_simulation_request,
 )
 
 
+DEFAULT_PLAN_MONTH = "202609"
+
+
+def _performance_lookup(params: dict) -> dict:
+    """월 단위 라인별 입고 실적 합계. 취소(status_cd = 'X')는 제외한다."""
+
+    month_from = params["workMonthFrom"]
+    month_to = params["workMonthTo"]
+
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT line_cd AS line,
+                   substr(work_date, 1, 4) || substr(work_date, 6, 2) AS workMonth,
+                   SUM(inbound_qty) AS qty
+              FROM FGS_INBOUND_RESULT
+             WHERE status_cd <> 'X'
+               AND substr(work_date, 1, 4) || substr(work_date, 6, 2) BETWEEN ? AND ?
+             GROUP BY 1, 2
+             ORDER BY 2, 1
+            """,
+            (month_from, month_to),
+        ).fetchall()
+
+    return {
+        "workMonthFrom": month_from,
+        "workMonthTo": month_to,
+        "results": [
+            {"line": row["line"], "workMonth": row["workMonth"], "qty": row["qty"]}
+            for row in rows
+        ],
+    }
+
+
+def _fixed_mp_lookup(params: dict) -> dict:
+    plan_month = params.get("fixedPlanMonth") or DEFAULT_PLAN_MONTH
+
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT version, fixed_at, changed FROM MP_VERSION WHERE plan_month = ?",
+            (plan_month,),
+        ).fetchone()
+
+    if row is None:
+        return {
+            "status": "error",
+            "message": f"확정 MP 가 없습니다: {plan_month}",
+        }
+
+    return {
+        "fixedPlanMonth": plan_month,
+        "mpVersion": row["version"],
+        "fixedAt": row["fixed_at"],
+        "changed": row["changed"],
+    }
+
+
 def _mock_result(simulation_type: str, params: dict) -> dict:
     if simulation_type == "실적_조회":
-        return {
-            "status": "ok",
-            "simulation_type": simulation_type,
-            "workMonthFrom": params["workMonthFrom"],
-            "workMonthTo": params["workMonthTo"],
-            "results": [
-                {"line": "A", "workMonth": params["workMonthFrom"], "qty": 950},
-            ],
-        }
+        return {"status": "ok", "simulation_type": simulation_type, **_performance_lookup(params)}
+
+    if simulation_type == "MP_확정조회":
+        result = _fixed_mp_lookup(params)
+        if result.get("status") == "error":
+            return result
+        return {"status": "ok", "simulation_type": simulation_type, **result}
 
     if simulation_type == "MP_최신조회":
         return {
@@ -26,21 +89,12 @@ def _mock_result(simulation_type: str, params: dict) -> dict:
             "updatedAt": "2026-09-01T00:00:00",
         }
 
-    if simulation_type == "MP_확정조회":
-        fixed_plan_month = params.get("fixedPlanMonth", "202609")
-        return {
-            "status": "ok",
-            "simulation_type": simulation_type,
-            "fixedPlanMonth": fixed_plan_month,
-            "mpVersion": f"MP-{fixed_plan_month}-FIXED",
-        }
-
     if simulation_type == "SWAP_결과조회":
         return {
             "status": "ok",
             "simulation_type": simulation_type,
             "productId": params["productId"],
-            "planYm": params.get("planYm", "202609"),
+            "planYm": params.get("planYm", DEFAULT_PLAN_MONTH),
             "requiredQty": 500,
             "actualQty": 480,
         }
@@ -66,7 +120,10 @@ class MockSimulationService:
         if error is not None:
             return {"status": "error", "message": error}
 
-        return _mock_result(simulation_type, params)
+        try:
+            return _mock_result(simulation_type, params)
+        except SampleDbMissingError:
+            return {"status": "error", "message": MISSING_DB_MESSAGE}
 
 
 _service = MockSimulationService()

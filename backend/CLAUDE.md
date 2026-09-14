@@ -20,12 +20,20 @@ Frontend → FastAPI(/api/chat, SSE) → Agent Runner → Claude Agent SDK
 | Event Adapter | `agent/event_adapter.py` | SDK 이벤트 → `AgentEvent` 변환 (SDK 종속 코드 집중) |
 | SDK Tools | `agent/sdk_tools.py` | `tools/` 함수를 `@tool`로 감싼 in-process MCP Server |
 | Tools | `tools/*.py` | 입력 검증 + Service 호출 |
+| Knowledge | `knowledge/*.yaml` + `services/knowledge_service.py` | 카탈로그·KPI·시뮬레이션 정의 (YAML이 source of truth) |
 | Services | `services/{mock,real}/*` | 실제 I/O (DB / Milvus / Simulation MCP) |
 
 - `conversation_id`(사용자 대화)와 SDK `session_id`는 `agent/session_store.py`에서 매핑한다.
-- 시뮬레이션 종류·파라미터 스키마는 `services/simulation_registry.py`에
-  mock/real 공용으로 정의되어 있다 (`SIMULATION_TYPES`, `PARAM_SCHEMA`).
-  새 시뮬레이션 종류를 추가할 때 이 한 곳만 수정하면 된다.
+- 시뮬레이션 종류·파라미터 스키마는 `knowledge/simulations/*.yaml`에 정의하고
+  `services/simulation_registry.py`가 로드해 mock/real 공용으로 제공한다.
+  새 시뮬레이션 종류를 추가할 때는 YAML 파일 하나만 추가하면 된다.
+- 도메인 지식(테이블 카탈로그·KPI·시뮬레이션·용어집·시나리오)은 `knowledge/`
+  아래 YAML이 source of truth다. `services/knowledge_service.py`가 pydantic으로
+  검증해 로드하고, 에이전트는 `tools/knowledge_tool.py`를 통해서만 접근한다
+  (설계: [docs/domain-knowledge.md](../docs/domain-knowledge.md)).
+- 합성 시드 SQLite(`data/sample.sqlite`, git 미추적)는 카탈로그 YAML에서
+  `python -m scripts.seed_sample_db`로 생성한다. `execute_sql`과 mock 시뮬레이션이
+  같은 DB를 본다. mock 개발 중 테스트가 실패하면 시드부터 확인한다.
 
 ## Mock ↔ Real 서비스 전환
 
@@ -89,6 +97,12 @@ python -m pytest -q
 ```
 
 - `tests/test_services.py`, `tests/test_tools.py` — mock 서비스/tool 단위 테스트
+- `tests/test_knowledge.py`, `tests/test_knowledge_integrity.py` — 지식 로더와
+  YAML 간 참조 정합성 (KPI 원천 테이블, diagnostics 참조 등)
+- `tests/test_sql_guard.py` — `execute_sql` 조회 전용 가드레일
+- `tests/test_scenarios.py` — 시드 DB가 시나리오대로 이상치를 만들었는지
+- `tests/test_prompt_consistency.py` — SYSTEM_PROMPT/CLAUDE.md/Skills와 `TOOL_NAMES` 드리프트 방지
+- `pytest -m e2e` — 실제 에이전트를 호출하는 시나리오 테스트 (API 키 필요, 기본 실행에서 제외)
 - `tests/test_event_adapter.py` — SDK 이벤트 → `AgentEvent` 변환 테스트
 - `tests/test_api.py` — `/api/chat` 엔드포인트 통합 테스트 (Fake Runner 사용)
 - 새 Tool/Service를 추가하면 mock 구현 기준으로 테스트를 먼저 작성한다.

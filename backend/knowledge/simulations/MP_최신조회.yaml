@@ -1,0 +1,10 @@
+type: MP_최신조회
+name: 최신 MP 조회
+aliases: [최신 MP, MP 버전]
+when_to_use: 현재 운영 중인 최신 MP 버전을 알아야 할 때.
+params: {}
+output_schema:
+  mpVersion: {type: string, desc: 최신 MP 버전}
+  updatedAt: {type: string, desc: 갱신 시각}
+follows: []
+status: verified

@@ -104,7 +104,20 @@ def test_mock_list_simulation_contract() -> None:
     assert types == {"실적_조회", "MP_최신조회", "MP_확정조회", "SWAP_결과조회"}
 
 
-def test_mock_run_simulation_performance_lookup() -> None:
+def test_mock_list_simulation_exposes_param_detail() -> None:
+    """PARAM_SCHEMA 가 합쳐지지 않아 에이전트에게 안 가던 문제(설계 §현재 상태)."""
+
+    result = asyncio.run(mock_simulation_service.list_simulation())
+    performance = next(s for s in result["simulations"] if s["type"] == "실적_조회")
+
+    assert performance["params"]["workMonthFrom"]["description"]
+    assert performance["params"]["workMonthFrom"]["required"] is True
+    assert performance["when_to_use"]
+    assert performance["output_schema"]["results"]["desc"]
+    assert performance["follows"] == []
+
+
+def test_mock_run_simulation_performance_lookup(seeded_db) -> None:
     result = asyncio.run(
         mock_simulation_service.run_simulation(
             simulation_type="실적_조회",
@@ -114,6 +127,37 @@ def test_mock_run_simulation_performance_lookup() -> None:
 
     assert result["status"] == "ok"
     assert isinstance(result["results"], list)
+    assert {row["line"] for row in result["results"]} == {"A", "B", "C", "D"}
+    assert all(row["workMonth"] == "202608" for row in result["results"])
+
+
+def test_mock_run_simulation_reflects_scenario(seeded_db) -> None:
+    """시뮬레이션이 SQL 과 같은 시드 DB 를 본다 — 부진 라인이 두 경로에서 일치해야 한다."""
+
+    result = asyncio.run(
+        mock_simulation_service.run_simulation(
+            simulation_type="실적_조회",
+            params={"workMonthFrom": "202607", "workMonthTo": "202609"},
+        )
+    )
+    by_month = {
+        (row["line"], row["workMonth"]): row["qty"] for row in result["results"]
+    }
+
+    assert by_month[("B", "202609")] < by_month[("B", "202607")]
+
+
+def test_mock_run_simulation_fixed_mp_reads_seed(seeded_db) -> None:
+    result = asyncio.run(
+        mock_simulation_service.run_simulation(
+            simulation_type="MP_확정조회", params={}
+        )
+    )
+
+    assert result["status"] == "ok"
+    assert result["mpVersion"] == "MP-202609-FIXED"
+    # 시나리오가 계획 변경 흔적을 남기지 않았으므로 이 가설은 기각돼야 한다.
+    assert result["changed"] == 0
 
 
 def test_mock_run_simulation_swap_result() -> None:

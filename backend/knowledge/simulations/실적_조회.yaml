@@ -1,0 +1,11 @@
+type: 실적_조회
+name: 실적조회
+aliases: [생산실적 조회, 실적 시뮬레이션]
+when_to_use: 월 단위 라인별 생산 실적 합계가 필요할 때. 일별 상세는 execute_sql 로 조회한다.
+params:
+  workMonthFrom: {required: true, description: "조회 시작 작업 월 (yyyyMM, 포함)", example: "202608"}
+  workMonthTo: {required: true, description: "조회 끝 작업 월 (yyyyMM, 포함)", example: "202609"}
+output_schema:
+  results: {type: array, desc: "[{line, workMonth, qty}]"}
+follows: []
+status: verified
