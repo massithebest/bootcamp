@@ -89,6 +89,25 @@ def root(tmp_path: Path) -> Path:
           status: draft
         """,
     )
+    _write(
+        tmp_path / "recipes/plan_vs_actual.yaml",
+        """
+        recipe_id: plan_vs_actual
+        name: 계획 대비 실적
+        description: FGS 입고 실적과 라인 마스터를 조인해 라인별로 집계하는 CTE
+        cte_name: plan_vs_actual
+        cte_sql: |
+          SELECT r.work_date, r.line_cd, SUM(1) AS cnt
+          FROM FGS_INBOUND_RESULT r
+          JOIN LINE_MASTER l ON l.line_cd = r.line_cd
+          GROUP BY r.work_date, r.line_cd
+        sources: [FGS_INBOUND_RESULT, LINE_MASTER]
+        sample_queries:
+          - description: 라인별 합계
+            sql: SELECT line_cd, SUM(cnt) FROM plan_vs_actual GROUP BY line_cd
+        status: draft
+        """,
+    )
     return tmp_path
 
 
@@ -98,6 +117,7 @@ def test_load_reads_all_kinds(root: Path) -> None:
     assert len(store.list_tables()) == 2
     assert len(store.list_kpis()) == 1
     assert len(store.list_simulations()) == 1
+    assert len(store.list_recipes()) == 1
     assert store.table_names() == {"FGS_INBOUND_RESULT", "LINE_MASTER"}
 
 
@@ -187,3 +207,38 @@ def test_missing_directory_loads_empty(tmp_path: Path) -> None:
 
     assert store.list_tables() == []
     assert store.table_names() == set()
+    assert store.list_recipes() == []
+
+
+def test_list_recipes_keyword_filter(root: Path) -> None:
+    store = KnowledgeStore.load(root)
+
+    assert [r["recipe_id"] for r in store.list_recipes(keyword="계획 대비")] == [
+        "plan_vs_actual"
+    ]
+    assert set(store.list_recipes()[0]) == {
+        "recipe_id",
+        "name",
+        "description",
+        "cte_name",
+        "verified",
+    }
+    assert store.list_recipes(keyword="존재하지않는") == []
+
+
+def test_get_recipe_full_and_verified(root: Path) -> None:
+    store = KnowledgeStore.load(root)
+
+    recipe = store.get_recipe("plan_vs_actual")
+    assert recipe["cte_name"] == "plan_vs_actual"
+    assert recipe["sources"] == ["FGS_INBOUND_RESULT", "LINE_MASTER"]
+    assert recipe["sample_queries"][0]["description"] == "라인별 합계"
+    assert recipe["verified"] is False
+
+
+def test_get_recipe_unknown_returns_error(root: Path) -> None:
+    result = KnowledgeStore.load(root).get_recipe("no_such")
+
+    assert result["status"] == "error"
+    assert "no_such" in result["message"]
+    assert "list_recipes" in result["message"]

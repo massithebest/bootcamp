@@ -1,6 +1,6 @@
 """도메인 지식 저장소 로더.
 
-`knowledge/` 아래의 YAML(카탈로그·KPI·시뮬레이션·용어집·시나리오)을 읽어
+`knowledge/` 아래의 YAML(카탈로그·KPI·시뮬레이션·용어집·시나리오·레시피)을 읽어
 pydantic 으로 검증하고, tool/서비스/API 가 함께 쓰는 조회 인터페이스를 제공한다.
 
 설계: docs/domain-knowledge.md §3
@@ -130,6 +130,29 @@ class Scenario(BaseModel):
     expected_diagnosis: str
 
 
+class RecipeSample(BaseModel):
+    """CTE 를 사용하는 완전한 실행 가능 SQL 예시 하나."""
+
+    description: str
+    sql: str
+
+
+class KnowledgeRecipe(KnowledgeMeta):
+    """자주 쓰는 집계·조인 패턴을 담은 재사용 가능 CTE.
+
+    에이전트는 `cte_sql` 을 `WITH <cte_name> AS (...)` 로 직접 조합해
+    execute_sql 에 붙여 쓴다. 자동 치환 없음 — sql_guard 는 그대로 둔다.
+    """
+
+    recipe_id: str
+    name: str
+    description: str
+    cte_name: str  # WITH 절에서 쓸 별칭
+    cte_sql: str  # `WITH <cte_name> AS (` 와 `)` 사이에 들어갈 본문
+    sources: list[str]  # cte_sql 이 읽는 실제 카탈로그 테이블
+    sample_queries: list[RecipeSample] = []
+
+
 # ---- 로더 ----
 
 
@@ -168,12 +191,14 @@ class KnowledgeStore:
         simulations: list[KnowledgeSimulation],
         glossary: list[GlossaryEntry],
         scenarios: list[Scenario],
+        recipes: list[KnowledgeRecipe] | None = None,
     ) -> None:
         self.tables = {table.table: table for table in tables}
         self.kpis = {kpi.kpi_id: kpi for kpi in kpis}
         self.simulations = {sim.type: sim for sim in simulations}
         self.glossary = glossary
         self.scenarios = {scenario.name: scenario for scenario in scenarios}
+        self.recipes = {recipe.recipe_id: recipe for recipe in (recipes or [])}
 
     # -- 로드 --
 
@@ -199,6 +224,10 @@ class KnowledgeStore:
             _parse(Scenario, _read_yaml(path), path)
             for path in sorted(root.glob("scenarios/*.yaml"))
         ]
+        recipes = [
+            _parse(KnowledgeRecipe, _read_yaml(path), path)
+            for path in sorted(root.glob("recipes/*.yaml"))
+        ]
 
         glossary_path = root / "glossary.yaml"
         glossary: list[GlossaryEntry] = []
@@ -208,7 +237,7 @@ class KnowledgeStore:
                 raise ValueError(f"{glossary_path.name}: 최상위가 리스트여야 합니다.")
             glossary = [_parse(GlossaryEntry, item, glossary_path) for item in raw]
 
-        return cls(tables, kpis, simulations, glossary, scenarios)
+        return cls(tables, kpis, simulations, glossary, scenarios, recipes)
 
     # -- 조회 (tool / API 공용) --
 
@@ -282,6 +311,30 @@ class KnowledgeStore:
 
     def list_scenarios(self) -> list[Scenario]:
         return list(self.scenarios.values())
+
+    def list_recipes(self, keyword: str | None = None) -> list[dict]:
+        rows = []
+        for recipe in self.recipes.values():
+            if keyword and not _contains(
+                keyword, recipe.recipe_id, recipe.name, recipe.description
+            ):
+                continue
+            rows.append(
+                {
+                    "recipe_id": recipe.recipe_id,
+                    "name": recipe.name,
+                    "description": recipe.description,
+                    "cte_name": recipe.cte_name,
+                    "verified": self._verified(recipe),
+                }
+            )
+        return rows
+
+    def get_recipe(self, recipe_id: str) -> dict:
+        found = self.recipes.get(recipe_id) or self._find_ci(self.recipes, recipe_id)
+        if found is None:
+            return self._not_found("레시피", recipe_id, "list_recipes")
+        return {**found.model_dump(mode="json"), "verified": self._verified(found)}
 
     def table_names(self) -> set[str]:
         """execute_sql 가드레일이 쓰는 허용 테이블 목록."""
