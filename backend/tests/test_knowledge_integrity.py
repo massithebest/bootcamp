@@ -18,6 +18,16 @@ def store() -> KnowledgeStore:
     return KnowledgeStore.load(KNOWLEDGE_DIR)
 
 
+#: `FROM`/`JOIN` 뒤의 이름. `services/sql_guard.py`의 `_TABLE_REF`와 같은 패턴.
+#: `(?<![:\w.])` 는 `BETWEEN :from AND :to` 의 `:from` 을 FROM 절로 오인하지
+#: 않게 한다.
+_TABLE_REF = re.compile(r"(?<![:\w.])\b(?:FROM|JOIN)\s+([A-Za-z_][A-Za-z0-9_]*)", re.I)
+
+
+def _referenced_tables(sql: str) -> set[str]:
+    return {name.upper() for name in _TABLE_REF.findall(sql)}
+
+
 def _table_columns(store: KnowledgeStore, table: str) -> set[str]:
     return {column.name for column in store.tables[table].columns}
 
@@ -58,15 +68,7 @@ def test_kpi_sources_exist(store: KnowledgeStore) -> None:
 
 def test_kpi_sql_template_tables_are_declared_sources(store: KnowledgeStore) -> None:
     for kpi in store.kpis.values():
-        used = {
-            name.upper()
-            # (?<![:\w.]) : `BETWEEN :from AND :to` 의 `:from` 을 FROM 절로 오인하지 않게 한다.
-            for name in re.findall(
-                r"(?<![:\w.])\b(?:FROM|JOIN)\s+([A-Za-z_][A-Za-z0-9_]*)",
-                kpi.sql_template,
-                re.I,
-            )
-        }
+        used = _referenced_tables(kpi.sql_template)
         declared = {source.upper() for source in kpi.sources}
         assert used <= declared, (
             f"KPI {kpi.kpi_id} 의 sql_template 이 sources 에 없는 테이블을 쓴다: {used - declared}"
@@ -74,8 +76,6 @@ def test_kpi_sql_template_tables_are_declared_sources(store: KnowledgeStore) -> 
 
 
 def test_diagnostics_refs_resolve(store: KnowledgeStore) -> None:
-    recipes_dir = KNOWLEDGE_DIR / "recipes"
-
     for kpi in store.kpis.values():
         for diagnostic in kpi.diagnostics:
             ref = diagnostic.ref
@@ -87,12 +87,44 @@ def test_diagnostics_refs_resolve(store: KnowledgeStore) -> None:
                 )
             else:
                 is_table = ref in store.tables
+                # recipes/<recipe_id> 형태 — 레시피는 knowledge/recipes/*.yaml 로 로드되므로
+                # store.recipes 에서 확인한다 (파일시스템의 .md 를 직접 찾지 않는다).
                 is_recipe = ref.startswith("recipes/") and (
-                    recipes_dir / f"{ref.removeprefix('recipes/')}.md"
-                ).exists()
+                    ref.removeprefix("recipes/") in store.recipes
+                )
                 assert is_table or is_recipe, (
                     f"KPI {kpi.kpi_id} diagnostics 가 테이블도 레시피도 아닌 것을 가리킨다: {ref}"
                 )
+
+
+def test_recipe_sources_exist(store: KnowledgeStore) -> None:
+    for recipe in store.recipes.values():
+        for source in recipe.sources:
+            assert source in store.tables, (
+                f"레시피 {recipe.recipe_id} 의 원천 테이블이 없다: {source}"
+            )
+
+
+def test_recipe_cte_sql_tables_are_declared_sources(store: KnowledgeStore) -> None:
+    for recipe in store.recipes.values():
+        used = _referenced_tables(recipe.cte_sql)
+        declared = {source.upper() for source in recipe.sources}
+        assert used <= declared, (
+            f"레시피 {recipe.recipe_id} 의 cte_sql 이 sources 에 없는 테이블을 쓴다: "
+            f"{used - declared}"
+        )
+
+
+def test_recipe_sample_queries_reference_declared_or_own_cte(store: KnowledgeStore) -> None:
+    for recipe in store.recipes.values():
+        # 샘플 쿼리는 CTE 자기 자신(cte_name)을 FROM 하는 게 정상이므로 허용 목록에 포함한다.
+        allowed = {source.upper() for source in recipe.sources} | {recipe.cte_name.upper()}
+        for sample in recipe.sample_queries:
+            used = _referenced_tables(sample.sql)
+            assert used <= allowed, (
+                f"레시피 {recipe.recipe_id} 의 샘플 쿼리가 선언되지 않은 대상을 쓴다: "
+                f"{used - allowed} (샘플: {sample.description})"
+            )
 
 
 def test_glossary_links_resolve(store: KnowledgeStore) -> None:
