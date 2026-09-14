@@ -39,8 +39,8 @@ Part 1을 마쳐 `SERVICE_MODE=mock`으로 서버가 정상 기동하는 것을 
 - 이 저장소(`production-planning-agent`) 전체를 클론/압축한다.
 - `.git` 히스토리가 필요 없다면 `git archive`로 워킹트리만 내보내도 된다.
   히스토리가 필요하면 `.git` 폴더까지 통째로 옮긴다.
-- `node_modules`, `__pycache__`, `.next` 등 빌드 산출물/캐시는 제외한다
-  (폐쇄망 쪽에서 다시 만든다).
+- `node_modules`, `__pycache__`, `dist`(frontend 빌드 산출물) 등
+  빌드 산출물/캐시는 제외한다 (폐쇄망 쪽에서 다시 만든다).
 
 ### Python 의존성 오프라인 번들
 

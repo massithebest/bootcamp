@@ -4,33 +4,39 @@ Claude Agent SDK 기반 Backend와 통신하는 질의응답형 3-pane 에이전
 
 ## 스택
 
-- Next.js 14 (App Router) · React 18 · TypeScript
-- Tailwind CSS **v4** + shadcn/ui 컴포넌트 (2026-09-11 도입)
+- Vite 7 (SPA, App Router 아님) · React 18 · TypeScript (2026-09-14 Next.js 14에서 이관 — [docs/decisions.md#nextjs--vite-이관](docs/decisions.md#nextjs--vite-이관))
+- Tailwind CSS **v4** + shadcn/ui 컴포넌트 (2026-09-11 도입, `@tailwindcss/vite` 플러그인 경유)
 - **AI Elements** (2026-09-14 채택) — `src/components/ai-elements/`에 소스로 복사해 우리 코드로 관리한다(`chain-of-thought` / `tool` / `task`). 컴포넌트만 쓰고 `useChat`·`@ai-sdk/react`·`streamdown`은 도입하지 않는다.
 - 아이콘은 `lucide-react` (npm 번들, 외부 CDN 아님)
 - 상태관리: React 기본(`useState`/`useRef`)만 사용
-- Vercel AI SDK(`ai@7.0.97`)는 AI Elements `tool.tsx`가 **타입만**(`ToolUIPart`) import한다. 런타임 코드 미사용이며, 프론트는 외부 LLM provider를 직접 호출하지 않고 항상 사내 백엔드(`src/lib/chat-api.ts`)를 경유한다.
+- Vercel AI SDK(`ai`)는 도입하지 않는다. AI Elements `tool.tsx`가 예전엔 `ToolUIPart` 타입만 import했지만 Vite 이관 때 로컬 타입 선언으로 대체하고 의존성 자체를 제거했다. 프론트는 외부 LLM provider를 직접 호출하지 않고 항상 사내 백엔드(`src/lib/chat-api.ts`)를 경유한다.
 
 ## 실행
 
 ```bash
 npm install
-cp .env.example .env.local   # NEXT_PUBLIC_API_BASE_URL 확인
+cp .env.example .env.local   # VITE_API_BASE_URL 확인
 npm run dev      # http://localhost:3000
 npm run build
 npm run lint
 ```
 
-Backend 주소는 `.env.local`의 `NEXT_PUBLIC_API_BASE_URL` (기본 `http://localhost:8000`).
-Browser가 FastAPI를 직접 호출한다 (Next.js BFF 없음). Backend에 `localhost:3000`
-Origin 허용 CORS 설정이 필요하다. 연결에 실패하면 대화 내용을 유지한 채
-`connection-banner.tsx`가 요청 주소와 확인할 항목을 안내한다.
+Backend 주소는 `.env.local`의 `VITE_API_BASE_URL` (기본 `http://localhost:8000`).
+Browser가 FastAPI를 직접 호출한다 (BFF 없음). Backend에 `localhost:3000`
+Origin 허용 CORS 설정이 필요하다 — `vite.config.ts`가 dev/preview 포트를
+3000으로 고정(`strictPort: true`)해 이 CORS 설정과 어긋나지 않게 한다.
+연결에 실패하면 대화 내용을 유지한 채 `connection-banner.tsx`가 요청
+주소와 확인할 항목을 안내한다.
 
 ## 구조
 
 ```
+index.html                        Vite 엔트리 HTML — title/description/favicon
 src/
-├── app/                          layout / page / globals.css / icon.svg
+├── main.tsx                      ReactDOM 엔트리 (globals.css import, <React.StrictMode>)
+├── App.tsx                       루트 컴포넌트 (<ChatWindow /> 렌더링)
+├── vite-env.d.ts                 ImportMetaEnv 타입 선언
+├── app/                          globals.css / icon.svg (Next 시절 경로를 그대로 유지)
 ├── components/
 │   ├── ai-elements/              AI Elements 복사 소스 (chain-of-thought / tool / task) — 우리 코드로 취급
 │   ├── chat/                     3-pane 워크벤치
@@ -79,11 +85,11 @@ src/
 
 ## 폐쇄망 원칙
 
-외부 Font / CDN / 외부 Script / Telemetry 없음. FastAPI Backend 주소 외 외부 Network 호출 없음. `next/font/google` 미사용 (System Font만 사용). shadcn·AI Elements처럼 CLI가 레지스트리에서 소스를 받아오는 도구는 인터넷 환경에서 미리 받아 커밋해 둔다. 새 의존성 도입 시 검증 절차는 [docs/closed-network.md](docs/closed-network.md) 참고.
+외부 Font / CDN / 외부 Script / Telemetry 없음. FastAPI Backend 주소 외 외부 Network 호출 없음 (`npm run build` 후 `grep -rE "https?://" dist/`로 검증). System Font만 사용. shadcn·AI Elements처럼 CLI가 레지스트리에서 소스를 받아오는 도구는 인터넷 환경에서 미리 받아 커밋해 둔다. 새 의존성 도입 시 검증 절차는 [docs/closed-network.md](docs/closed-network.md) 참고.
 
 ## 문서
 
-- [docs/decisions.md](docs/decisions.md) — 아키텍처 결정과 그 배경 (워크벤치 리디자인 · shadcn 도입/Tailwind v4 · AI Elements 채택)
+- [docs/decisions.md](docs/decisions.md) — 아키텍처 결정과 그 배경 (워크벤치 리디자인 · shadcn 도입/Tailwind v4 · AI Elements 채택 · Next.js → Vite 이관)
 - [docs/closed-network.md](docs/closed-network.md) — 폐쇄망 원칙과 의존성 검증 체크리스트
 - [plan/](plan/) — 실행 계획 문서
 - [CLAUDE.md](CLAUDE.md) — Claude Code로 이 디렉토리에서 작업할 때의 규칙

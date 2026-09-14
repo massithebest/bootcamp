@@ -5,7 +5,7 @@
 ```
 production-planning-agent/
 ├── backend/    FastAPI + Claude Agent SDK. /api/chat 에서 AgentEvent 를 SSE 로 스트리밍
-└── frontend/   Next.js(App Router) 워크스페이스 UI. 커스텀 Tailwind, 폐쇄망 대응
+└── frontend/   Vite + React SPA 워크스페이스 UI. 커스텀 Tailwind, 폐쇄망 대응
 ```
 
 ## 실행
@@ -22,7 +22,7 @@ uvicorn main:app --reload --port 8000
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local  # NEXT_PUBLIC_API_BASE_URL 을 backend 주소로
+cp .env.example .env.local  # VITE_API_BASE_URL 을 backend 주소로
 npm run dev                 # http://localhost:3000
 ```
 

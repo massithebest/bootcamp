@@ -1,21 +1,21 @@
 # frontend/ 작업 지침
 
-Production Planning Agent의 Next.js 프론트엔드. 이 파일이 다루는 범위는 `frontend/` 디렉토리로 한정된다. 백엔드 런타임 에이전트 지침은 `backend/agent/agent_sdk/CLAUDE.md`이며 이 파일과 무관하다.
+Production Planning Agent의 Vite + React SPA 프론트엔드 (2026-09-14 Next.js 14 App Router에서 이관 — [docs/decisions.md#nextjs--vite-이관](docs/decisions.md#nextjs--vite-이관)). 이 파일이 다루는 범위는 `frontend/` 디렉토리로 한정된다. 백엔드 런타임 에이전트 지침은 `backend/agent/agent_sdk/CLAUDE.md`이며 이 파일과 무관하다.
 
 ## 스택
 
-- Next.js 14 (App Router) · React 18 · TypeScript
-- Tailwind CSS **v4** (v3에서 마이그레이션됨, 2026-09-11 — [docs/decisions.md#shadcnui-도입](docs/decisions.md#shadcnui-도입))
+- Vite 7 · React 18 · TypeScript. **App Router가 아니다** — `src/app/`이라는 디렉토리명은 Next 시절 잔재이며 (아래 "구조" 참고), 라우터 없는 단일 페이지 SPA다.
+- Tailwind CSS **v4** (`@tailwindcss/vite` 플러그인 경유, v3에서 마이그레이션됨, 2026-09-11 — [docs/decisions.md#shadcnui-도입](docs/decisions.md#shadcnui-도입))
 - shadcn/ui 컴포넌트 (2026-09-11 도입, 그 이전엔 custom Tailwind만 사용하는 게 원칙이었음 — [docs/decisions.md#shadcnui-도입](docs/decisions.md#shadcnui-도입))
 - 상태관리: React 기본(`useState`/`useRef`)만 사용, 외부 상태관리 라이브러리 없음
 - **AI Elements** (2026-09-14 채택) — `src/components/ai-elements/`에 shadcn CLI로 복사된 소스(`chain-of-thought`, `tool`, `task`). **컴포넌트만 쓰고 `useChat`/`@ai-sdk/react`/`streamdown`은 도입하지 않는다.** 복사된 소스는 우리 코드로 취급해 토큰·한국어 라벨로 다듬었고, `code-block`(shiki)·radix 훅 의존은 제거했다(로컬 `hooks/use-controllable-state.ts`). 배경과 assistant-ui 비교는 [docs/decisions.md#ai-sdk-및-채팅-ui-라이브러리-도입-검토](docs/decisions.md#ai-sdk-및-채팅-ui-라이브러리-도입-검토).
-- Vercel AI SDK(`ai@7.0.97`)는 AI Elements `tool.tsx`가 **타입만** import한다(`ToolUIPart`). 런타임 코드 미사용. **외부 LLM provider(OpenAI/Anthropic/`@ai-sdk/gateway` 등)를 프론트에서 직접 호출하지 않는다** — 반드시 사내 백엔드(`lib/chat-api.ts`)를 경유한다.
+- **Vercel AI SDK(`ai`)는 도입하지 않는다.** AI Elements `tool.tsx`가 예전엔 `ToolUIPart`/`DynamicToolUIPart` 타입만 import했지만, Vite 이관(2026-09-14) 때 실제로 쓰는 표면(`type`/`state`)만 로컬 타입으로 옮기고 `ai` 의존성 자체를 제거했다 (`ai` + `@ai-sdk/*` 트리 ~12.6MB, `@ai-sdk/gateway`에 외부 URL 하드코딩 — 폐쇄망 반입 대상에서 뺐다). **외부 LLM provider(OpenAI/Anthropic 등)를 프론트에서 직접 호출하지 않는다** — 반드시 사내 백엔드(`lib/chat-api.ts`)를 경유한다.
 
 ## 최우선 원칙: 폐쇄망(closed-network)
 
 이 앱은 최종적으로 인터넷이 차단된 환경에 배포된다. 새 의존성/라이브러리를 추가하기 전에 반드시 **[docs/closed-network.md](docs/closed-network.md)의 체크리스트**를 따른다. 요약:
 
-- 외부 폰트 금지 (`next/font/google` 등) — 시스템 폰트만 사용
+- 외부 폰트 금지 — 시스템 폰트만 사용
 - 외부 CDN/스크립트 금지 — 전부 npm 의존성으로 번들
 - 새 패키지의 런타임 코드에 하드코딩된 외부 URL이 없는지 확인 (`grep -rEo 'https?://...' node_modules/<pkg>/dist`)
 - 의심되면 오프라인 조건으로 `npm run build`를 재현해서 검증
@@ -36,8 +36,13 @@ Production Planning Agent의 Next.js 프론트엔드. 이 파일이 다루는 �
 ## 구조
 
 ```
+index.html                        Vite 엔트리 HTML — title/description/favicon
 src/
-├── app/                          layout / page / globals.css
+├── main.tsx                      ReactDOM 엔트리 (globals.css import, <React.StrictMode>)
+├── App.tsx                       루트 컴포넌트 (<ChatWindow /> 렌더링, 구 page.tsx)
+├── vite-env.d.ts                 ImportMetaEnv 타입 선언
+├── app/                          globals.css / icon.svg (Next 시절 경로를 파일 이동 없이 유지 —
+│                                  globals.css의 @config 상대경로, components.json의 css 경로 보존 목적)
 ├── components/
 │   ├── ai-elements/              AI Elements 복사 소스 (chain-of-thought / tool / task) — 우리 코드로 취급, 토큰 규칙 적용
 │   ├── chat/                     3-pane 워크벤치 (사이드바 / 대화 / 인스펙터)
@@ -59,6 +64,8 @@ src/
 └── types/chat.ts                 Backend `api/schemas.py` AgentEvent 와 동일 Contract
 ```
 
+`@/*` alias는 `vite.config.ts`의 `resolve.alias`와 `tsconfig.json`의 `paths` 양쪽에 유지한다 — 하나만 바꾸면 빌드는 되는데 에디터 타입 탐색이 깨지거나 그 반대가 된다.
+
 ## 중요한 구현 디테일
 
 - **메시지 구조**: 어시스턴트 메시지는 `parts: MessagePart[]` (text/tool, 도착 순서)를 쓴다. 단일 `content` 문자열이 아니다 — 도구 호출 전 내레이션과 최종 답변이 하나로 뭉개지지 않게 하기 위함. `content`는 사용자 메시지 전용.
@@ -69,8 +76,8 @@ src/
 
 ## 백엔드 연동
 
-- 백엔드는 포트 **8000**에서 실행한다. `.env.local`의 `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`.
-- Browser가 FastAPI를 직접 호출한다 (Next.js BFF 없음). 백엔드에 `localhost:3000` Origin CORS 허용 필요 (`backend/main.py` + `backend/core/config.py`의 `CORS_ALLOW_ORIGINS`).
+- 백엔드는 포트 **8000**에서 실행한다. `.env.local`의 `VITE_API_BASE_URL=http://localhost:8000`.
+- Browser가 FastAPI를 직접 호출한다 (BFF 없음). 백엔드에 `localhost:3000` Origin CORS 허용 필요 (`backend/main.py` + `backend/core/config.py`의 `CORS_ALLOW_ORIGINS`). `vite.config.ts`가 dev/preview 포트를 3000으로 고정(`strictPort: true`)해 이 CORS 설정과 어긋나면 조용히 넘어가지 않고 서버가 즉시 실패하게 한다 — 다른 프로세스가 3000을 점유 중이면 그 프로세스를 먼저 정리할 것.
 - 현재 백엔드 LLM provider는 개발 단계라 OpenRouter를 임시로 쓴다. 프론트 코드는 이 사실에 의존하지 않는다 — provider 교체는 백엔드 책임이고, 프론트는 항상 `lib/chat-api.ts`를 통해서만 통신한다.
 
 ## 명령어
@@ -78,8 +85,9 @@ src/
 ```bash
 npm install
 npm run dev      # http://localhost:3000
-npm run build
-npm run lint
+npm run build    # tsc -b && vite build
+npm run lint     # eslint .
+npm run preview  # 빌드 산출물(dist/)을 :3000에서 서빙 (start와 동일)
 ```
 
 ## 문서

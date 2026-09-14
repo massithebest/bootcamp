@@ -123,10 +123,11 @@ python -m pytest -q
 ## 프론트엔드 연동
 
 - 백엔드는 포트 **8000**에서 실행한다. 프론트 `.env.local`의
-  `NEXT_PUBLIC_API_BASE_URL`이 이 포트를 가리킨다.
-- Browser가 FastAPI를 직접 호출한다 (Next.js BFF 없음) — `localhost:3000`
+  `VITE_API_BASE_URL`이 이 포트를 가리킨다.
+- Browser가 FastAPI를 직접 호출한다 (BFF 없음) — `localhost:3000`
   Origin CORS 허용이 필요하다 (`main.py` + `core/config.py`의
-  `CORS_ALLOW_ORIGINS`).
+  `CORS_ALLOW_ORIGINS`). 프론트 `vite.config.ts`가 dev/preview 포트를
+  3000으로 고정(`strictPort: true`)해 이 CORS 설정과 맞춘다.
 - `AgentEvent` 계약(`text`/`status`/`tool_call`/`tool_result`/`error`/`done`,
   `api/schemas.py`)을 바꾸면 프론트 `frontend/src/types/chat.ts`와
   반드시 함께 맞춘다. `status` 이벤트의 data는 `{ step, label?, status }`

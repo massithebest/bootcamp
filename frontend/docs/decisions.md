@@ -16,6 +16,7 @@
 | 마크다운 렌더러 자체 구현 (라이브러리 미사용) | 유효 | [closed-network.md](./closed-network.md) |
 | AI Elements 컴포넌트 도입 (`useChat`/`@ai-sdk/react`/`streamdown` 미사용) | **결정 완료** (2026-09-14) | [ai SDK 및 채팅 UI 라이브러리 도입 검토](#ai-sdk-및-채팅-ui-라이브러리-도입-검토) |
 | 지식 카드(`kind: catalog`)·Skills 탭 API 연결 | **대기** — 백엔드 계약 확정 후 착수 | [plan/domain-knowledge-plan.md](../plan/domain-knowledge-plan.md) |
+| Next.js 14 App Router → Vite 7 + React 18 이관, `ai` 의존성 제거 | **결정 완료** (2026-09-14) | [Next.js → Vite 이관](#nextjs--vite-이관) |
 
 ---
 
@@ -212,3 +213,115 @@ AI Elements는 소스 복사 방식. 받은 소스가 의존하는 `streamdown`(
 
 - [closed-network.md](./closed-network.md) — 폐쇄망 원칙
 - [shadcn/ui 도입](#shadcnui-도입) — shadcn CLI 소스 복사 방식의 선례
+
+---
+
+## Next.js → Vite 이관
+
+**일자:** 2026-09-14
+**상태:** 결정 완료
+
+### 배경
+
+`frontend/`는 Next.js 14 App Router로 스캐폴딩됐지만 실제로는 단일 라우트
+SPA였다 — `src/app/page.tsx`가 `<ChatWindow />` 하나를 렌더링하는 게
+전부이고, 브라우저가 FastAPI를 직접 호출해 BFF도 없었다 (Next를 쓰는
+이유였던 App Router 데이터 페칭·Server Action·라우팅이 애초에 전부
+미사용). 실제로 쓰인 Next 기능은 번들링·dev 서버·JSX 트랜스폼뿐이었고,
+그 대가로 `"use client"` 29개, App Router 파일 규약, `next-env.d.ts`
+앰비언트 타입, `eslint-config-next` 같은 프레임워크 결합이 남아 있었다.
+
+이관 전 전수조사 결과 `next/*` import는 전체 소스에서 `src/app/layout.tsx`의
+`import type { Metadata } from "next"` 단 1건, 그것도 타입 전용이었다.
+`next/image`·`next/link`·`next/navigation`·`next/font`·`next/dynamic`·
+`next/script`·`next/headers`, Server Action, async 서버 컴포넌트,
+route handler, `middleware.ts`는 전부 0건이었다.
+
+### 결정
+
+- **Vite 7.3.6** (`@vitejs/plugin-react@5.2.0`, `@tailwindcss/vite@4.3.3`).
+  Rollup+esbuild 기반 — 폐쇄망 반입 대상 네이티브 바이너리가 esbuild 하나만
+  늘어난다 (기존에도 `@next/swc-linux-x64-gnu`를 반입했던 것과 같은 급).
+  Vite 8(rolldown 기반)은 `@rolldown/binding-*`·`lightningcss-*` 계열이
+  추가로 필요해 반입 표면이 넓어져 제외
+- **`ai@7.0.97` 제거.** `src/components/ai-elements/tool.tsx`가
+  `ToolUIPart`/`DynamicToolUIPart` 타입만 쓰고 있었는데, 실제로 소비하는
+  표면은 `type`(`` `tool-${string}` `` / `"dynamic-tool"`)과 7개짜리
+  `state` 유니온뿐이었다. `ai` + `@ai-sdk/*` 트리가 ~12.6MB이고
+  `@ai-sdk/gateway`에 `https://ai-gateway.vercel.sh`가 하드코딩돼 있어
+  (기존엔 "쓰지 않는 코드 경로라 문제 없음"으로 정리했던 항목, 위
+  "AI Elements" 절 참고) 타입 10여 줄로 옮기고 의존성 자체를 뺐다.
+  `ToolPart`/`ToolState`/`ToolHeaderProps` 공개 타입의 이름과 형태는
+  그대로 유지했다
+- **dev 서버 포트 3000 고정 + 직접 호출 유지.** 백엔드
+  `CORS_ALLOW_ORIGINS` 기본값이 `localhost:3000`이라, `vite.config.ts`에
+  `server.port`/`preview.port`를 3000으로 고정하고 `strictPort: true`를
+  줘서 다른 포트로 조용히 밀리지 않게 했다. dev proxy는 도입하지
+  않았다 — 브라우저가 FastAPI를 직접 호출하는 운영 경로를 dev에서도
+  그대로 검증하기 위함
+- **`src/app/globals.css`·`src/app/icon.svg`는 이동하지 않았다.**
+  `globals.css`의 `@config "../../tailwind.config.ts"` 상대경로와
+  `components.json`의 `tailwind.css` 경로가 무수정으로 유지된다.
+  `src/main.tsx`에서 `import "./app/globals.css"`로 원위치를 참조하고,
+  `index.html`은 `icon.svg`를 `href="/src/app/icon.svg"`로 가리킨다.
+  트레이드오프로 `src/app/` 디렉토리에 CSS·아이콘 2개만 남는다
+- **`base: "./"` (상대 경로).** FastAPI가 아직 프론트를 서빙하지 않아
+  (`backend/main.py`에 `StaticFiles` 마운트 없음) 마운트 지점이 미정.
+  클라이언트 라우터가 없으므로 상대 경로면 `/`든 서브패스든 동작한다
+
+### 이관하며 바뀐 것
+
+- `src/app/layout.tsx`(App Router 레이아웃) → `index.html`(charset·
+  viewport·favicon·title·description) + `src/main.tsx`
+  (`<React.StrictMode>`로 `next.config.mjs`의 `reactStrictMode: true`
+  대체) + `src/App.tsx`(구 `page.tsx`와 동일 내용)
+- `process.env.NEXT_PUBLIC_API_BASE_URL` → `import.meta.env.VITE_API_BASE_URL`
+  (`src/lib/chat-api.ts` 2줄만; `knowledge-api.ts`·`connection-banner.tsx`는
+  `API_BASE_URL` 재수출을 그대로 재사용해 무수정)
+- `"use client"` 29개 파일 전부 제거 (RSC 경계가 의미 없는 순수 SPA이므로)
+- `tsconfig.json`: `jsx: "preserve"` → `"react-jsx"`, Next 전용
+  `plugins`/`include` 항목 제거. `tsconfig.node.json`은 추가하지 않고
+  단일 tsconfig로 `tsc -b`가 `vite.config.ts`까지 그대로 타입체크하게 함
+- `.eslintrc.json`(`next/core-web-vitals` 한 줄) → `eslint.config.js`
+  (flat config, `eslint@9` + `typescript-eslint@8` +
+  `eslint-plugin-react-hooks@7`의 `rules-of-hooks`/`exhaustive-deps`만).
+  **커버리지 축소**: `eslint-plugin-react`(`jsx-key` 등),
+  `eslint-plugin-jsx-a11y`, `eslint-plugin-import`를 더는 쓰지 않는다.
+  `@next/next/*`는 프레임워크 제거로 당연히 빠짐
+- **typescript 5.5.3 → 5.9.3.** 예정에 없던 변경 — `@vitejs/plugin-react`의
+  타입 선언이 `export { x as "module.exports" }`(임의 문자열 export
+  이름)를 쓰는데 TS 5.5.3이 이 구문 자체를 파싱하지 못해 `tsc -b`가
+  즉시 실패했다. 5.6+ 부터 지원. `typescript-eslint@8`의 `<6.1.0`
+  제약 안에서 최신인 5.9.3을 선택
+- `@types/node` 20.14.10 → `^20.19.0` (Vite 7의 peer 요구사항)
+- `components.json`: `"rsc": true` → `false` (이후 `shadcn add`가
+  `"use client"`를 다시 붙이지 않도록)
+- `package.json`에 `"type": "module"` 추가 (`eslint.config.js`가 ESM)
+
+### 폐쇄망 검증
+
+`npm run build` 후 `grep -rE "https?://" dist/`로 확인. 매치된 것은 전부
+양성이었다: `w3.org/*` 5건(SVG/XML 네임스페이스 식별자, fetch 아님),
+`http://localhost:8000`(`API_BASE_URL` 폴백, 의도된 값),
+`base-ui.com/production-error`·`reactjs.org/docs/error-decoder.html`
+(React/`@base-ui/react`가 프로덕션 에러 메시지에 박아두는 표준 관행 —
+텍스트로만 조립되고 fetch되지 않음, Next 아래서도 원래 있던 것). 화이트리스트
+필터로 위 항목을 제외하면 잔여 매치 0건. `vite`/`@vitejs/plugin-react`/
+`@tailwindcss/vite` 모두 postinstall/preinstall 스크립트 없음 확인.
+
+`ai` 제거는 폐쇄망 관점에서 순이익이다 — closed-network.md "실제 발견
+사례"에 있던 `@ai-sdk/gateway` 하드코딩 URL이 "안 쓰는 코드 경로라
+괜찮음"에서 "트리 자체가 빠짐"으로 바뀌었다.
+
+### 재검토 트리거
+
+- FastAPI가 `StaticFiles`로 프론트를 서빙하게 되면 `vite.config.ts`의
+  `base: "./"`와 마운트 서브패스가 맞는지 재확인
+- `eslint-plugin-react`/`jsx-a11y`/`import` 커버리지 축소가 실제
+  문제(접근성 회귀, 미사용 import 누락 등)로 이어지면 flat config에
+  다시 추가
+
+### 관련 문서
+
+- [closed-network.md](./closed-network.md) — 폐쇄망 원칙, 네이티브 바이너리
+  구성 변경(`@next/swc-*` → `@esbuild/*` + `@rollup/rollup-*`)
