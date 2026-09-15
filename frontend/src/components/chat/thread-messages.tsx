@@ -1,5 +1,5 @@
 /**
- * assistant-ui `ThreadPrimitive.Messages` 에 등록하는 메시지별 컴포넌트.
+ * assistant-ui `ThreadPrimitive.Messages` children renderer가 선택하는 메시지 컴포넌트.
  *
  * 기존 `message-bubble.tsx` 의 마크업을 최대한 그대로 옮긴다 — 사용자 메시지는
  * 오른쪽 정렬 원문, 어시스턴트 메시지는 진행 블록 위 + 파트 도착 순서 렌더.
@@ -24,17 +24,15 @@ import { ToolResultCard } from "./tool-result-card";
 import { readAgentMetadata } from "@/lib/chat-runtime";
 
 export function UserMessage() {
-  const text = useAuiState((s) => {
-    if (s.message.role !== "user") return "";
-    const first = s.message.content[0];
-    return first && first.type === "text" ? first.text : "";
-  });
-
   return (
     <MessagePrimitive.Root>
       <div className="flex flex-col items-end gap-1">
         <div className="max-w-[85%] whitespace-pre-wrap break-words rounded border border-line-strong bg-surface px-3 py-2 text-ui text-ink">
-          {text}
+          <MessagePrimitive.Parts>
+            {({ part }) =>
+              part.type === "text" ? <MessagePartPrimitive.Text /> : null
+            }
+          </MessagePrimitive.Parts>
         </div>
         <ActionBarPrimitive.Root
           hideWhenRunning
@@ -99,12 +97,15 @@ export function AssistantMessage() {
           <AgentProgress statuses={meta.statuses} streaming={meta.streaming} />
         )}
 
-        <MessagePrimitive.Parts
-          components={{
-            Text: AssistantText,
-            tools: { Override: ToolPart },
+        <MessagePrimitive.Parts>
+          {({ part }) => {
+            if (part.type === "text") return <AssistantText />;
+            if (part.type === "tool-call") {
+              return part.toolUI ?? <ToolPart {...part} />;
+            }
+            return null;
           }}
-        />
+        </MessagePrimitive.Parts>
 
         {showThinking && (
           <p className="text-ui text-ink-3">응답을 준비하고 있습니다…</p>

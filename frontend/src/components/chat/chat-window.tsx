@@ -123,9 +123,14 @@ export function ChatWindow() {
               <EmptyState />
             ) : (
               <div className="mx-auto flex max-w-reading flex-col gap-6 py-6">
-                <ThreadPrimitive.Messages
-                  components={{ UserMessage, AssistantMessage, UserEditComposer }}
-                />
+                <ThreadPrimitive.Messages>
+                  {({ message }) => {
+                    if (message.composer.isEditing) return <UserEditComposer />;
+                    if (message.role === "user") return <UserMessage />;
+                    if (message.role === "assistant") return <AssistantMessage />;
+                    return null;
+                  }}
+                </ThreadPrimitive.Messages>
               </div>
             )}
 
