@@ -14,14 +14,21 @@ async def list_simulation() -> dict:
     return await simulation_service.list_simulation()
 
 
-async def run_simulation(simulation_type: str, params: dict) -> dict:
+async def run_simulation(
+    simulation_type: str, params: dict, *, access_scope: str | None = None
+) -> dict:
     """Run a simulation identified by `simulation_type` with `params`.
 
     Example:
-        simulation_type="실적_조회", params={"workMonthFrom": "202608", "workMonthTo": "202608"}
+        simulation_type="SMT2020_입력검증", params={"dataset": "LVHM"}
+
+    Args:
+        access_scope: 요청 브라우저 세션의 불투명 scope. 모델에게 노출하지
+            않고 `agent/sdk_tools.py`의 tool wrapper가 내부에서 채운다.
     """
 
     return await simulation_service.run_simulation(
         simulation_type=simulation_type,
         params=params,
+        access_scope=access_scope,
     )

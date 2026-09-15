@@ -22,7 +22,7 @@ function formatStat(v: ResultColumnSummary["min"] | ResultColumnSummary["mean"])
 }
 
 /**
- * 대용량 조회 결과(`type: "large_result"`, docs/result-store.md §5) 요약 카드.
+ * 대용량 조회 결과(`type: "large_result"`, plan/260915-result-store-plan.md) 요약 카드.
  * 원본 행 대신 표본 몇 행 + 컬럼별 기초 통계만 보여준다.
  * 페이지네이션/"더 보기"는 두지 않는다 — 전체가 필요하면 후속 대화로 처리한다(§7·§9).
  */

@@ -22,7 +22,7 @@ export interface Session {
  * 에이전트가 선택해 쓰는 Skill. `GET /api/knowledge/skills` 응답 형태다.
  *
  * 활성/비활성 토글은 두지 않는다 — 끄는 것이 `allowed_tools` 제한인지 Skill
- * 비활성화인지 아직 정해지지 않았다 (docs/domain-knowledge.md §7).
+ * 비활성화인지 아직 정해지지 않았다 (plan/260914-domain-knowledge-plan.md).
  */
 export interface Skill {
   name: string;

@@ -84,6 +84,23 @@ def test_build_options_fork_point_enables_fork_session() -> None:
     assert options.resume_session_at == "entry-uuid-1"
 
 
+def test_build_options_binds_scope_without_exposing_model_argument() -> None:
+    from agent.sdk_tools import _prepare_visualization_tool
+
+    options = _build_options(None, access_scope="scope-a")
+    prepare_tool = _prepare_visualization_tool("scope-a")
+
+    assert options.mcp_servers["planning"]["type"] == "sdk"
+    assert "access_scope" not in prepare_tool.input_schema.__annotations__
+    assert prepare_tool.input_schema.__required_keys__ == {
+        "result_id",
+        "kind",
+        "x",
+        "y",
+    }
+    assert prepare_tool.input_schema.__optional_keys__ == {"group_by"}
+
+
 # ---- run_agent (query() 를 대체) ------------------------------------------
 
 

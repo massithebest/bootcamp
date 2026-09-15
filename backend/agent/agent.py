@@ -33,6 +33,7 @@ def _use_fake_runner() -> bool:
 def _build_options(
     resume_session_id: str | None,
     resume_session_at: str | None = None,
+    access_scope: str | None = None,
 ) -> ClaudeAgentOptions:
     """Claude Agent SDK 실행 옵션을 구성한다.
 
@@ -40,13 +41,16 @@ def _build_options(
     새 session_id 를 받는다 — 원본 session 파일을 그 자리에서 잘라내지 않고
     그 지점까지만 복사해 새 세션으로 이어간다. 평범한 다음 턴(`resume_session_at`
     없음)은 지금까지와 동일하게 같은 session_id 에 계속 이어 쓴다.
+
+    `access_scope`는 요청 브라우저 세션의 불투명 scope다(차트 v2 §6.1) —
+    Result Store 접근 범위 구분에만 쓰이고 모델 입력으로 노출되지 않는다.
     """
 
     return ClaudeAgentOptions(
         system_prompt=SYSTEM_PROMPT,
         cwd=AGENT_SDK_CWD,
         setting_sources=["project"],  # CLAUDE.md / .claude/skills 로드
-        mcp_servers={"planning": build_planning_mcp_server()},
+        mcp_servers={"planning": build_planning_mcp_server(access_scope)},
         # Skill: 프로젝트 Skills(.claude/skills/*)를 에이전트가 선택해 로드한다.
         # 문자열 system_prompt 로도 Claude Code preset 의 Skill 도구가 유지된다 (Task 0 확인).
         allowed_tools=TOOL_NAMES + ["Skill"],
@@ -97,6 +101,7 @@ async def run_agent(
     message: str,
     conversation_id: str | None = None,
     fork_from_turn_id: str | None = None,
+    access_scope: str | None = None,
 ) -> AsyncIterator[AgentEvent]:
     """Run the production planning agent.
 
@@ -114,6 +119,11 @@ async def run_agent(
             `None` 이면 평범한 다음 턴, 빈 문자열이면 처음부터 새로 시작,
             알 수 없는 값이면 `error` 이벤트를 하나 내보내고 새로 시작한다.
 
+        access_scope:
+            요청 브라우저 세션의 불투명 scope(차트 v2 §6.1). `execute_sql`/
+            `run_simulation`이 저장하는 결과의 접근 범위를 구분하는 데만
+            쓰이고, 모델의 tool 입력으로는 노출하지 않는다.
+
     Yields:
         AgentEvent:
             Frontend-independent common agent events.
@@ -125,7 +135,7 @@ async def run_agent(
     """
 
     if _use_fake_runner():
-        async for event in run_fake_agent(message, conversation_id):
+        async for event in run_fake_agent(message, conversation_id, access_scope):
             yield event
         return
 
@@ -137,7 +147,7 @@ async def run_agent(
         yield warning
 
     adapter = AgentEventAdapter()
-    options = _build_options(resume_session_id, resume_session_at)
+    options = _build_options(resume_session_id, resume_session_at, access_scope)
 
     try:
         async for raw_event in query(prompt=message, options=options):

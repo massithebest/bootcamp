@@ -1,18 +1,29 @@
 """Chat API endpoint with SSE streaming."""
 
-from fastapi import APIRouter
+import re
+
+from uuid import uuid4
+
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from agent.agent import run_agent
 from api.schemas import ChatRequest
+from core.config import SESSION_COOKIE_SECURE, SESSION_SCOPE_COOKIE_NAME
 
 
 router = APIRouter()
+_SCOPE_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 
 
 @router.post("/chat")
-async def chat(request: ChatRequest) -> StreamingResponse:
+async def chat(request: ChatRequest, http_request: Request) -> StreamingResponse:
     """Run the production planning agent and stream AgentEvents via SSE."""
+
+    access_scope = http_request.cookies.get(SESSION_SCOPE_COOKIE_NAME)
+    issue_cookie = access_scope is None or not _SCOPE_PATTERN.fullmatch(access_scope)
+    if issue_cookie:
+        access_scope = uuid4().hex
 
     async def event_generator():
         try:
@@ -20,6 +31,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
                 message=request.message,
                 conversation_id=request.conversation_id,
                 fork_from_turn_id=request.fork_from_turn_id,
+                access_scope=access_scope,
             ):
                 yield f"data: {event.model_dump_json()}\n\n"
 
@@ -34,7 +46,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
 
             yield 'data: {"type":"done"}\n\n'
 
-    return StreamingResponse(
+    response = StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
         headers={
@@ -42,3 +54,13 @@ async def chat(request: ChatRequest) -> StreamingResponse:
             "Connection": "keep-alive",
         },
     )
+    if issue_cookie:
+        response.set_cookie(
+            key=SESSION_SCOPE_COOKIE_NAME,
+            value=access_scope,
+            httponly=True,
+            samesite="lax",
+            secure=SESSION_COOKIE_SECURE,
+            path="/",
+        )
+    return response

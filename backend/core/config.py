@@ -27,12 +27,20 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 #: 도메인 지식 YAML(카탈로그·KPI·시뮬레이션·용어집·시나리오) 루트.
 KNOWLEDGE_DIR = Path(os.getenv("KNOWLEDGE_DIR") or BACKEND_DIR / "knowledge")
 
-#: 합성 시드 SQLite 경로. `python -m scripts.seed_sample_db` 산출물이며 git 추적 대상이 아니다.
-SAMPLE_DB_PATH = Path(os.getenv("SAMPLE_DB_PATH") or BACKEND_DIR / "data" / "sample.sqlite")
+#: SMT2020 SQLite 경로. `python -m scripts.build_smt2020_db` 산출물이다.
+SMT2020_DB_PATH = Path(
+    os.getenv("SMT2020_DB_PATH") or BACKEND_DIR / "datasets" / "smt2020.db"
+)
 
 #: 조회 결과(parquet) 저장 디렉터리. git 추적 대상이 아니다.
 RESULT_STORE_DIR = Path(
     os.getenv("RESULT_STORE_DIR") or BACKEND_DIR / "data" / "results"
+)
+
+#: 검증된 시각화 명세(JSON sidecar) 저장 디렉터리. 수치 데이터는 저장하지 않는다.
+VISUALIZATION_STORE_DIR = Path(
+    os.getenv("VISUALIZATION_STORE_DIR")
+    or BACKEND_DIR / "data" / "visualizations"
 )
 
 #: 조회 결과 보존 시간과 결과 저장소의 최대 디스크 사용량.
@@ -51,6 +59,15 @@ CORS_ALLOW_ORIGINS = [
     ).split(",")
     if origin.strip()
 ]
+
+#: 결과·시각화 접근 범위를 구분하는 불투명 브라우저 세션 쿠키 이름.
+#: 인증 principal이 아니다 — "같은 브라우저가 만든 결과인지" 구분용
+#: (plan/260915-chart-visualization-plan.md).
+SESSION_SCOPE_COOKIE_NAME = "pp_session_scope"
+
+#: 쿠키의 Secure 속성. 로컬 개발(HTTP)에서는 꺼야 브라우저가 쿠키를 저장한다.
+#: 운영 배포(HTTPS)에서는 반드시 켠다. ENV=prod일 때만 True.
+SESSION_COOKIE_SECURE = ENV == "prod"
 
 
 # ---- LLM Provider ----

@@ -1,7 +1,5 @@
 /** tool_result data(Record<string, unknown>) 안전 파싱 helper. */
 
-import type { ChartSpec } from "@/types/chat";
-
 export function str(v: unknown): string | null {
   return typeof v === "string" && v.length > 0 ? v : null;
 }
@@ -29,17 +27,6 @@ export function asRecords(v: unknown): Record<string, unknown>[] {
   );
 }
 
-export function asChart(v: unknown): ChartSpec | undefined {
-  if (typeof v !== "object" || v === null) return undefined;
-  const c = v as Record<string, unknown>;
-  if (c.type !== "bar" && c.type !== "line") return undefined;
-  if (typeof c.x !== "string") return undefined;
-  if (!Array.isArray(c.series) || !Array.isArray(c.categories) || !Array.isArray(c.data)) {
-    return undefined;
-  }
-  return c as unknown as ChartSpec;
-}
-
 export type ResultTone = "neutral" | "ok" | "warn" | "block";
 
 export function toneOf(v: unknown): ResultTone {
@@ -47,7 +34,7 @@ export function toneOf(v: unknown): ResultTone {
 }
 
 /**
- * `execute_sql`/`run_simulation` 결과가 대용량(200행 초과, docs/result-store.md §1)이라
+ * `execute_sql`/`run_simulation` 결과가 대용량(100행 초과, plan/260915-result-store-plan.md)이라
  * 원본 행 대신 `sample_rows`/`summary` 요약만 실려 왔는지 판별한다.
  * `database-result.tsx`/`simulation-result.tsx` 양쪽에서 같은 판별 로직을 쓴다.
  */

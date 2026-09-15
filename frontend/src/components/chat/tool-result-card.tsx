@@ -6,7 +6,7 @@
  *   list_tables/describe_table/list_kpis/get_kpi → 참조한 지식 (기본 접힘)
  *
  * 구분은 카드가 아니라 얇은 좌측 룰 + 헤더 한 줄로 만든다.
- * 도구 목록은 Backend `agent/sdk_tools.py` 의 `TOOL_NAMES` 8개와 일치해야 한다.
+ * 도구 목록은 Backend `agent/sdk_tools.py` 의 `TOOL_NAMES`를 기준으로 유지한다.
  */
 
 import type { ToolResult } from "@/types/chat";
@@ -35,6 +35,7 @@ const TOOL_META: Record<string, { label: string; kind: Kind }> = {
   get_kpi: { label: "KPI 정의", kind: "catalog" },
   get_result_summary: { label: "결과 요약 조회", kind: "database" },
   get_result_page: { label: "결과 구간 조회", kind: "database" },
+  prepare_visualization: { label: "차트 준비", kind: "generic" },
 };
 
 function resolveKind(result: ToolResult): { label: string; kind: Kind } {

@@ -45,6 +45,12 @@ class ResultMeta:
     source: str
     conversation_id: str | None
     path: Path
+    #: 원본 조회가 저장 상한(MAX_ROWS)에서 잘렸는지. row_count는 항상 저장된
+    #: 행 수이며 이 값과 무관하다 — "전체 몇 건 중 일부"를 의미하지 않는다.
+    source_truncated: bool
+    #: 이 결과를 조회할 수 있는 브라우저 세션 scope(불투명 토큰).
+    #: None이면 접근 제어를 적용하지 않았던 이전 데이터를 뜻한다(마이그레이션 호환).
+    access_scope: str | None
 
 
 @dataclass(frozen=True)
@@ -65,6 +71,8 @@ class ResultStore(ABC):
         *,
         source: str,
         conversation_id: str | None,
+        source_truncated: bool = False,
+        access_scope: str | None = None,
     ) -> ResultMeta:
         """조회 결과를 저장하고 메타데이터를 반환한다."""
 
@@ -149,6 +157,8 @@ class LocalParquetResultStore(ResultStore):
         *,
         source: str,
         conversation_id: str | None,
+        source_truncated: bool = False,
+        access_scope: str | None = None,
     ) -> ResultMeta:
         result_id = uuid4().hex
         self.directory.mkdir(parents=True, exist_ok=True)
@@ -173,6 +183,8 @@ class LocalParquetResultStore(ResultStore):
             source=source,
             conversation_id=conversation_id,
             path=path,
+            source_truncated=source_truncated,
+            access_scope=access_scope,
         )
         payload = asdict(meta)
         payload["created_at"] = meta.created_at.isoformat()
@@ -199,6 +211,8 @@ class LocalParquetResultStore(ResultStore):
             source=payload["source"],
             conversation_id=payload.get("conversation_id"),
             path=Path(payload["path"]),
+            source_truncated=payload.get("source_truncated", False),
+            access_scope=payload.get("access_scope"),
         )
 
     def get_page(self, result_id: str, offset: int, limit: int) -> ResultPage | None:

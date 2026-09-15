@@ -13,7 +13,11 @@
 
 import type { ComponentPropsWithoutRef } from "react";
 import remarkGfm from "remark-gfm";
-import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
+import {
+  MarkdownTextPrimitive,
+  type SyntaxHighlighterProps,
+} from "@assistant-ui/react-markdown";
+import { ChartMarker } from "./tool-results/chart-marker";
 
 /**
  * 자체 파서가 지원하던 `· item` 불릿을 remark 가 인식하는 `- item` 으로
@@ -154,12 +158,18 @@ function Pre(props: ComponentPropsWithoutRef<"pre">) {
   );
 }
 
+/** language-chart 펜스는 기본 Pre/Code 셸 없이 전용 조회 컨테이너로 위임한다. */
+function ChartFence({ code }: SyntaxHighlighterProps) {
+  return <ChartMarker source={code.replace(/\n$/, "")} />;
+}
+
 export function MarkdownText() {
   return (
     <MarkdownTextPrimitive
       remarkPlugins={[remarkGfm]}
       preprocess={preprocess}
       className="flex flex-col gap-2"
+      componentsByLanguage={{ chart: { SyntaxHighlighter: ChartFence } }}
       components={{
         h1: Heading1or2,
         h2: Heading1or2,

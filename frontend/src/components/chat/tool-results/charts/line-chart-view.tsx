@@ -27,15 +27,30 @@ export function LineChartView({ chart }: { chart: ChartSpec }) {
 
   return (
     <ChartContainer config={config} className="aspect-[16/9] max-h-64 w-full">
-      <LineChart data={chart.data} margin={{ left: 4, right: 4 }}>
+      <LineChart data={chart.data} margin={{ left: 12, right: 12, bottom: chart.x_label ? 20 : 0 }}>
         <CartesianGrid vertical={false} />
         <XAxis
           dataKey={chart.x}
           tickLine={false}
           axisLine={false}
           tickMargin={8}
+          label={
+            chart.x_label
+              ? { value: chart.x_label, position: "insideBottom", offset: -12 }
+              : undefined
+          }
         />
-        <YAxis tickLine={false} axisLine={false} tickMargin={4} width={40} />
+        <YAxis
+          tickLine={false}
+          axisLine={false}
+          tickMargin={4}
+          width={chart.y_label ? 56 : 40}
+          label={
+            chart.y_label
+              ? { value: chart.y_label, angle: -90, position: "insideLeft" }
+              : undefined
+          }
+        />
         <ChartTooltip content={<ChartTooltipContent />} />
         {chart.series.length > 1 && <ChartLegend content={<ChartLegendContent />} />}
         {chart.series.map((s, i) => (
@@ -46,6 +61,7 @@ export function LineChartView({ chart }: { chart: ChartSpec }) {
             stroke={PALETTE[i % PALETTE.length]}
             strokeWidth={2}
             dot={false}
+            connectNulls={false}
           />
         ))}
       </LineChart>

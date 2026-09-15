@@ -14,7 +14,9 @@ class RealSimulationService:
 
         return {"status": "ok", "simulations": list_simulation_types()}
 
-    async def run_simulation(self, simulation_type: str, params: dict) -> dict:
+    async def run_simulation(
+        self, simulation_type: str, params: dict, *, access_scope: str | None = None
+    ) -> dict:
         """Run a simulation identified by `simulation_type` with `params`."""
 
         error = validate_simulation_request(simulation_type, params)
@@ -23,6 +25,7 @@ class RealSimulationService:
 
         # TODO:
         # 실제 Simulation MCP Server 호출 (simulation_type 별 분기)
+        # 결과를 Result Store에 저장할 때 mock과 동일하게 access_scope를 채운다.
 
         raise NotImplementedError(
             "Simulation MCP integration is not implemented."
@@ -36,5 +39,9 @@ async def list_simulation() -> dict:
     return await _service.list_simulation()
 
 
-async def run_simulation(simulation_type: str, params: dict) -> dict:
-    return await _service.run_simulation(simulation_type=simulation_type, params=params)
+async def run_simulation(
+    simulation_type: str, params: dict, *, access_scope: str | None = None
+) -> dict:
+    return await _service.run_simulation(
+        simulation_type=simulation_type, params=params, access_scope=access_scope
+    )

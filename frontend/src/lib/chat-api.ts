@@ -124,6 +124,7 @@ export async function sendChatMessage(
       },
       body: JSON.stringify(body),
       signal,
+      credentials: "include",
     });
   } catch (err) {
     if (isAbortError(err)) return;

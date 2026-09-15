@@ -20,13 +20,23 @@ def _save(store: LocalParquetResultStore, rows: list[list] | None = None):
 
 def test_save_and_get_meta_round_trip(tmp_path) -> None:
     store = LocalParquetResultStore(tmp_path)
-    saved = _save(store)
+    saved = store.save(
+        ["line_cd", "qty"],
+        [["A", 10]],
+        source="execute_sql",
+        conversation_id=None,
+        source_truncated=True,
+        access_scope="scope-a",
+    )
 
     loaded = store.get_meta(saved.result_id)
 
     assert loaded is not None
     assert loaded.row_count == saved.row_count
     assert loaded.columns == saved.columns
+    assert loaded.row_count == 1
+    assert loaded.source_truncated is True
+    assert loaded.access_scope == "scope-a"
 
 
 def test_get_page_returns_requested_slice(tmp_path) -> None:

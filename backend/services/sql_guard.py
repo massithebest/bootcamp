@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 
 
-#: 한 번에 돌려줄 최대 행 수. 초과분은 잘라내고 `truncated` 로 알린다.
+#: 한 번에 저장할 최대 행 수. 서비스는 MAX_ROWS + 1행으로 source_truncated를 판정한다.
 MAX_ROWS = 500
 
 _FORBIDDEN = re.compile(

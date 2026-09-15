@@ -40,3 +40,34 @@ class AgentEvent(BaseModel):
     content: str | None = None
     tool_name: str | None = None
     data: dict[str, Any] | None = None
+
+
+class VisualizationWarningSchema(BaseModel):
+    code: str
+    message: str
+
+
+class VisualizationSeriesSchema(BaseModel):
+    key: str
+    label: str
+
+
+class VisualizationChartSchema(BaseModel):
+    type: Literal["bar", "line"]
+    x: str
+    series: list[VisualizationSeriesSchema]
+    categories: list[str | int | float]
+    data: list[dict[str, Any]]
+    title: str | None
+    x_label: str | None
+    y_label: str | None
+    unit: str | None
+
+
+class VisualizationResponse(BaseModel):
+    visualization_id: str
+    result_id: str
+    schema_version: Literal[1]
+    expires_at: str
+    chart: VisualizationChartSchema
+    warnings: list[VisualizationWarningSchema]

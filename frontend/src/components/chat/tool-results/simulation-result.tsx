@@ -1,7 +1,6 @@
 import { DataTable, Disclosure, StatusDot, type Tone } from "../primitives";
-import { ChartBlock } from "./chart-block";
 import { ResultSummaryCard } from "./result-summary";
-import { asChart, asRecords, asRows, asStrings, isLargeResult, str, toneOf } from "./shared";
+import { asRecords, asRows, asStrings, isLargeResult, str, toneOf } from "./shared";
 
 /** 레코드 배열(`[{line, workMonth, qty}]` 등)의 컬럼명을 첫 원소의 key 순서로 뽑는다. */
 function columnsOfRecords(records: Record<string, unknown>[]): string[] {
@@ -20,7 +19,6 @@ export function SimulationResult({ data }: { data: Record<string, unknown> }) {
   const results = asRecords(data.results);
   const resultColumns = columnsOfRecords(results);
   const resultRows = results.map((r) => resultColumns.map((c) => String(r[c] ?? "")));
-  const chart = asChart(data.chart);
   const large = isLargeResult(data);
 
   return (
@@ -57,9 +55,7 @@ export function SimulationResult({ data }: { data: Record<string, unknown> }) {
         <p className="text-ui leading-relaxed text-ink-2">{summary}</p>
       )}
 
-      {chart && <ChartBlock chart={chart} />}
-
-      {/* `실적_조회` 등 배열 결과가 대용량(200행 초과, docs/result-store.md §1)이면
+      {/* 배열형 simulation 결과가 대용량(100행 초과, plan/260915-result-store-plan.md)이면
           `results` 는 sample_rows 로 축소되어 있다 — 표 대신 요약 카드로 렌더한다. */}
       {large ? (
         <ResultSummaryCard data={data} />
