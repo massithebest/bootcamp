@@ -80,7 +80,7 @@ const statusIcons: Record<ToolState, ReactNode> = {
   "output-error": <XCircleIcon className="size-3.5 text-block-ink" />,
 };
 
-export const getStatusBadge = (status: ToolState) => (
+const getStatusBadge = (status: ToolState) => (
   <span className="inline-flex items-center gap-1 text-2xs text-ink-3">
     {statusIcons[status]}
     {statusLabels[status]}
