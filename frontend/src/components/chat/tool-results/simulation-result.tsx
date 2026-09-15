@@ -1,5 +1,11 @@
 import { DataTable, Disclosure, StatusDot, type Tone } from "../primitives";
-import { asRecords, asRows, asStrings, str, toneOf } from "./shared";
+import { ChartBlock } from "./chart-block";
+import { asChart, asRecords, asRows, asStrings, str, toneOf } from "./shared";
+
+/** 레코드 배열(`[{line, workMonth, qty}]` 등)의 컬럼명을 첫 원소의 key 순서로 뽑는다. */
+function columnsOfRecords(records: Record<string, unknown>[]): string[] {
+  return records.length > 0 ? Object.keys(records[0]) : [];
+}
 
 /** 시뮬레이션 결과 → 핵심 수치 + 병목/제약 요약이 즉시 읽히도록. 표는 접어서. */
 export function SimulationResult({ data }: { data: Record<string, unknown> }) {
@@ -9,6 +15,11 @@ export function SimulationResult({ data }: { data: Record<string, unknown> }) {
   const table = data.table as Record<string, unknown> | undefined;
   const tableColumns = table ? asStrings(table.columns) : [];
   const tableRows = table ? asRows(table.rows) : [];
+
+  const results = asRecords(data.results);
+  const resultColumns = columnsOfRecords(results);
+  const resultRows = results.map((r) => resultColumns.map((c) => String(r[c] ?? "")));
+  const chart = asChart(data.chart);
 
   return (
     <div className="flex flex-col gap-3">
@@ -42,6 +53,12 @@ export function SimulationResult({ data }: { data: Record<string, unknown> }) {
 
       {summary && (
         <p className="text-ui leading-relaxed text-ink-2">{summary}</p>
+      )}
+
+      {chart && <ChartBlock chart={chart} />}
+
+      {resultColumns.length > 0 && resultRows.length > 0 && (
+        <DataTable columns={resultColumns} rows={resultRows} />
       )}
 
       {tableColumns.length > 0 && tableRows.length > 0 && (

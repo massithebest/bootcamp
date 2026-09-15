@@ -1,5 +1,6 @@
 import { DataTable, Disclosure } from "../primitives";
-import { asRows, asStrings, str } from "./shared";
+import { ChartBlock } from "./chart-block";
+import { asChart, asRows, asStrings, str } from "./shared";
 
 /**
  * DB 조회 결과 → 표 + 실행 SQL 펼쳐보기.
@@ -15,11 +16,13 @@ export function DatabaseResult({ data }: { data: Record<string, unknown> }) {
   const sql = str(data.sql);
   const note = str(data.note);
   const truncated = data.truncated === true;
+  const chart = asChart(data.chart);
 
   if (columns.length === 0 || rows.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-2">
+      {chart && <ChartBlock chart={chart} />}
       <DataTable columns={columns} rows={rows} />
       {truncated && (
         <p className="text-2xs text-warn-ink">

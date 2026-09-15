@@ -1,157 +1,243 @@
-# 에이전트 응답 차트/그래프 시각화 검토
+# 에이전트 응답 차트 시각화
 
-**상태: 설계 논의 완료, 구현 착수 전.** 백엔드/프론트엔드 양쪽에 걸친 결정이라 최상위 `docs/`에 둔다. 각 하위 프로젝트에서 실제 구현에 들어갈 때 이 문서를 출발점으로 삼는다.
+**상태: v1 구현 완료(bar/line). v2 설계, 구현 착수 전.**
+v2는 [result-store.md](result-store.md)를 전제로 한다 — **Result Store를 먼저 구현한 뒤 착수한다.**
 
-## 배경
+## 1. v1 — 현재 구현된 것
 
-에이전트 응답 결과(`query_database`, `run_simulation` 등 tool 결과)를 표뿐 아니라 그래프/도표/간트차트로도 표현하고, 에이전트가 어떤 tool을 호출하고 어떤 계획을 진행 중인지 보여주는 요구사항이 나왔다. 이 문서는 전자(데이터 시각화)를 다룬다. 후자(진행상태 표시)는 이미 결론이 나 있다 — [frontend/docs/decisions.md#ai-sdk-및-채팅-ui-라이브러리-도입-검토](../frontend/docs/decisions.md#ai-sdk-및-채팅-ui-라이브러리-도입-검토) 및 `frontend/src/components/chat/agent-progress.tsx`의 기존 커스텀 구현(`AgentEvent`의 `status`/`tool_call`/`tool_result`) 유지, 신규 패키지 도입 불필요로 결론.
+2026-09-15에 bar/line 차트를 구현해 동작 중이다.
 
-## 1. 차트 라이브러리 선택
-
-프론트엔드 기존 스택: Next.js 14 · React 18 · Tailwind v4 · shadcn/ui (자세한 배경은 [frontend/CLAUDE.md](../frontend/CLAUDE.md), [frontend/docs/decisions.md#shadcnui-도입](../frontend/docs/decisions.md#shadcnui-도입)). 폐쇄망 배포 원칙([frontend/docs/closed-network.md](../frontend/docs/closed-network.md)) 적용 대상.
-
-| 후보 | 결론 | 근거 |
+| 구성 요소 | 파일 | 역할 |
 | --- | --- | --- |
-| **Recharts** | **채택** | shadcn/ui 공식 `chart` 컴포넌트가 이를 감싸는 래퍼 — CLI로 `add chart` 시 소스 복사, 기존 shadcn 토큰(`--shadcn-*` 매핑) 위에서 그대로 동작. `npm view recharts` 확인 결과 React 18 peer dep 지원(`^18.0.0` 포함), 런타임 의존성(Redux Toolkit, immer, d3 벤더 번들 등) 전부 순수 연산 라이브러리라 하드코딩된 외부 URL 없음 — 폐쇄망 체크리스트 통과. v3부터 `sideEffects: false` + ESM으로 트리셰이킹 지원. |
-| visx | 보류 | 번들 최소(~15KB)지만 D3 원시 API 수준이라 조립 비용 큼. 지금 요구사항엔 과함 — 커스텀 시각화가 실제로 필요해지면 재검토. |
-| Nivo | 제외 | 자체 스타일 시스템이 강해 shadcn 토큰과 이중화 위험 (Chatscope 때와 같은 패턴의 문제). |
-| **SVAR React Gantt** | **간트 전용으로 채택** | 오픈소스 코어 MIT 라이선스, React 18/19 지원, 활발히 유지보수. 단 critical path·baseline·export 등 고급 기능은 유료 PRO 티어 — 지금은 무료 코어 범위(기본 일정 바 표시)로 충분하다고 판단, 고급 기능 필요 시 별도 라이선스 검토. |
-| gantt-task-react | 제외 | MIT지만 4년간 미유지보수. |
-| AI Elements / assistant-ui / CopilotKit / Chatscope 등 | 해당 없음 | 이들은 채팅/tool-call UI 라이브러리로, 데이터 시각화와는 무관한 카테고리. [frontend/docs/decisions.md#ai-sdk-및-채팅-ui-라이브러리-도입-검토](../frontend/docs/decisions.md#ai-sdk-및-채팅-ui-라이브러리-도입-검토) 참고. |
+| 추론 | `backend/services/chart_inference.py` | `infer_chart(columns, rows)` — 결정론적 규칙으로 차트 스펙 조립 |
+| 백엔드 연결 | `services/mock/mock_sql_service.py`, `mock_simulation_service.py` | 결과 조립 직후 `chart` 필드 첨부 |
+| 타입 | `frontend/src/types/chat.ts` | `ChartSpec` |
+| 렌더 | `tool-results/chart-block.tsx`, `charts/bar-chart-view.tsx`, `line-chart-view.tsx` | Recharts (shadcn `chart` 컴포넌트 경유) |
+| 색상 | `src/app/globals.css` | `--chart-1` ~ `--chart-5` 전용 팔레트 |
 
-## 2. 백엔드 응답 스키마
+동작 방식: LLM을 거치지 않고 서비스 레이어가 `columns`/`rows` 형태만 보고 차트를 만든다. `line_cd`+`line_nm` 코드·명 쌍은 자동으로 `_nm`만 남기고, 항목이 20개를 넘으면 상위 N개 + `truncated`로 자른다.
 
-기존 `AgentEvent`(`backend/api/schemas.py`) 계약은 바꾸지 않는다. `tool_result` 이벤트의 `data`(자유형 `dict[str, Any]`) 안에 **선택적** `chart` 필드를 추가하는 방식 — 표 렌더링을 대체하지 않고 병렬로 얹는다.
+### v1의 한계 — v2를 만드는 이유
 
-```jsonc
-// query_database 결과 예시
-{
-  "kind": "database",
-  "sql": "...",
-  "table": { "columns": [...], "rows": [...] },
-  "chart": {
-    "type": "bar",            // "bar" | "line" | "pie" | "gantt"
-    "x": "line_name",
-    "series": [{ "key": "output_qty", "label": "생산량" }]
-  }
-}
-```
+**(1) 차트가 도구 호출 카드 안에만 뜬다.**
+`execute_sql` 결과 카드(접었다 펴는 UI) 안에 렌더된다. 사용자가 실제로 읽는 것은 에이전트의 **최종 답변**인데, 거기에는 차트가 없다. "표를 만들었으면 차트도 같이 보여달라"는 요구를 지금 구조로는 만족시킬 수 없다.
 
-```jsonc
-// 간트 예시 (simulate_* 결과 등)
-{
-  "kind": "simulation",
-  "chart": {
-    "type": "gantt",
-    "tasks": [
-      { "id": "L1", "label": "1라인", "start": "2026-09-01", "end": "2026-09-05" }
-    ]
-  }
-}
-```
-
-`chart`는 optional이다 — 시각화할 가치가 없는 결과(컬럼이 너무 많거나 row가 과도하게 많은 경우 등)는 채우지 않고 표만 남긴다.
-
-## 3. 차트 생성 위치 — 별도 tool 불필요
-
-**결론: "차트 생성" 전용 tool은 만들지 않는다.**
-
-- 차트 `chart` 필드는 실제 렌더링과 무관한 순수 메타데이터(타입 + 축 매핑)이므로 새 tool 호출로 왕복시킬 이유가 없다.
-- LLM이 별도 tool에 데이터를 다시 자연어로 옮겨 넘기게 하면 숫자 transcription 오류나 스키마 임의 변경 위험이 생긴다.
-- `sql_service.generate_and_query()` / `simulation_service.run_simulation()`이 이미 갖고 있는 실제 결과(`table.rows`, `kpis`)를 그 자리에서 그대로 보고 `chart`를 조립하면 데이터 왕복 없이 결정론적으로 일치한다.
-
-적용 위치: `backend/services/*/sql_service.py`, `backend/services/*/simulation_service.py`의 결과 조립부. `backend/tools/sql_tool.py`, `backend/tools/simulation_tool.py` 자체는 지금처럼 얇은 패스스루로 유지.
-
-## 4. 차트 타입 판단 로직
-
-**우선순위: LLM 힌트 → 없으면 데이터 shape 규칙 → 그래도 없으면 차트 생략.**
-
-### 4.1 LLM 힌트 (override, optional)
-
-`query_database` / `run_simulation` tool signature에 optional 파라미터 추가:
+**(2) 숫자 컬럼이 2개 이상이면 차트가 통째로 사라진다.**
+`infer_chart`는 숫자 컬럼이 정확히 1개일 때만 동작한다:
 
 ```python
-async def query_database(
-    question: str,
-    chart_type_hint: Literal["bar", "line", "pie", "gantt", "none"] | None = None,
-) -> dict:
-    """...
-    chart_type_hint: 사용자가 특정 시각화(추이=line, 비교=bar, 일정=gantt 등)를
-    명시적으로 요청했을 때만 지정. 불확실하면 생략 — 데이터 형태로 자동 판단됨.
-    """
+if len(numeric_cols) != 1 or not non_numeric_cols:
+    return None
 ```
 
-docstring에 "불확실하면 생략"을 명시해 LLM이 애매한 케이스에서 억지로 고르지 않게 한다.
+"계획 대비 실적 달성률"처럼 `plan_qty`, `actual_qty`, `achievement_rate`가 함께 나오는 — 이 도메인에서 가장 흔한 — 조회는 차트가 나오지 않는다. 어떤 컬럼으로 그릴지 지정할 방법도 없다.
 
-### 4.2 데이터 shape 기반 규칙 (힌트 없을 때 폴백, 서비스 레이어의 결정론적 함수)
+**(3) 규칙만으로는 의도를 못 읽는다.**
+"추이를 보고 싶다"와 "라인별로 비교하고 싶다"는 같은 컬럼 구성에서도 다른 차트를 원한다. 컬럼 shape만 보는 규칙은 이 차이를 알 수 없다.
 
-```python
-def _infer_chart(columns: list[str], rows: list[list]) -> ChartSpec | None:
-    ...
-```
+### v2에서 재사용 / 폐기
 
-- 컬럼이 `[카테고리, 숫자]` 1~2개 → **bar**
-- 컬럼에 날짜/월 축 + 숫자 시계열 → **line**
-- 컬럼이 `[카테고리, 비율]`이고 합이 100%에 가까움 → **pie** (오용되기 쉬워 지원 자체를 재검토할 수 있음)
-- `start`/`end`(또는 `기간`) 필드를 가진 작업/라인 목록 → **gantt**
-- 숫자 컬럼 3개 이상이거나 row가 과도하게 많음(예: 50+) → 생략, 표만
+- **재사용**: 렌더 계층 전체(`chart-block.tsx`, `charts/*`, 팔레트, `ChartSpec` 타입의 뼈대). Recharts 채택과 폐쇄망 검증 결과도 유효하다.
+- **유지**: `infer_chart`는 3단 폴백의 마지막 단계로 남긴다(§3).
+- **폐기**: 서비스 레이어가 tool 결과에 `chart`를 무조건 첨부하던 방식. v2에서는 차트 스펙의 출처가 셋으로 늘고, 데이터는 `result_id`에서 온다.
 
-### 4.3 힌트와 shape 충돌 시 처리
+## 2. v2의 전제 — Result Store
 
-```
-chart_type_hint 있음
-  └─ 해당 타입에 필요한 컬럼(예: line/bar면 카테고리+숫자, gantt면 start/end)이 있는가?
-       ├─ 있음 → 그 타입으로 생성
-       └─ 없음 → 생략 (규칙 기반 폴백으로 다른 타입을 자동 선택하지 않음 —
-                 사용자가 요청한 타입과 다른 게 나오면 더 혼란스럽다)
-hint 없음
-  └─ shape 규칙으로 추론 → 매칭 없으면 생략
-```
+[result-store.md](result-store.md)가 구현되면 상황이 바뀐다.
 
-hint는 "타입 선택권"만 주고, "그릴 수 있는 축이 실제로 있는가"는 항상 shape 검증을 통과해야 한다. 즉 판단/검증 로직 자체는 항상 서비스 레이어(결정론적 코드)에 있어 테스트 가능하다.
+- 모든 조회 결과가 parquet에 저장되고 `result_id`를 갖는다.
+- LLM은 **전체 행을 들고 있지 않다.** 대신 컬럼 목록(이름·dtype·role), 샘플 몇 행, 요약 통계를 본다.
+- 전체 데이터가 필요한 쪽은 `result_id`로 저장소를 직접 읽는다.
 
-## 5. 프론트엔드 렌더링 파이프라인
+이것이 v2 설계의 핵심 제약이자 기회다. **LLM은 숫자를 옮겨 적을 수 없다**(애초에 갖고 있지 않으니까). 그러므로 LLM에게 차트 결정을 맡겨도 v1 설계가 우려했던 transcription 오류가 원천적으로 발생하지 않는다.
 
-`frontend/src/components/chat/tool-result-card.tsx`의 기존 kind 분기 패턴을 그대로 따른다. 2026-09-14부터 이 카드는 AI Elements `Tool`/`ToolOutput`으로 감싸져 있고([frontend/docs/decisions.md#ai-sdk-및-채팅-ui-라이브러리-도입-검토](../frontend/docs/decisions.md#ai-sdk-및-채팅-ui-라이브러리-도입-검토) §적용 범위), `ToolOutput`의 `output`은 ReactNode 슬롯이라 차트도 같은 자리에 들어간다.
+> v1 문서 §3은 "차트 생성 전용 tool을 만들지 않는다"고 했고, 근거는 *LLM이 `execute_sql`이 반환한 숫자를 tool 인자로 다시 옮겨 적어야 해서*였다. v2에서 LLM이 다루는 것은 **`result_id`와 컬럼명뿐**이다. 따라서 그 원칙의 근거가 해소되고, LLM이 차트를 지정하는 설계가 안전해진다.
+
+## 3. 차트 스펙 결정 — 3단 폴백
+
+차트 스펙(타입 + 축 컬럼)을 누가 정하는가. 우선순위대로 셋을 둔다.
 
 ```
-ToolResultCard (AI Elements Tool > ToolHeader + ToolContent > ToolOutput)
- └─ (kind별 결과 컴포넌트: DatabaseResult / SimulationResult / ...)
-      └─ data.chart 있으면 → <ChartBlock chart={data.chart} />
+1. Knowledge 명세  — knowledge YAML 의 charts: 블록에 해당하는 패턴이 있는가?
+2. LLM 판단        — 없으면 LLM 이 컬럼 메타데이터를 보고 마커로 지정
+3. 규칙 폴백       — LLM 도 지정 안 했으면 infer_chart (v1 로직)
 ```
 
-`ChartBlock`은 `chart.type`으로 다시 분기하는 얇은 스위치:
+### 3.1 Knowledge 명세 (우선)
 
-```tsx
-function ChartBlock({ chart }: { chart: ChartSpec }) {
-  switch (chart.type) {
-    case "bar": return <BarChartView {...chart} />;
-    case "line": return <LineChartView {...chart} />;
-    case "pie": return <PieChartView {...chart} />;
-    case "gantt": return <GanttView {...chart} />;
-  }
-}
+테이블·시뮬레이션마다 "이런 결과가 나오면 이렇게 그려라"를 미리 선언한다. 도메인 담당자가 한 번 정해두면 LLM 판단의 흔들림 없이 항상 같은 형태가 나온다.
+
+`knowledge/catalog/tables/<table>.yaml`에 `charts:` 추가:
+
+```yaml
+table: FGS_INBOUND_RESULT
+# ... 기존 필드 ...
+charts:
+  - name: 라인별_실적_비교
+    when:                            # 결과 컬럼이 이 조건을 만족하면 적용
+      has_columns: [line_cd, inbound_qty]
+      absent_columns: [work_date]    # 시계열이 아닐 때만
+    spec:
+      type: bar
+      x: line_cd                     # line_nm 이 함께 있으면 자동으로 명 우선
+      y: [inbound_qty]
+      sort: desc
+  - name: 일자별_실적_추이
+    when:
+      has_columns: [work_date, inbound_qty]
+    spec:
+      type: line
+      x: work_date
+      y: [inbound_qty]
+      group_by: line_cd              # 있으면 라인별 시리즈로 분리
 ```
 
-- bar/line/pie: Recharts (shadcn `chart` 컴포넌트 기반)
-- gantt: SVAR React Gantt 무료 코어
-- 각 View는 `DatabaseResult`/`SimulationResult`가 이미 하듯 `table.rows`/`chart.tasks`를 그대로 받아 그리기만 한다 — 데이터 변환/집계는 백엔드 책임, 프론트는 순수 렌더러로 유지.
+`knowledge/simulations/<type>.yaml`도 동일하게:
 
-구현 시 추가될 파일(예상):
-- `frontend/src/types/chat.ts` — `ChartSpec` 유니온 타입 추가
-- `frontend/src/components/chat/tool-results/chart-block.tsx` — 타입 분기 스위치
-- `frontend/src/components/chat/tool-results/charts/` — `bar-chart-view.tsx`, `line-chart-view.tsx`, `pie-chart-view.tsx`, `gantt-view.tsx`
+```yaml
+type: 실적_조회
+# ... 기존 필드 ...
+charts:
+  - name: 라인별_월별_추이
+    when:
+      has_columns: [line, workMonth, qty]
+    spec:
+      type: line
+      x: workMonth
+      y: [qty]
+      group_by: line
+```
 
-## 열린 질문 / 다음 단계
+계획 대비 실적처럼 **숫자 컬럼이 여럿인 경우**(v1 한계 2)가 여기서 풀린다:
 
-- pie 차트를 실제로 지원할지 — 오용 위험이 커서 bar/line/gantt 3종만으로 시작하고 필요성이 명확해지면 추가하는 방안도 있음.
-- `_infer_chart` shape 규칙의 임계값(컬럼 수, row 수 등)은 실제 데이터로 튜닝 필요 — 지금은 추정치.
-- `chart_type_hint`가 tool signature에 추가되면 `backend/agent/system_prompt.py`에 사용 가이드를 반영해야 함 (언제 지정하고 언제 생략할지).
-- SVAR React Gantt 무료 코어의 실제 기능 범위(드래그, 의존성 표시 등)를 구현 전에 한 번 더 확인 — 지금은 문서 조사 수준.
-- 구현 순서: (1) 백엔드 `ChartSpec` pydantic 모델 + `_infer_chart` 규칙 함수 + `sql_service`/`simulation_service` 연동 → (2) 프론트 `ChartSpec` 타입 + `ChartBlock` + Recharts 3종 → (3) 간트(SVAR) 별도 스파이크.
+```yaml
+charts:
+  - name: 계획_대비_실적
+    when:
+      has_columns: [work_date, plan_qty, actual_qty]
+    spec:
+      type: bar
+      x: work_date
+      y: [plan_qty, actual_qty]      # 다중 시리즈 — 나란히 비교
+  - name: 달성률_추이
+    when:
+      has_columns: [work_date, achievement_rate]
+    spec:
+      type: line
+      x: work_date
+      y: [achievement_rate]          # 비율은 스케일이 달라 별도 차트로
+```
+
+수량과 비율은 축 스케일이 달라 한 차트에 섞으면 읽히지 않는다. 이런 도메인 판단이 YAML에 담기는 것이 이 방식의 핵심 가치다.
+
+**구현**: `backend/services/knowledge_service.py`의 `KnowledgeTable`/`KnowledgeSimulation` pydantic 모델에 `charts: list[ChartRule] = []` 추가. `when` 매칭은 결과 컬럼 집합에 대한 단순 포함 검사이므로 결정론적이고 테스트 가능하다.
+
+### 3.2 LLM 판단 (폴백 1)
+
+명세에 해당 패턴이 없으면 LLM이 정한다. LLM은 tool 결과로 이미 컬럼 메타데이터를 받고 있다:
+
+```jsonc
+"columns": [
+  { "name": "work_date", "dtype": "object", "role": "time" },
+  { "name": "line_cd",   "dtype": "object", "role": "category" },
+  { "name": "inbound_qty","dtype": "int64", "role": "measure" }
+]
+```
+
+이걸 보고 **컬럼 이름만 골라** 마커를 쓴다(§4). 값은 쓰지 않는다.
+
+### 3.3 규칙 폴백 (폴백 2)
+
+1·2 모두 없으면 v1의 `infer_chart`가 동작한다. 단일 카테고리 + 단일 숫자처럼 명백한 경우를 자동 처리해, 명세를 아직 안 쓴 테이블도 최소한의 시각화를 얻는다.
+
+## 4. 차트를 최종 응답에 — 마커 방식
+
+**LLM이 답변 본문에 마커를 쓰면 프론트가 그 자리에 차트를 렌더한다.**
+
+### 마커 형식
+
+```chart
+{ "result_id": "a3f2c8...", "type": "bar", "x": "line_nm", "y": ["actual_qty"] }
+```
+
+코드펜스의 언어 태그를 `chart`로 쓰고 본문에 JSON 스펙을 담는다. 이 형식을 고른 이유:
+
+- **마크다운 파서가 이미 처리한다.** `frontend/src/components/chat/markdown-text.tsx`의 `Code` 컴포넌트가 이미 `language-*` 클래스 유무로 인라인/블록을 가르고 있다. 여기에 `language-chart` 분기를 추가하면 된다.
+- **`MessagePart` 유니온을 늘리지 않아도 된다.** 차트는 텍스트 파트 안의 한 블록이므로 `frontend/src/types/chat.ts`의 파트 구조와 `chat-runtime.ts`의 `convertMessage` 매핑을 건드리지 않는다.
+- **LLM이 위치를 통제한다.** "표 다음에 차트", "결론 앞에 추이 그래프" 같은 배치가 자연스럽게 나온다.
+- **실패해도 안전하다.** 프론트가 마커를 이해 못 하면 그냥 코드 블록으로 보인다. 깨진 화면이 아니라 읽을 수 있는 JSON이 남는다.
+
+### 렌더 흐름
+
+```
+LLM 답변 텍스트 (마커 포함)
+  └─ MarkdownText (markdown-text.tsx)
+       └─ pre/code 슬롯에서 language-chart 가로채기
+            └─ 스펙 JSON 파싱
+                 └─ GET /api/results/{result_id}/chart?type=bar&x=line_nm&y=actual_qty
+                      └─ 백엔드가 parquet 에서 집계해 데이터 포인트 반환
+                           └─ ChartBlock (v1 컴포넌트 재사용)
+```
+
+**데이터는 마커에 없다.** 마커는 "무엇을 어떻게 그릴지"만 말하고, 실제 값은 프론트가 `result_id`로 조회한다. LLM은 숫자를 만지지 않는다.
+
+### 집계 API
+
+```
+GET /api/results/{result_id}/chart?type=bar&x=line_nm&y=actual_qty&group_by=&limit=20
+  → { type, x, categories, series, data, truncated?, hiddenCount? }
+```
+
+응답 형태는 v1의 `ChartSpec`과 같게 유지한다 — 렌더 컴포넌트를 그대로 재사용하기 위해서다. 상위 N개 자르기(`MAX_CHART_ITEMS`)와 코드·명 쌍 처리도 v1 로직을 여기로 옮긴다.
+
+### 스트리밍 중 처리
+
+마커는 텍스트 스트림에 섞여 들어오므로, 코드펜스가 닫히기 전의 부분 텍스트가 잠시 화면에 보인다.
+
+```
+```chart
+{ "result_id": "a3f2
+```
+
+`MarkdownTextPrimitive`는 매 델타마다 다시 파싱하므로 이 상태에서는 닫히지 않은 코드 블록으로 렌더된다. 대응:
+
+- **JSON 파싱 실패 시 조용히 대기.** 차트 컴포넌트가 스펙을 못 읽으면 스켈레톤(로딩 자리)을 보여주고, 다음 델타에서 완성되면 렌더한다. 에러를 띄우지 않는다 — 스트리밍 중에는 미완성이 정상이다.
+- **완성된 뒤에만 API 호출.** 파싱 성공 + `result_id` 존재를 확인한 뒤 조회한다. 부분 문자열로 요청하지 않는다.
+
+### Skill 연동
+
+"표가 있으면 차트도" 요구는 Skill 규칙으로 유도한다. `sql-analysis` SKILL.md에 추가:
+
+> **시각화**: 조회 결과를 표로 제시할 때, 비교·추이가 드러나는 결과면 차트 마커를 함께 쓴다. 마커에는 `result_id`와 컬럼명만 쓰고 수치는 쓰지 않는다. 어떤 차트가 적절한지는 tool 결과의 `columns[].role`을 본다.
+
+`simulation` SKILL.md에도 동일 취지의 문구를 넣는다.
+
+**주의**: `backend/tests/test_prompt_consistency.py`의 `test_skill_does_not_copy_schema`가 SKILL.md에 실제 테이블명이 들어가는 것을 금지한다. 위 문구처럼 **구체적 테이블·컬럼명 없이** 절차만 서술해야 한다.
+
+## 5. 구현 순서
+
+Result Store 완료가 전제다.
+
+1. **집계 API** — `GET /api/results/{id}/chart`. v1 `infer_chart`의 코드·명 처리와 상위 N개 자르기를 이쪽으로 이동.
+2. **마커 렌더** — `markdown-text.tsx`에 `language-chart` 분기 + 스켈레톤/파싱 실패 처리. `ChartBlock`은 그대로 재사용하되 데이터를 props가 아니라 API에서 받도록 변경.
+3. **Skill 문구** — `sql-analysis`/`simulation` SKILL.md에 시각화 절차 추가. LLM이 마커를 쓰기 시작한다.
+4. **Knowledge 명세** — `ChartRule` pydantic 모델, `charts:` 블록 파싱, `when` 매칭. tool 결과에 "이 결과에 적용 가능한 차트 명세"를 실어 LLM이 그대로 쓰게 한다.
+5. **v1 경로 정리** — 서비스 레이어의 무조건 `chart` 첨부 제거, tool 카드 내 차트를 유지할지 결정(§열린 질문).
+
+3까지 하면 사용자가 요구한 "최종 응답에 차트"가 동작한다. 4는 품질·일관성 개선이다.
+
+## 6. 열린 질문
+
+- **tool 카드의 차트를 남길 것인가.** 최종 답변에 차트가 생기면 도구 카드의 차트는 중복이다. 다만 "에이전트가 무엇을 봤는지" 확인하는 용도로는 여전히 쓸모가 있다. 제거하면 v1 코드가 단순해지고, 남기면 같은 차트를 두 번 보게 된다.
+- **`when` 매칭 규칙의 표현력.** `has_columns`/`absent_columns`만으로 부족한 경우(행 수 조건, 값 범위 조건)가 나올 수 있다. 처음부터 복잡하게 만들지 말고 실제 부족한 사례가 나올 때 늘린다.
+- **LLM이 마커를 남발하거나 안 쓰는 경우.** Skill 문구만으로 빈도가 통제될지는 실제로 돌려봐야 안다. 너무 안 쓰면 명세 기반 자동 첨부(§3.1의 결과를 답변 끝에 자동으로)를 보조로 둘 수 있다.
+- **`role` 추정 정확도.** `columns[].role`(`category`/`measure`/`time`)이 LLM 판단의 입력인데, 이 값이 틀리면 차트도 틀린다. [result-store.md](result-store.md)의 같은 이름 열린 질문과 연결된다.
+- **pie·간트.** 여전히 범위 밖이다. 간트는 구간(시작~종료) 데이터를 가진 조회가 실제로 생긴 뒤에 다시 본다.
 
 ## 관련 문서
 
-- [frontend/docs/decisions.md](../frontend/docs/decisions.md) — 결정 사항 기록 전체 (ai SDK/채팅 UI 라이브러리 검토, shadcn 도입 경위·토큰 네임스페이싱 포함)
-- [frontend/docs/closed-network.md](../frontend/docs/closed-network.md) — 폐쇄망 원칙, 신규 의존성 체크리스트
-- [frontend/CLAUDE.md](../frontend/CLAUDE.md) — 프론트엔드 작업 지침 전반
+- [result-store.md](result-store.md) — **선행 구현 대상.** `result_id`·컬럼 메타데이터·저장 구조
+- [domain-knowledge.md](domain-knowledge.md) — 지식 YAML 구조. `charts:` 블록이 여기 스키마에 추가된다
+- [frontend/docs/decisions.md](../frontend/docs/decisions.md) — Recharts 채택, assistant-ui 구조
+- [frontend/docs/closed-network.md](../frontend/docs/closed-network.md) — 폐쇄망 의존성 체크리스트
+- [frontend/CLAUDE.md](../frontend/CLAUDE.md) · [backend/CLAUDE.md](../backend/CLAUDE.md) — 작업 지침

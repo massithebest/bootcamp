@@ -40,6 +40,14 @@
   --warn-weak: #f8f0e1;
   --block-ink: #bb3a30;
   --block-weak: #f9ebe9;
+
+  /* 차트 팔레트 — 다계열(grouped-line 등) 구분 전용. --chart-1 은 --accent 와
+     동일 톤이라 단일 시리즈 차트는 이것만 쓴다. 그 외 UI에는 쓰지 않는다. */
+  --chart-1: #2f5fd0;
+  --chart-2: #1a9a8c;
+  --chart-3: #c9822a;
+  --chart-4: #7a5fd0;
+  --chart-5: #b0563f;
 }
 
 * {

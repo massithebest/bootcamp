@@ -42,6 +42,24 @@ export interface StatusStep {
   detail?: string;
 }
 
+/**
+ * `execute_sql`/`run_simulation` 결과의 선택적 `chart` 필드.
+ * 백엔드 `services/chart_inference.py` 가 결정론적으로 조립한다 — LLM 을
+ * 거치지 않는다. `data`의 각 원소는 `{ [x]: 값, [series[i].key]: 값 }` 형태의
+ * 레코드로, Recharts 컴포넌트에 그대로 넘길 수 있다.
+ */
+export interface ChartSpec {
+  type: "bar" | "line";
+  x: string;
+  series: { key: string; label: string }[];
+  categories: (string | number)[];
+  data: Record<string, unknown>[];
+  /** 상위 N개만 담았을 때 true. */
+  truncated?: true;
+  /** truncated 일 때 차트에 담기지 않은 나머지 개수. */
+  hiddenCount?: number;
+}
+
 /** tool_result Event 로부터 만들어지는 Tool 결과 항목. */
 export interface ToolResult {
   id: string;
