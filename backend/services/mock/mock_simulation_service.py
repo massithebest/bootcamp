@@ -19,7 +19,8 @@ from services.simulation_registry import (
 
 
 DEFAULT_PLAN_MONTH = "202609"
-INLINE_ROW_THRESHOLD = 200
+INLINE_ROW_THRESHOLD = 100
+SAMPLE_ROW_COUNT = 10
 
 
 def _performance_lookup(params: dict) -> dict:
@@ -153,7 +154,7 @@ class MockSimulationService:
                     {"name": column.name, "dtype": column.dtype, "role": column.role}
                     for column in meta.columns
                 ]
-                result["sample_rows"] = rows[:5]
+                result["sample_rows"] = rows[:SAMPLE_ROW_COUNT]
                 result["summary"] = summarize_dataframe(
                     pd.DataFrame(rows, columns=columns)
                 )

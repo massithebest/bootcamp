@@ -1,6 +1,7 @@
 import { DataTable, Disclosure, StatusDot, type Tone } from "../primitives";
 import { ChartBlock } from "./chart-block";
-import { asChart, asRecords, asRows, asStrings, str, toneOf } from "./shared";
+import { ResultSummaryCard } from "./result-summary";
+import { asChart, asRecords, asRows, asStrings, isLargeResult, str, toneOf } from "./shared";
 
 /** 레코드 배열(`[{line, workMonth, qty}]` 등)의 컬럼명을 첫 원소의 key 순서로 뽑는다. */
 function columnsOfRecords(records: Record<string, unknown>[]): string[] {
@@ -20,6 +21,7 @@ export function SimulationResult({ data }: { data: Record<string, unknown> }) {
   const resultColumns = columnsOfRecords(results);
   const resultRows = results.map((r) => resultColumns.map((c) => String(r[c] ?? "")));
   const chart = asChart(data.chart);
+  const large = isLargeResult(data);
 
   return (
     <div className="flex flex-col gap-3">
@@ -57,8 +59,13 @@ export function SimulationResult({ data }: { data: Record<string, unknown> }) {
 
       {chart && <ChartBlock chart={chart} />}
 
-      {resultColumns.length > 0 && resultRows.length > 0 && (
-        <DataTable columns={resultColumns} rows={resultRows} />
+      {/* `실적_조회` 등 배열 결과가 대용량(200행 초과, docs/result-store.md §1)이면
+          `results` 는 sample_rows 로 축소되어 있다 — 표 대신 요약 카드로 렌더한다. */}
+      {large ? (
+        <ResultSummaryCard data={data} />
+      ) : (
+        resultColumns.length > 0 &&
+        resultRows.length > 0 && <DataTable columns={resultColumns} rows={resultRows} />
       )}
 
       {tableColumns.length > 0 && tableRows.length > 0 && (

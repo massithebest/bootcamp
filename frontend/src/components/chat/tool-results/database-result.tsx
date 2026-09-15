@@ -1,22 +1,52 @@
 import { DataTable, Disclosure } from "../primitives";
 import { ChartBlock } from "./chart-block";
-import { asChart, asRows, asStrings, str } from "./shared";
+import { ResultSummaryCard } from "./result-summary";
+import { asChart, asRows, asStrings, isLargeResult, str } from "./shared";
 
 /**
  * DB 조회 결과 → 표 + 실행 SQL 펼쳐보기.
  *
  * Backend `execute_sql` 은 컬럼·행을 `table` 아래에 담는다
- * (`{ table: { columns, rows }, row_count, truncated }`). 초기 더미가 쓰던
+ * (`{ table: { columns, rows }, row_count }`). 초기 더미가 쓰던
  * 최상위 `columns`/`rows` 형태도 함께 받아준다.
+ *
+ * `type: "large_result"`(200행 초과, docs/result-store.md §1)면 전체 행 대신
+ * `sample_rows`/`summary` 요약 카드를 렌더한다 — 페이지네이션은 두지 않는다,
+ * 후속 조회는 대화로 처리된다(설계 §7·§9).
  */
 export function DatabaseResult({ data }: { data: Record<string, unknown> }) {
-  const table = (data.table ?? {}) as Record<string, unknown>;
-  const columns = asStrings(table.columns ?? data.columns);
-  const rows = asRows(table.rows ?? data.rows);
   const sql = str(data.sql);
   const note = str(data.note);
-  const truncated = data.truncated === true;
   const chart = asChart(data.chart);
+
+  if (isLargeResult(data)) {
+    return (
+      <div className="flex flex-col gap-2">
+        {chart && <ChartBlock chart={chart} />}
+        <ResultSummaryCard data={data} />
+        {note && <p className="font-mono text-2xs text-ink-3">{note}</p>}
+        {sql && (
+          <Disclosure summary="실행된 SQL" dense>
+            <pre className="thin-scroll mt-1 overflow-x-auto rounded bg-[#1c2530] px-3 py-2.5 font-mono text-data leading-relaxed text-[#d7dce4]">
+              {sql}
+            </pre>
+          </Disclosure>
+        )}
+      </div>
+    );
+  }
+
+  const table = (data.table ?? {}) as Record<string, unknown>;
+  const rows = asRows(table.rows ?? data.rows);
+  const declaredColumns = asStrings(table.columns ?? data.columns);
+  // `get_result_page` 는 컬럼명 없이 `rows` 만 반환한다(백엔드 tools/result_tool.py) —
+  // 그런 경우 인덱스를 헤더로 써서 같은 표 컴포넌트를 재사용한다.
+  const columns =
+    declaredColumns.length > 0
+      ? declaredColumns
+      : rows.length > 0
+        ? rows[0].map((_, i) => String(i))
+        : [];
 
   if (columns.length === 0 || rows.length === 0) return null;
 
@@ -24,11 +54,6 @@ export function DatabaseResult({ data }: { data: Record<string, unknown> }) {
     <div className="flex flex-col gap-2">
       {chart && <ChartBlock chart={chart} />}
       <DataTable columns={columns} rows={rows} />
-      {truncated && (
-        <p className="text-2xs text-warn-ink">
-          결과가 많아 {rows.length}행까지만 표시했습니다.
-        </p>
-      )}
       {note && <p className="font-mono text-2xs text-ink-3">{note}</p>}
       {sql && (
         <Disclosure summary="실행된 SQL" dense>

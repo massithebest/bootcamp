@@ -33,6 +33,8 @@ const TOOL_META: Record<string, { label: string; kind: Kind }> = {
   describe_table: { label: "테이블 상세", kind: "catalog" },
   list_kpis: { label: "KPI 목록", kind: "catalog" },
   get_kpi: { label: "KPI 정의", kind: "catalog" },
+  get_result_summary: { label: "결과 요약 조회", kind: "database" },
+  get_result_page: { label: "결과 구간 조회", kind: "database" },
 };
 
 function resolveKind(result: ToolResult): { label: string; kind: Kind } {

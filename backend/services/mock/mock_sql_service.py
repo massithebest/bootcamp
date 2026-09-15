@@ -19,7 +19,8 @@ from services.sql_guard import MAX_ROWS, SqlGuardError, check_sql
 
 
 logger = logging.getLogger(__name__)
-INLINE_ROW_THRESHOLD = 200
+INLINE_ROW_THRESHOLD = 100
+SAMPLE_ROW_COUNT = 10
 
 
 def _error(message: str, sql: str) -> dict:
@@ -79,7 +80,7 @@ class MockSQLService:
                 {"name": column.name, "dtype": column.dtype, "role": column.role}
                 for column in meta.columns
             ]
-            result["sample_rows"] = rows[:5]
+            result["sample_rows"] = rows[:SAMPLE_ROW_COUNT]
             result["summary"] = summarize_dataframe(pd.DataFrame(rows, columns=columns))
         chart = infer_chart(columns, rows)
         if chart is not None:
