@@ -83,6 +83,7 @@ class AgentEventAdapter:
         self._tool_name_by_id: dict[str, str] = {}
         self._last_session_id: str | None = None
         self._last_entry_uuid: str | None = None
+        self.result_succeeded: bool | None = None
 
     @property
     def session_id(self) -> str | None:
@@ -124,6 +125,7 @@ class AgentEventAdapter:
 
         if isinstance(raw_event, ResultMessage):
             self._last_session_id = raw_event.session_id
+            self.result_succeeded = not raw_event.is_error
             if raw_event.is_error:
                 return [
                     AgentEvent(
@@ -190,8 +192,15 @@ class AgentEventAdapter:
                 continue
 
             tool_name = _short_tool_name(raw_name)
-            data = _coerce_tool_result(block.content)
-            status = "error" if getattr(block, "is_error", False) else "completed"
+            # SDK 실행 실패에는 내부 예외/경로가 들어갈 수 있다. 업무 함수가
+            # 반환한 안전한 status:error payload와 구분해 원문을 공개하지 않는다.
+            data = (
+                {"status": "error", "message": "도구 실행 중 오류가 발생했습니다."}
+                if block.is_error
+                else _coerce_tool_result(block.content)
+            )
+            failed = data.get("status") == "error" or bool(data.get("error"))
+            status = "error" if failed else "completed"
 
             events.append(
                 AgentEvent(
@@ -206,7 +215,7 @@ class AgentEventAdapter:
                     data={
                         "step": tool_name,
                         "status": status,
-                        "label": f"{tool_name} 완료",
+                        "label": f"{tool_name} {'실패' if failed else '완료'}",
                     },
                 )
             )

@@ -21,6 +21,11 @@ ENV = os.getenv("ENV", "dev")
 
 SERVICE_MODE = os.getenv("SERVICE_MODE", "mock")
 
+
+def use_fake_runner() -> bool:
+    """테스트/데모 실행 플래그. 호출 시 읽어 테스트 환경 전환을 지원한다."""
+    return os.getenv("PLANNING_AGENT_FAKE", "").lower() in {"1", "true", "yes"}
+
 #: backend/ 디렉터리. 아래 경로 상수의 기준점.
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 

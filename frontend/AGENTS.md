@@ -52,11 +52,14 @@ Vite 7, React 18, strict TypeScript 기반의 라우터 없는 SPA다. 코드 �
 npm install
 cp .env.example .env.local
 npm run dev
+npm test
 npm run build
 npm run lint
 npm run preview
 ```
 
-- `npm run build`가 현재 type check를 포함한다. 자동 테스트와 formatter는 아직 없다.
+- `npm run build`가 type check를 포함한다. `npm test`는 Node 내장 실행기로
+  SSE·상태 전이·결과 렌더 회귀를 검증한다. 브라우저 lifecycle 검증은
+  개발 서버의 `/tests/chat-browser.html`을 사용한다. formatter는 아직 없다.
 - UI 변경은 loading·empty·error, 키보드·focus·label, tool card와 chart/table
   fallback, 좁은 화면부터 desktop까지 수동 확인한다.

@@ -188,3 +188,35 @@ def test_mock_run_simulation_unknown_type() -> None:
         mock_simulation_service.run_simulation("존재하지_않는_타입", {})
     )
     assert result["status"] == "error"
+
+
+@pytest.mark.parametrize("source", ['"private_table"', '[private_table]', '`private_table`', '/* gap */ private_table'])
+def test_sql_catalog_cannot_be_bypassed_with_quoted_or_commented_table(smt_db, source):
+    import sqlite3
+
+    with sqlite3.connect(smt_db) as conn:
+        conn.execute("CREATE TABLE private_table (value TEXT)")
+        conn.execute("INSERT INTO private_table VALUES ('hidden fixture')")
+    result = asyncio.run(mock_sql_service.execute_sql(f"SELECT * FROM {source}", purpose="guard test"))
+    assert result["status"] == "error"
+    assert "hidden fixture" not in str(result)
+
+
+def test_sql_catalog_allows_quoted_table_and_cte(smt_db):
+    result = asyncio.run(mock_sql_service.execute_sql(
+        'WITH source AS (SELECT part FROM "part") SELECT COUNT(*) AS n FROM source', purpose="CTE test"))
+    assert result["status"] == "ok"
+    assert result["table"]["rows"] == [[12]]
+
+
+def test_mock_real_function_signatures_match():
+    import inspect
+    from services.real import sql_service, rag_service, simulation_service
+
+    for mock, real, names in [
+        (mock_sql_service, sql_service, ["execute_sql"]),
+        (mock_rag_service, rag_service, ["search"]),
+        (mock_simulation_service, simulation_service, ["list_simulation", "run_simulation"]),
+    ]:
+        for name in names:
+            assert inspect.signature(getattr(mock, name), eval_str=True) == inspect.signature(getattr(real, name), eval_str=True)

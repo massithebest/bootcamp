@@ -7,8 +7,8 @@
  * 메시지 상태는 계속 우리가 소유한다 — assistant-ui는 상태/UI 플럼빙
  * 계층일 뿐이다.
  *
- * 편집/재생성(onEdit/onReload)은 백엔드 세션 포크가 필요해서(docs/decisions.md
- * Q5) `turnId`(백엔드 `done` Event 의 `data.turn_id`)를 assistant 메시지에
+ * 편집/재생성(onEdit/onReload)은 백엔드 세션 포크가 필요해서
+ * `turnId`(백엔드 `done` Event 의 `data.turn_id`)를 assistant 메시지에
  * 실어두고, 그 직전 turnId 를 포크 지점으로 다시 보낸다. 더미 시드 대화처럼
  * turnId 가 없는 메시지를 편집/재생성하면 그 대화를 처음부터 새로 시작한다
  * (`fork_from_turn_id: ""`) — 애초에 백엔드에 보낸 적이 없어 포크할 지점이
@@ -23,15 +23,10 @@ import {
   type AssistantRuntime,
 } from "@assistant-ui/react";
 
-import type {
-  AgentEvent,
-  ChatMessage,
-  StatusStep,
-  StepStatus,
-  ToolResult,
-} from "@/types/chat";
+import type { ChatMessage } from "@/types/chat";
 import { createConversationId, sendChatMessage } from "@/lib/chat-api";
 import { convertMessage } from "@/lib/chat-runtime";
+import { applyAgentEvent, eventHasOutput } from "@/lib/chat-state";
 
 let idCounter = 0;
 const nextId = (p: string) => `${p}-${Date.now()}-${(idCounter += 1)}`;
@@ -54,12 +49,12 @@ const freshUser = (text: string): ChatMessage => ({
   runState: { type: "complete" },
 });
 
-/** 실패 시 재시도에 필요한 만큼만 기억한다. 편집/재생성 실패 후 "다시 시도"가
- *  포크 지점을 잃지 않도록 — 평범한 턴 실패는 이 값이 없다(runTurn 참고). */
+/** 재시도는 원래 사용자 메시지와 fork 지점을 그대로 재사용한다. */
 interface RetryContext {
   text: string;
-  forkFromTurnId: string;
-  prefix: ChatMessage[];
+  prefixWithUser?: ChatMessage[];
+  forkFromTurnId?: string;
+  reuseUser?: boolean;
 }
 
 export interface UseAgentChatResult {
@@ -77,213 +72,83 @@ export interface UseAgentChatResult {
 export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [streaming, setStreaming] = useState(false);
-  const [retryPrompt, setRetryPrompt] = useState<string | null>(null);
-
-  const conversationIdRef = useRef<string>("");
+  const [retryContext, setRetryContext] = useState<RetryContext | null>(null);
+  const conversationIdRef = useRef("");
   const abortRef = useRef<AbortController | null>(null);
-  const retryContextRef = useRef<RetryContext | null>(null);
 
   useEffect(() => {
     conversationIdRef.current = createConversationId();
-    return () => abortRef.current?.abort();
+    return () => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    };
   }, []);
 
-  const updateAssistant = useCallback(
-    (id: string, fn: (m: ChatMessage) => ChatMessage) => {
-      setMessages((prev) => prev.map((m) => (m.id === id ? fn(m) : m)));
-    },
-    [],
-  );
+  const runRequest = useCallback(async (request: RetryContext) => {
+    // React의 다음 render를 기다리지 않고 같은 tick의 중복 실행도 막는다.
+    if (abortRef.current) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const assistantId = nextId("assistant");
+    const userMessage = freshUser(request.text);
+    setMessages((prev) => [
+      ...(request.prefixWithUser ?? (request.reuseUser ? prev : [...prev, userMessage])),
+      emptyAssistant(assistantId),
+    ]);
+    setRetryContext(null);
+    setStreaming(true);
+    let hadOutput = false;
+    const isCurrent = () => abortRef.current === controller && !controller.signal.aborted;
 
-  const applyEvent = useCallback(
-    (assistantId: string, event: AgentEvent): boolean => {
-      switch (event.type) {
-        case "text": {
-          const delta = event.content ?? "";
-          if (!delta) return false;
-          updateAssistant(assistantId, (m) => {
-            const last = m.parts[m.parts.length - 1];
-            // 마지막 조각이 텍스트면 이어붙이고, 아니면(도구 결과 뒤) 새 조각 시작.
-            if (last && last.kind === "text") {
-              const parts = m.parts.slice();
-              parts[parts.length - 1] = { ...last, text: last.text + delta };
-              return { ...m, parts };
-            }
-            return {
-              ...m,
-              parts: [...m.parts, { kind: "text", id: nextId("txt"), text: delta }],
-            };
-          });
-          return true;
-        }
-        case "status": {
-          const step = readStatusStep(event);
-          if (!step) return false;
-          updateAssistant(assistantId, (m) => ({
-            ...m,
-            statuses: upsertStatus(m.statuses, step),
-          }));
-          return true;
-        }
-        case "tool_call": {
-          const step = readStatusStep(event, "running");
-          if (step) {
-            updateAssistant(assistantId, (m) => ({
-              ...m,
-              statuses: upsertStatus(m.statuses, step),
-            }));
-          }
-          return Boolean(step);
-        }
-        case "tool_result": {
-          const result: ToolResult = {
-            id: nextId("tool"),
-            toolName: event.tool_name ?? "tool",
-            data: event.data ?? null,
-            content: event.content ?? null,
-          };
-          // `execute_sql` 의 purpose 는 결과에 실려 온다. 진행 표시의 해당 단계에 붙인다.
-          const purpose = asString(result.data?.purpose);
-          updateAssistant(assistantId, (m) => ({
-            ...m,
-            parts: [...m.parts, { kind: "tool", id: result.id, result }],
-            statuses: purpose
-              ? annotateStatus(m.statuses, result.toolName, purpose)
-              : m.statuses,
-          }));
-          return true;
-        }
-        case "error": {
-          const message =
-            event.content ?? "요청을 처리하는 중 오류가 발생했습니다.";
-          updateAssistant(assistantId, (m) => ({
-            ...m,
-            runState: { type: "error", message },
-          }));
-          return false;
-        }
-        case "done": {
-          // turn_id 는 이 턴의 포크 지점 — 편집/재생성이 나중에 참조한다.
-          const turnId = asString(event.data?.turn_id);
-          updateAssistant(assistantId, (m) => ({
-            ...m,
-            runState:
-              m.runState.type === "running"
-                ? { type: "complete" }
-                : m.runState,
-            turnId: turnId ?? m.turnId,
-          }));
-          return false;
-        }
-      }
-    },
-    [updateAssistant],
-  );
-
-  /**
-   * 스트리밍 실행 공통부. 호출 측이 `messages` 를 원하는 형태로 미리
-   * 세팅해두고(새 user 메시지 + emptyAssistant 까지 포함) 호출한다.
-   * 반환값이 `true` 면 무출력 실패 — 호출 측이 배너/재시도 컨텍스트를 정리한다.
-   */
-  const streamTurn = useCallback(
-    async (
-      assistantId: string,
-      text: string,
-      forkFromTurnId?: string,
-    ): Promise<boolean> => {
-      setStreaming(true);
-      let turnHadOutput = false;
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      await sendChatMessage({
-        message: text,
+    try {
+      const outcome = await sendChatMessage({
+        message: request.text,
         conversationId: conversationIdRef.current || undefined,
-        forkFromTurnId,
+        forkFromTurnId: request.forkFromTurnId,
         signal: controller.signal,
         onEvent: (event) => {
-          turnHadOutput = applyEvent(assistantId, event) || turnHadOutput;
+          if (!isCurrent()) return;
+          hadOutput = eventHasOutput(event) || hadOutput;
+          // updater는 StrictMode에서 재실행될 수 있으므로 ID는 밖에서 만든다.
+          const partId = nextId("part");
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? applyAgentEvent(m, event, partId) : m,
+            ),
+          );
         },
       });
-
-      updateAssistant(assistantId, (m) =>
-        m.runState.type === "running"
-          ? { ...m, runState: { type: "complete" } }
-          : m,
-      );
-      // 취소 직후 새 요청이 시작됐으면 이전 요청의 정리 작업이 새 controller와
-      // 전역 running 상태를 덮어쓰지 않게 한다.
-      if (abortRef.current === controller) {
-        setStreaming(false);
-        abortRef.current = null;
-      }
-
-      return !turnHadOutput && !controller.signal.aborted;
-    },
-    [applyEvent, updateAssistant],
-  );
-
-  const runTurn = useCallback(
-    async (text: string, opts?: { retryOf?: string }) => {
-      if (streaming) return;
-      setRetryPrompt(null);
-      retryContextRef.current = null;
-
-      const assistantId = nextId("assistant");
-      setMessages((prev) => {
-        const base = opts?.retryOf
-          ? prev.filter((m) => m.id !== opts.retryOf)
-          : [...prev, freshUser(text)];
-        return [...base, emptyAssistant(assistantId)];
-      });
-
-      const failed = await streamTurn(assistantId, text);
-
-      // 출력이 하나도 없었으면 연결 실패로 간주하고 배너를 띄운다.
-      if (failed) {
+      if (!isCurrent()) return;
+      if (outcome === "failed" && !hadOutput) {
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));
-        setRetryPrompt(text);
+        setRetryContext({ ...request, reuseUser: true });
       }
-    },
-    [streaming, streamTurn],
-  );
+    } finally {
+      if (isCurrent()) {
+        abortRef.current = null;
+        setStreaming(false);
+      }
+    }
+  }, []);
 
-  /**
-   * 편집/재생성 저수준 실행부. `prefix` 이후를 새 user 메시지 + 응답으로
-   * 갈아 끼우고, `forkFromTurnId` 로 그 지점부터 백엔드 세션을 포크한다.
-   */
+  const runTurn = useCallback(async (text: string) => {
+    await runRequest({ text });
+  }, [runRequest]);
+
   const runFromPrefix = useCallback(
     async (prefix: ChatMessage[], text: string, forkFromTurnId: string) => {
-      if (streaming) return;
-      setRetryPrompt(null);
-
-      const assistantId = nextId("assistant");
-      const userMessage = freshUser(text);
-      setMessages([...prefix, userMessage, emptyAssistant(assistantId)]);
-
-      const failed = await streamTurn(assistantId, text, forkFromTurnId);
-
-      if (failed) {
-        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
-        setRetryPrompt(text);
-        retryContextRef.current = { text, forkFromTurnId, prefix };
-      } else {
-        retryContextRef.current = null;
-      }
+      await runRequest({
+        text,
+        prefixWithUser: [...prefix, freshUser(text)],
+        forkFromTurnId,
+      });
     },
-    [streaming, streamTurn],
+    [runRequest],
   );
 
   const handleRetry = useCallback(() => {
-    if (!retryPrompt) return;
-    const ctx = retryContextRef.current;
-    if (ctx) {
-      runFromPrefix(ctx.prefix, ctx.text, ctx.forkFromTurnId);
-    } else {
-      runTurn(retryPrompt);
-    }
-  }, [retryPrompt, runTurn, runFromPrefix]);
+    if (retryContext) void runRequest(retryContext);
+  }, [retryContext, runRequest]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
@@ -298,16 +163,12 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
     );
   }, []);
 
-  const resetConversation = useCallback(
-    (seed: ChatMessage[]) => {
-      handleStop();
-      setMessages(seed);
-      setRetryPrompt(null);
-      retryContextRef.current = null;
-      conversationIdRef.current = createConversationId();
-    },
-    [handleStop],
-  );
+  const resetConversation = useCallback((seed: ChatMessage[]) => {
+    handleStop();
+    setMessages(seed);
+    setRetryContext(null);
+    conversationIdRef.current = createConversationId();
+  }, [handleStop]);
 
   /* ---- assistant-ui 런타임 ---- */
 
@@ -323,7 +184,7 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
     handleStop();
   }, [handleStop]);
 
-  /** 재생성 — `parentId`(직전 user 메시지)는 그대로 재사용하고 응답만 새로 받는다. */
+  /** 재생성 — 직전 사용자 입력과 이전 턴까지의 prefix로 다시 실행한다. */
   const handleReload = useCallback(
     async (parentId: string | null) => {
       if (!parentId) return;
@@ -367,7 +228,7 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
     runtime,
     messages,
     streaming,
-    retryPrompt,
+    retryPrompt: retryContext?.text ?? null,
     handleRetry,
     handleStop,
     resetConversation,
@@ -392,77 +253,4 @@ function appendMessageText(message: AppendMessage): string {
     .map((part) => part.text)
     .join("")
     .trim();
-}
-
-/* ---- AgentEvent → StatusStep 파싱 (기존 로직 유지) ---- */
-
-function readStatusStep(
-  event: AgentEvent,
-  defaultStatus: StepStatus = "running",
-): StatusStep | null {
-  const data = event.data ?? {};
-  const step =
-    asString(data.step) ??
-    asString(data.id) ??
-    event.tool_name ??
-    asString(data.name);
-
-  if (!step) {
-    if (event.type === "status" && event.content) {
-      return {
-        step: event.content,
-        label: event.content,
-        status: defaultStatus,
-      };
-    }
-    return null;
-  }
-
-  const label =
-    asString(data.label) ?? asString(data.title) ?? event.content ?? step;
-  const status = normalizeStatus(asString(data.status)) ?? defaultStatus;
-  return { step, label, status };
-}
-
-/** 이미 만들어진 진행 단계에 부가 설명을 붙인다. 해당 step 이 없으면 그대로 둔다. */
-function annotateStatus(
-  statuses: StatusStep[],
-  step: string,
-  detail: string,
-): StatusStep[] {
-  const idx = statuses.findIndex((s) => s.step === step);
-  if (idx === -1) return statuses;
-  const next = statuses.slice();
-  next[idx] = { ...next[idx], detail };
-  return next;
-}
-
-function upsertStatus(statuses: StatusStep[], incoming: StatusStep) {
-  const idx = statuses.findIndex((s) => s.step === incoming.step);
-  if (idx === -1) return [...statuses, incoming];
-  const next = statuses.slice();
-  next[idx] = { ...next[idx], ...incoming };
-  return next;
-}
-
-function normalizeStatus(value: string | undefined): StepStatus | null {
-  switch (value) {
-    case "pending":
-    case "running":
-    case "completed":
-    case "error":
-      return value;
-    case "done":
-    case "complete":
-      return "completed";
-    case "start":
-    case "in_progress":
-      return "running";
-    default:
-      return null;
-  }
-}
-
-function asString(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
 }

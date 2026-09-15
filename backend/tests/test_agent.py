@@ -257,3 +257,57 @@ def test_run_agent_empty_fork_turn_id_starts_conversation_over(
     assert captured["options"].resume is None
     assert captured["options"].fork_session is False
     assert session_store.get_session_id("conv-1") == "sess-restarted"
+
+
+@pytest.mark.parametrize("ending", ["error", "eof", "cancel"])
+def test_failed_or_cancelled_run_does_not_publish_success_anchor(monkeypatch, ending):
+    import asyncio
+
+    session_store.bind_session_id("conv-1", "sess-existing")
+
+    async def fake_query(**kwargs):
+        yield AssistantMessage(content=[TextBlock(text="부분 응답")], model="x", uuid="a-1")
+        if ending != "eof":
+            yield ResultMessage(subtype="error" if ending == "error" else "success",
+                duration_ms=1, duration_api_ms=1, is_error=ending == "error",
+                num_turns=1, session_id="sess-uncommitted")
+        if ending == "cancel":
+            raise asyncio.CancelledError()
+
+    monkeypatch.setattr(agent_module, "query", fake_query)
+    if ending == "cancel":
+        with pytest.raises(asyncio.CancelledError):
+            asyncio.run(_collect(run_agent("hi", conversation_id="conv-1")))
+    else:
+        events = asyncio.run(_collect(run_agent("hi", conversation_id="conv-1")))
+        assert [e.type for e in events][-2:] == ["error", "done"]
+        assert events[-1].data is None
+    assert session_store.get_session_id("conv-1") == "sess-existing"
+    assert not session_store._turn_anchors
+
+
+def test_old_cancel_cleanup_does_not_overwrite_new_session(monkeypatch):
+    import asyncio
+
+    async def scenario():
+        old_waiting = asyncio.Event()
+        never = asyncio.Event()
+
+        async def fake_query(*, prompt, options):
+            yield AssistantMessage(content=[TextBlock(text=prompt)], model="x", uuid=prompt)
+            yield ResultMessage(subtype="success", duration_ms=1, duration_api_ms=1,
+                is_error=False, num_turns=1, session_id=f"sess-{prompt}")
+            if prompt == "old":
+                old_waiting.set()
+                await never.wait()
+
+        monkeypatch.setattr(agent_module, "query", fake_query)
+        old = asyncio.create_task(_collect(run_agent("old", conversation_id="conv")))
+        await old_waiting.wait()
+        await _collect(run_agent("new", conversation_id="conv", fork_from_turn_id=""))
+        old.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await old
+        assert session_store.get_session_id("conv") == "sess-new"
+
+    asyncio.run(scenario())

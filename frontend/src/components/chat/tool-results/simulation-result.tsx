@@ -1,6 +1,6 @@
-import { DataTable, Disclosure, StatusDot, type Tone } from "../primitives";
+import { DataTable, Disclosure, StatusDot } from "../primitives";
 import { ResultSummaryCard } from "./result-summary";
-import { asRecords, asRows, asStrings, isLargeResult, str, toneOf } from "./shared";
+import { asRecord, asRecords, asRows, asStrings, isLargeResult, num, str, toneOf } from "./shared";
 
 /** 레코드 배열(`[{line, workMonth, qty}]` 등)의 컬럼명을 첫 원소의 key 순서로 뽑는다. */
 function columnsOfRecords(records: Record<string, unknown>[]): string[] {
@@ -12,7 +12,7 @@ export function SimulationResult({ data }: { data: Record<string, unknown> }) {
   const scenario = str(data.scenario);
   const summary = str(data.summary);
   const kpis = asRecords(data.kpis);
-  const table = data.table as Record<string, unknown> | undefined;
+  const table = asRecord(data.table);
   const tableColumns = table ? asStrings(table.columns) : [];
   const tableRows = table ? asRows(table.rows) : [];
 
@@ -20,9 +20,16 @@ export function SimulationResult({ data }: { data: Record<string, unknown> }) {
   const resultColumns = columnsOfRecords(results);
   const resultRows = results.map((r) => resultColumns.map((c) => String(r[c] ?? "")));
   const large = isLargeResult(data);
+  const simulations = asRecords(data.simulations);
 
   return (
     <div className="flex flex-col gap-3">
+      {simulations.length > 0 && (
+        <DataTable
+          columns={["종류", "이름", "사용 시점"]}
+          rows={simulations.map((s) => [str(s.type) ?? "", str(s.name) ?? "", str(s.when_to_use) ?? ""])}
+        />
+      )}
       {scenario && (
         <p className="font-mono text-2xs text-ink-3">{scenario}</p>
       )}
@@ -30,7 +37,7 @@ export function SimulationResult({ data }: { data: Record<string, unknown> }) {
       {kpis.length > 0 && (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
           {kpis.map((kpi, i) => {
-            const tone = toneOf(kpi.tone) as Tone;
+            const tone = toneOf(kpi.tone);
             return (
               <div key={i} className="flex flex-col gap-1">
                 <dt className="flex items-center gap-1.5 text-2xs text-ink-3">
@@ -38,7 +45,7 @@ export function SimulationResult({ data }: { data: Record<string, unknown> }) {
                   {str(kpi.label) ?? ""}
                 </dt>
                 <dd className="font-mono text-ui-lg font-medium tabular-nums text-ink">
-                  {str(kpi.value) ?? "—"}
+                  {num(kpi.value) ?? str(kpi.value) ?? "—"}
                   {str(kpi.unit) && (
                     <span className="ml-0.5 text-2xs font-normal text-ink-3">
                       {str(kpi.unit)}

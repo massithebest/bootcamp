@@ -10,13 +10,15 @@
  */
 
 import type { ToolResult } from "@/types/chat";
+import { toolResultError } from "@/lib/tool-result";
 import {
   Tool,
   ToolContent,
   ToolHeader,
   ToolOutput,
 } from "@/components/ai-elements/tool";
-import { CatalogResult, catalogSummary } from "./tool-results/catalog-result";
+import { CatalogResult } from "./tool-results/catalog-result";
+import { catalogSummary } from "./tool-results/catalog-data";
 import { DatabaseResult } from "./tool-results/database-result";
 import { KnowledgeResult } from "./tool-results/knowledge-result";
 import { SimulationResult } from "./tool-results/simulation-result";
@@ -33,6 +35,8 @@ const TOOL_META: Record<string, { label: string; kind: Kind }> = {
   describe_table: { label: "테이블 상세", kind: "catalog" },
   list_kpis: { label: "KPI 목록", kind: "catalog" },
   get_kpi: { label: "KPI 정의", kind: "catalog" },
+  list_recipes: { label: "집계 레시피 목록", kind: "catalog" },
+  get_recipe: { label: "집계 레시피", kind: "catalog" },
   get_result_summary: { label: "결과 요약 조회", kind: "database" },
   get_result_page: { label: "결과 구간 조회", kind: "database" },
   prepare_visualization: { label: "차트 준비", kind: "generic" },
@@ -56,7 +60,7 @@ function resolveKind(result: ToolResult): { label: string; kind: Kind } {
 export function ToolResultCard({ result }: { result: ToolResult }) {
   const { label, kind } = resolveKind(result);
   const data = result.data ?? {};
-  const errorText = str(data.error) ?? (data.status === "error" ? str(data.message) : null);
+  const errorText = toolResultError(result);
 
   // 지식 카드는 접힌 채로도 무엇을 참조했는지 보여야 한다.
   const summary = kind === "catalog" ? catalogSummary(data) : null;

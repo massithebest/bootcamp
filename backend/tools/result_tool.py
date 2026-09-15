@@ -1,6 +1,8 @@
 """저장된 조회 결과를 에이전트 Tool payload로 노출한다."""
 
-from services.result_store import ResultMeta, get_result_store, summarize_dataframe
+from datetime import datetime, timezone
+
+from services.result_store import ResultMeta, ResultStore, get_result_store, summarize_dataframe
 
 
 def _not_found(result_id: str) -> dict:
@@ -22,13 +24,28 @@ def _forbidden_as_not_found(meta: ResultMeta, access_scope: str | None) -> bool:
     return meta.access_scope is not None and meta.access_scope != access_scope
 
 
+def _readable_meta(store: ResultStore, result_id: str, access_scope: str | None) -> ResultMeta | None:
+    try:
+        meta = store.get_meta(result_id)
+        if meta is None or _forbidden_as_not_found(meta, access_scope):
+            return None
+        return meta if meta.expires_at > datetime.now(timezone.utc) else None
+    except Exception:
+        # 손상된 metadata도 존재/내부 경로를 노출하지 않는다.
+        return None
+
+
 async def get_result_summary(result_id: str, *, access_scope: str | None = None) -> dict:
     store = get_result_store()
-    meta = store.get_meta(result_id)
-    if meta is None or _forbidden_as_not_found(meta, access_scope):
+    meta = _readable_meta(store, result_id, access_scope)
+    if meta is None:
         return _not_found(result_id)
 
-    frame = store.load(result_id)
+    try:
+        frame = store.load(result_id)
+        summary = summarize_dataframe(frame)
+    except Exception:
+        return _not_found(result_id)
     return {
         "status": "ok",
         "result_id": result_id,
@@ -37,7 +54,7 @@ async def get_result_summary(result_id: str, *, access_scope: str | None = None)
             {"name": column.name, "dtype": column.dtype, "role": column.role}
             for column in meta.columns
         ],
-        "summary": summarize_dataframe(frame),
+        "summary": summary,
     }
 
 
@@ -45,11 +62,14 @@ async def get_result_page(
     result_id: str, offset: int, limit: int, *, access_scope: str | None = None
 ) -> dict:
     store = get_result_store()
-    meta = store.get_meta(result_id)
-    if meta is None or _forbidden_as_not_found(meta, access_scope):
+    meta = _readable_meta(store, result_id, access_scope)
+    if meta is None:
         return _not_found(result_id)
 
-    page = store.get_page(result_id, offset, limit)
+    try:
+        page = store.get_page(result_id, offset, limit)
+    except Exception:
+        return _not_found(result_id)
     if page is None:
         return _not_found(result_id)
 

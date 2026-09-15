@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "start": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs"
   },
   "dependencies": {
     "@assistant-ui/react": "0.15.19",

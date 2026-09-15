@@ -10,11 +10,10 @@
  * Browser 기본 API (fetch / ReadableStream / TextDecoder / AbortController) 로 구현한다.
  * 외부 SSE Parser Package 는 추가하지 않는다.
  *
- * AI SDK 가 추가되더라도 이 모듈의 함수 시그니처( sendChatMessage )는 유지하고
- * 내부 구현만 Transport 로 교체한다. Component 는 영향받지 않는다.
  */
 
 import type { AgentEvent, ChatRequestBody } from "@/types/chat";
+import { SseParser, parseAgentEvent } from "./chat-sse";
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -26,88 +25,19 @@ export interface SendChatMessageOptions {
   forkFromTurnId?: string;
   /** 각 AgentEvent 를 순서대로 전달받는다. */
   onEvent: (event: AgentEvent) => void;
-  /** Streaming 취소용. 초기 UI 에 Stop 버튼이 없어도 구조는 유지한다. */
+  /** 현재 요청 취소용. */
   signal?: AbortSignal;
-}
-
-/** SSE 프레임 사이에서 유지되는 파서 상태. */
-class SseParser {
-  private buffer = "";
-
-  /** 새 chunk 를 받아 완성된 data payload 문자열들을 반환한다. */
-  push(chunk: string): string[] {
-    this.buffer += chunk;
-    const payloads: string[] = [];
-
-    // SSE Event 경계는 빈 줄(\n\n). \r\n 도 방어적으로 처리한다.
-    let boundary: number;
-    while ((boundary = this.indexOfBoundary()) !== -1) {
-      const rawEvent = this.buffer.slice(0, boundary);
-      this.buffer = this.buffer.slice(this.boundaryEnd(boundary));
-
-      const data = this.extractData(rawEvent);
-      if (data !== null) payloads.push(data);
-    }
-    return payloads;
-  }
-
-  /** stream 종료 시 buffer 에 남은 마지막 Event 를 처리한다. */
-  flush(): string[] {
-    const remaining = this.buffer.trim();
-    this.buffer = "";
-    if (!remaining) return [];
-    const data = this.extractData(remaining);
-    return data !== null ? [data] : [];
-  }
-
-  private indexOfBoundary(): number {
-    const lf = this.buffer.indexOf("\n\n");
-    const crlf = this.buffer.indexOf("\r\n\r\n");
-    if (lf === -1) return crlf;
-    if (crlf === -1) return lf;
-    return Math.min(lf, crlf);
-  }
-
-  private boundaryEnd(index: number): number {
-    return this.buffer.startsWith("\r\n\r\n", index) ? index + 4 : index + 2;
-  }
-
-  /** 하나의 raw SSE Event 블록에서 `data:` 라인들을 이어붙여 반환한다. */
-  private extractData(rawEvent: string): string | null {
-    const lines = rawEvent.split(/\r?\n/);
-    const dataLines: string[] = [];
-    for (const line of lines) {
-      if (line.startsWith("data:")) {
-        dataLines.push(line.slice(5).replace(/^ /, ""));
-      }
-    }
-    if (dataLines.length === 0) return null;
-    return dataLines.join("\n");
-  }
-}
-
-function parseAgentEvent(payload: string): AgentEvent | null {
-  const trimmed = payload.trim();
-  if (!trimmed || trimmed === "[DONE]") return null;
-  try {
-    const obj = JSON.parse(trimmed) as AgentEvent;
-    if (obj && typeof obj.type === "string") return obj;
-    return null;
-  } catch {
-    console.warn("[chat-api] AgentEvent JSON 파싱 실패", trimmed);
-    return null;
-  }
 }
 
 /**
  * `/api/chat` 를 호출하고 SSE 로 들어오는 AgentEvent 를 onEvent 로 전달한다.
  *
  * 오류는 throw 하지 않고 `error` / `done` AgentEvent 로 정규화하여 전달한다.
- * (Component 는 Event Type 만 처리하면 되도록.)
+ * 반환값은 transport 종료 결과다. Backend error 이벤트와 연결 실패를 구분한다.
  */
 export async function sendChatMessage(
   options: SendChatMessageOptions,
-): Promise<void> {
+): Promise<"complete" | "failed" | "aborted"> {
   const { message, conversationId, forkFromTurnId, onEvent, signal } = options;
 
   const body: ChatRequestBody = { message };
@@ -127,12 +57,14 @@ export async function sendChatMessage(
       credentials: "include",
     });
   } catch (err) {
-    if (isAbortError(err)) return;
-    console.error("[chat-api] Backend 연결 실패", err);
+    if (signal?.aborted || isAbortError(err)) return "aborted";
+    console.error("[chat-api] Backend 연결 실패");
     onEvent({ type: "error", content: "Backend 에 연결하지 못했습니다." });
     onEvent({ type: "done" });
-    return;
+    return "failed";
   }
+
+  if (signal?.aborted) return "aborted";
 
   if (!response.ok) {
     console.error("[chat-api] HTTP 오류", response.status);
@@ -141,48 +73,55 @@ export async function sendChatMessage(
       content: `요청을 처리하지 못했습니다. (HTTP ${response.status})`,
     });
     onEvent({ type: "done" });
-    return;
+    return "failed";
   }
 
   if (!response.body) {
     onEvent({ type: "error", content: "응답 스트림을 읽을 수 없습니다." });
     onEvent({ type: "done" });
-    return;
+    return "failed";
   }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   const parser = new SseParser();
   let sawDone = false;
+  let transportFailed = false;
 
   const emit = (payload: string) => {
+    if (sawDone || signal?.aborted) return;
     const event = parseAgentEvent(payload);
-    if (!event) return;
     if (event.type === "done") sawDone = true;
     onEvent(event);
   };
 
   try {
-    for (;;) {
+    while (!sawDone && !signal?.aborted) {
       const { value, done } = await reader.read();
+      if (signal?.aborted) return "aborted";
+      for (const payload of parser.push(
+        done ? decoder.decode() : decoder.decode(value, { stream: true }),
+      )) emit(payload);
       if (done) break;
-      for (const payload of parser.push(decoder.decode(value, { stream: true }))) {
-        emit(payload);
-      }
     }
-    for (const payload of parser.flush()) emit(payload);
+    if (!sawDone && !signal?.aborted) {
+      transportFailed = true;
+      onEvent({ type: "error", content: "응답이 완료되기 전에 연결이 종료되었습니다." });
+    }
   } catch (err) {
-    if (isAbortError(err)) return;
-    console.error("[chat-api] SSE 스트림 오류", err);
+    if (signal?.aborted || isAbortError(err)) return "aborted";
+    transportFailed = true;
+    // malformed payload/SDK 원문을 콘솔이나 사용자 오류에 싣지 않는다.
     onEvent({ type: "error", content: "응답을 받는 중 오류가 발생했습니다." });
   } finally {
+    // done 이후 서버가 연결을 열어 두어도 요청과 reader를 남기지 않는다.
+    await reader.cancel().catch(() => {});
     reader.releaseLock();
   }
 
-  // Stream 비정상 종료 방어: done 이 없었다면 강제로 종료 신호를 준다.
-  if (!sawDone && !signal?.aborted) {
-    onEvent({ type: "done" });
-  }
+  if (signal?.aborted) return "aborted";
+  if (!sawDone) onEvent({ type: "done" });
+  return transportFailed ? "failed" : "complete";
 }
 
 function isAbortError(err: unknown): boolean {

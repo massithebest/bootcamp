@@ -8,6 +8,12 @@ export function num(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
+export function asRecord(v: unknown): Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v)
+    ? v as Record<string, unknown>
+    : {};
+}
+
 export function asStrings(v: unknown): string[] {
   return Array.isArray(v) ? v.map((x) => String(x)) : [];
 }

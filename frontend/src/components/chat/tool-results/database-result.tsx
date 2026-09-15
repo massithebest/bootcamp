@@ -1,6 +1,6 @@
 import { DataTable, Disclosure } from "../primitives";
 import { ResultSummaryCard } from "./result-summary";
-import { asRows, asStrings, isLargeResult, str } from "./shared";
+import { asRecord, asRows, asStrings, isLargeResult, str } from "./shared";
 
 /**
  * DB 조회 결과 → 표 + 실행 SQL 펼쳐보기.
@@ -17,23 +17,7 @@ export function DatabaseResult({ data }: { data: Record<string, unknown> }) {
   const sql = str(data.sql);
   const note = str(data.note);
 
-  if (isLargeResult(data)) {
-    return (
-      <div className="flex flex-col gap-2">
-        <ResultSummaryCard data={data} />
-        {note && <p className="font-mono text-2xs text-ink-3">{note}</p>}
-        {sql && (
-          <Disclosure summary="실행된 SQL" dense>
-            <pre className="thin-scroll mt-1 overflow-x-auto rounded bg-[#1c2530] px-3 py-2.5 font-mono text-data leading-relaxed text-[#d7dce4]">
-              {sql}
-            </pre>
-          </Disclosure>
-        )}
-      </div>
-    );
-  }
-
-  const table = (data.table ?? {}) as Record<string, unknown>;
+  const table = asRecord(data.table);
   const rows = asRows(table.rows ?? data.rows);
   const declaredColumns = asStrings(table.columns ?? data.columns);
   // `get_result_page` 는 컬럼명 없이 `rows` 만 반환한다(백엔드 tools/result_tool.py) —
@@ -45,11 +29,15 @@ export function DatabaseResult({ data }: { data: Record<string, unknown> }) {
         ? rows[0].map((_, i) => String(i))
         : [];
 
-  if (columns.length === 0 || rows.length === 0) return null;
+  const summary = isLargeResult(data) || (
+    typeof data.result_id === "string" && data.summary !== null &&
+    typeof data.summary === "object" && !Array.isArray(data.summary)
+  );
+  if (!summary && (columns.length === 0 || rows.length === 0)) return null;
 
   return (
     <div className="flex flex-col gap-2">
-      <DataTable columns={columns} rows={rows} />
+      {summary ? <ResultSummaryCard data={data} /> : <DataTable columns={columns} rows={rows} />}
       {note && <p className="font-mono text-2xs text-ink-3">{note}</p>}
       {sql && (
         <Disclosure summary="실행된 SQL" dense>

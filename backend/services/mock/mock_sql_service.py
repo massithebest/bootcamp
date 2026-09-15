@@ -37,8 +37,9 @@ class MockSQLService:
         # purpose 는 실행 전에 남긴다 — 프론트 진행 표시와 사후 감사에 쓴다.
         logger.info("execute_sql purpose=%s", purpose)
 
+        allowed_tables = get_store().table_names()
         try:
-            guarded_sql = check_sql(sql, get_store().table_names())
+            guarded_sql = check_sql(sql, allowed_tables)
         except SqlGuardError as exc:
             return _error(str(exc), sql)
 
@@ -47,6 +48,18 @@ class MockSQLService:
         except Smt2020DbMissingError:
             return _error(MISSING_DB_MESSAGE, sql)
 
+        allowed_lower = {name.lower() for name in allowed_tables}
+
+        def authorize(action, table, _column, database, _trigger):
+            # SQL 문자열 검사만으로 놓치는 인용 식별자/주석/CTE 내부 참조도
+            # SQLite가 실제 읽는 테이블을 기준으로 확인한다.
+            if action == sqlite3.SQLITE_READ and (
+                database not in {"main", None} or table.lower() not in allowed_lower
+            ):
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+
+        conn.set_authorizer(authorize)
         try:
             with conn:
                 cursor = conn.execute(guarded_sql)

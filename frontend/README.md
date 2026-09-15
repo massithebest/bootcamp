@@ -17,10 +17,17 @@ npm run dev
 ## 검증
 
 ```bash
+npm test
 npm run build
 npm run lint
 npm run preview
 ```
+
+`npm test`는 Node 내장 테스트 실행기와 설치된 Vite/TypeScript로 SSE 파서·전송,
+메시지 상태 전이와 결과 렌더링을 검증한다. 추가 테스트 패키지는 필요 없다.
+개발 서버의 `/tests/chat-browser.html`은 실제 React StrictMode와 assistant-ui
+runtime으로 retry/cancel/edit/regenerate를 검증한다. 요청은 해당 테스트 페이지
+안에서만 mock 처리하며 결과와 PASS/FAIL을 표시한다. production build에는 포함하지 않는다.
 
 ## 참고
 

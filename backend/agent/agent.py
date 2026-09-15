@@ -1,6 +1,5 @@
 """Claude Agent SDK initialization and execution."""
 
-import os
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -18,17 +17,11 @@ from agent.session_store import (
 )
 from agent.system_prompt import SYSTEM_PROMPT
 from api.schemas import AgentEvent
-from core.config import AGENT_MODEL, CLAUDE_CLI_PATH, agent_provider_env
+from core.config import AGENT_MODEL, CLAUDE_CLI_PATH, agent_provider_env, use_fake_runner
 
 
 #: `agent/agent_sdk/` — CLAUDE.md 와 .claude/skills 가 위치한 Agent 작업 디렉터리.
 AGENT_SDK_CWD = str((Path(__file__).parent / "agent_sdk").resolve())
-
-def _use_fake_runner() -> bool:
-    """네트워크 없이 전체 이벤트 흐름을 검증할지 여부. (테스트 / 데모)"""
-
-    return os.getenv("PLANNING_AGENT_FAKE", "").lower() in {"1", "true", "yes"}
-
 
 def _build_options(
     resume_session_id: str | None,
@@ -134,7 +127,7 @@ async def run_agent(
         - Internal chain-of-thought must never be exposed.
     """
 
-    if _use_fake_runner():
+    if use_fake_runner():
         async for event in run_fake_agent(message, conversation_id, access_scope):
             yield event
         return
@@ -149,14 +142,20 @@ async def run_agent(
     adapter = AgentEventAdapter()
     options = _build_options(resume_session_id, resume_session_at, access_scope)
 
-    try:
-        async for raw_event in query(prompt=message, options=options):
-            for event in adapter.convert(raw_event):
-                yield event
-    finally:
-        # SDK session_id 를 사용자 대화에 연결해 후속 turn 에서 이어서 실행한다.
-        bind_session_id(conversation_id, adapter.session_id)
-        if adapter.session_id:
-            record_turn_anchor(turn_id, adapter.session_id, adapter.last_entry_uuid)
+    async for raw_event in query(prompt=message, options=options):
+        for event in adapter.convert(raw_event):
+            yield event
+
+    # 예외/취소 cleanup에서는 완료 세션을 덮어쓰지 않는다. SDK 결과가 없이
+    # 닫힌 경우도 성공 turn으로 기록하지 않는다.
+    if adapter.result_succeeded is not True:
+        if adapter.result_succeeded is None:
+            yield AgentEvent(type="error", content="Agent 응답이 완료되기 전에 종료되었습니다.")
+        yield AgentEvent(type="done")
+        return
+
+    bind_session_id(conversation_id, adapter.session_id)
+    if adapter.session_id:
+        record_turn_anchor(turn_id, adapter.session_id, adapter.last_entry_uuid)
 
     yield AgentEvent(type="done", data={"turn_id": turn_id})

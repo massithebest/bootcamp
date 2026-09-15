@@ -215,3 +215,31 @@ def test_prepare_visualization_preserves_service_error(seeded_db) -> None:
     assert result["status"] == "error"
     assert result["code"] == "COLUMN_NOT_FOUND"
     assert result["message"]
+
+
+@pytest.mark.parametrize("state", ["expired", "missing-file", "corrupt-meta", "corrupt-data", "other-scope"])
+@pytest.mark.parametrize("operation", ["summary", "page"])
+def test_result_tools_reject_unavailable_results(tmp_path, monkeypatch, state, operation):
+    import json
+    from datetime import datetime, timedelta, timezone
+
+    store = LocalParquetResultStore(tmp_path)
+    monkeypatch.setattr(result_store, "_store", store)
+    meta = store.save(["qty"], [[10]], source="test", conversation_id=None, access_scope="scope-a")
+    path = tmp_path / f"{meta.result_id}.meta.json"
+    if state == "expired":
+        payload = json.loads(path.read_text())
+        payload["expires_at"] = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+        path.write_text(json.dumps(payload))
+    elif state == "missing-file":
+        meta.path.unlink()
+    elif state == "corrupt-meta":
+        path.write_text("{")
+    elif state == "corrupt-data":
+        meta.path.write_text("broken parquet")
+    scope = "scope-b" if state == "other-scope" else "scope-a"
+    call = get_result_summary(meta.result_id, access_scope=scope) if operation == "summary" else get_result_page(meta.result_id, 0, 10, access_scope=scope)
+    result = asyncio.run(call)
+    assert result["status"] == "error"
+    assert str(tmp_path) not in json.dumps(result)
+    assert "rows" not in result and "summary" not in result

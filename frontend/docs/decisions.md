@@ -65,6 +65,17 @@ assistant-ui는 thread, viewport, composer, message, action bar와 Markdown rend
 감사 결과와 후속 작업은
 [assistant-ui 감사 계획](../plan/260915-assistant-ui-audit-plan.md)에 둔다.
 
+### 요청 종료와 재시도 경계 (2026-09-15, 활성)
+
+SSE envelope 검증은 `lib/chat-sse.ts`, 순수 메시지 전이는 `lib/chat-state.ts`로
+분리하며 상태 소유자는 계속 `use-agent-chat.ts`다. transport가 반환하는
+완료/실패/취소 결과로 Backend의 `error` 이벤트와 연결 실패를 구분한다.
+재시도는 원래 사용자 메시지와 fork 지점을 재사용한다. 현재 controller와
+일치하는 요청만 메시지·retry·running 상태를 갱신할 수 있다.
+
+이 결정은 기존 External Store와 공개 AgentEvent 계약을 보완한다. 구현·회귀
+근거는 [전체 시스템 실행 계획](../plan/260915-full-stack-refactoring-plan.md)에 둔다.
+
 ## 차트 v2 marker
 
 도구 카드의 v1 자동 차트는 폐기했다. 최종 답변의 `chart` 코드 펜스에는

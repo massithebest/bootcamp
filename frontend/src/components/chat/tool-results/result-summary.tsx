@@ -3,6 +3,7 @@ import {
   asResultColumns,
   asResultSummary,
   asRows,
+  asStrings,
   num,
   type ResultColumnSummary,
 } from "./shared";
@@ -44,7 +45,7 @@ export function ResultSummaryCard({ data }: { data: Record<string, unknown> }) {
 
       {sampleRows.length > 0 && (
         <DataTable
-          columns={columnNames.length > 0 ? columnNames : (data.columns as string[]) ?? []}
+          columns={columnNames.length > 0 ? columnNames : asStrings(data.columns)}
           rows={sampleRows}
         />
       )}

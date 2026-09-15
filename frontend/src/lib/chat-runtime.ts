@@ -22,8 +22,8 @@ import type {
   ChatMessage,
   ChatMessageRunState,
   StatusStep,
-  ToolResult,
 } from "@/types/chat";
+import { toolResultError } from "./tool-result";
 
 /** 어시스턴트 메시지의 `metadata.custom` 에 싣는 값. */
 export interface AgentMessageMetadata {
@@ -57,13 +57,6 @@ function toAssistantStatus(runState: ChatMessageRunState): MessageStatus {
   }
 }
 
-/** `tool-result-card.tsx` 의 판정식과 같게 유지한다. */
-function isErrorResult(result: ToolResult): boolean {
-  const data = result.data;
-  if (!data) return false;
-  return Boolean(data.error) || data.status === "error";
-}
-
 export function convertMessage(message: ChatMessage): ThreadMessageLike {
   if (message.role === "user") {
     return {
@@ -86,7 +79,7 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
             toolName: part.result.toolName,
             // ToolResult 를 통째로 싣는다. ToolResultCard 의 props 를 바꾸지 않기 위함.
             result: part.result,
-            isError: isErrorResult(part.result),
+            isError: toolResultError(part.result) !== null,
           },
     ),
     status: toAssistantStatus(message.runState),

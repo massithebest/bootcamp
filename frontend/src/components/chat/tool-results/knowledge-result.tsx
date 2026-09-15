@@ -17,8 +17,8 @@ export function KnowledgeResult({ data }: { data: Record<string, unknown> }) {
         {documents.map((doc, i) => {
           const title = str(doc.title) ?? "제목 없음";
           const section = str(doc.section);
-          const snippet = str(doc.snippet);
-          const relevance = num(doc.relevance);
+          const snippet = str(doc.snippet) ?? str(doc.content);
+          const relevance = num(doc.relevance) ?? num(doc.score);
           return (
             <li
               key={i}

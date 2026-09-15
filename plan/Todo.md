@@ -63,6 +63,7 @@ P1~P3는 미수행 항목 간 상대적 우선순위이며 숫자가 낮을수�
 
 ## 수행해야 할 일
 
+- [x] [전체 시스템 근거 기반 감사 및 리팩토링](260915-full-stack-refactoring-plan.md) — 선정 P0/P1 및 소규모 P2 구현·검증 완료
 - [x] SMT2020 HVLM/LVHM 원본을 단일 SQLite DB로 변환
 - [x] 기존 합성 FGS/MP 시드와 mock을 SMT2020 SQL·입력 검증 mock으로 교체
 - [x] SMT2020 기반 Fake Runner와 프론트 예시·관통 흐름 검증
@@ -73,6 +74,8 @@ P1~P3는 미수행 항목 간 상대적 우선순위이며 숫자가 낮을수�
 - [x] assistant-ui 감사 계획의 6개 후속 개선 항목 구현
 - [ ] 실제 사내 DB·RAG·시뮬레이션 서비스를 `services/real`에 연결
 - [ ] Result Store의 후속 필터·재집계 기능과 저장 백엔드 전환 검토
+- [ ] Claude 프론트엔드 스킬(frontend-design)을 활용한 3-pane 워크벤치 UI/UX 개선
+- [ ] Codex(GPT-5.1 Astra 모델)를 활용한 백엔드·프론트엔드 전반 코드 리팩토링 및 개선
 
 ## 다음 우선순위
 
@@ -109,3 +112,4 @@ DB와 입력 정합성 mock으로 대체했다.
 - [Result Store](260915-result-store-plan.md)
 - [차트 시각화](260915-chart-visualization-plan.md)
 - [SMT2020 SQLite 및 Mock 전환](260915-smt2020-mock-data-plan.md)
+- [전체 시스템 리팩토링](260915-full-stack-refactoring-plan.md)

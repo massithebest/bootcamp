@@ -253,3 +253,39 @@ def test_knowledge_kpis_endpoint() -> None:
     kpis = response.json()
     assert [kpi["kpi_id"] for kpi in kpis] == ["initial_wip"]
     assert set(kpis[0]) == {"kpi_id", "name", "aliases", "verified"}
+
+
+def test_client_disconnect_cancels_agent_iterator(monkeypatch):
+    import asyncio
+    from fastapi import Request
+    from api.routes_chat import chat
+    from api.schemas import ChatRequest
+
+    async def scenario():
+        sent = asyncio.Event()
+        closed = asyncio.Event()
+
+        async def fake_agent(**kwargs):
+            try:
+                yield AgentEvent(type="text", content="부분 응답")
+                await asyncio.Event().wait()
+            finally:
+                closed.set()
+
+        monkeypatch.setattr("api.routes_chat.run_agent", fake_agent)
+        scope = {"type": "http", "method": "POST", "path": "/api/chat",
+                 "headers": [], "asgi": {"spec_version": "2.0"}}
+        response = await chat(ChatRequest(message="q"), Request(scope))
+
+        async def receive():
+            await sent.wait()
+            return {"type": "http.disconnect"}
+
+        async def send(event):
+            if event["type"] == "http.response.body":
+                sent.set()
+
+        await asyncio.wait_for(response(scope, receive, send), timeout=2)
+        assert closed.is_set()
+
+    asyncio.run(scenario())

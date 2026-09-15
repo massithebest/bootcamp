@@ -9,32 +9,10 @@
  * 구조화 지식이고, 분석 한 번에 4~6회 호출되므로 요약 위주로 얕게 보여준다.
  */
 
-import { DataTable } from "../primitives";
-import { asRecords, asStrings, str } from "./shared";
+import { DataTable, Disclosure } from "../primitives";
+import { asRecord, asRecords, asStrings, str } from "./shared";
 
-type CatalogType = "table" | "kpi" | "table_list" | "kpi_list";
-
-function catalogTypeOf(v: unknown): CatalogType | null {
-  return v === "table" || v === "kpi" || v === "table_list" || v === "kpi_list"
-    ? v
-    : null;
-}
-
-/** 헤더에 붙일 한 줄 요약. 카드를 펼치지 않아도 무엇을 참조했는지 보이게 한다. */
-export function catalogSummary(data: Record<string, unknown>): string | null {
-  const type = catalogTypeOf(data.catalog_type);
-  if (!type) return null;
-
-  const payload = data.data;
-
-  if (type === "table") {
-    return str((payload as Record<string, unknown>)?.table);
-  }
-  if (type === "kpi") {
-    return str((payload as Record<string, unknown>)?.name);
-  }
-  return `${asRecords(payload).length}건`;
-}
+import { catalogTypeOf, type CatalogType } from "./catalog-data";
 
 export function CatalogResult({ data }: { data: Record<string, unknown> }) {
   const type = catalogTypeOf(data.catalog_type);
@@ -42,12 +20,13 @@ export function CatalogResult({ data }: { data: Record<string, unknown> }) {
 
   if (type === "table") return <TableDetail data={data.data} />;
   if (type === "kpi") return <KpiDetail data={data.data} />;
+  if (type === "recipe") return <RecipeDetail data={data.data} />;
   return <NameList type={type} data={data.data} />;
 }
 
 /** 테이블 상세 → 컬럼 목록만. 조인·주의사항은 에이전트용이라 접어 둔다. */
 function TableDetail({ data }: { data: unknown }) {
-  const table = (data ?? {}) as Record<string, unknown>;
+  const table = asRecord(data);
   const columns = asRecords(table.columns);
   const description = str(table.description);
 
@@ -70,7 +49,7 @@ function TableDetail({ data }: { data: unknown }) {
 
 /** KPI 상세 → 정의·공식·판정 기준. */
 function KpiDetail({ data }: { data: unknown }) {
-  const kpi = (data ?? {}) as Record<string, unknown>;
+  const kpi = asRecord(data);
   const rows: [string, string][] = [
     ["정의", str(kpi.definition) ?? ""],
     ["공식", str(kpi.formula) ?? ""],
@@ -104,7 +83,7 @@ function NameList({ type, data }: { type: CatalogType; data: unknown }) {
         const name =
           type === "table_list" ? str(item.table) : str(item.name) ?? str(item.kpi_id);
         const description =
-          type === "table_list"
+          (type === "table_list" || type === "recipe_list")
             ? str(item.description)
             : asStrings(item.aliases).join(" · ");
         return (
@@ -122,4 +101,18 @@ function NameList({ type, data }: { type: CatalogType; data: unknown }) {
 
 function Note({ text }: { text: string }) {
   return <p className="text-2xs leading-snug text-ink-3">{text}</p>;
+}
+
+function RecipeDetail({ data }: { data: unknown }) {
+  const recipe = asRecord(data);
+  const sql = str(recipe.cte_sql);
+  const description = str(recipe.description);
+  return (
+    <div className="flex flex-col gap-2">
+      {str(recipe.name) && <p className="font-medium text-ink">{str(recipe.name)}</p>}
+      {description && <Note text={description} />}
+      {asStrings(recipe.output_grain).length > 0 && <Note text={`결과 단위: ${asStrings(recipe.output_grain).join(" · ")}`} />}
+      {sql && <Disclosure summary="CTE SQL" dense><pre className="thin-scroll overflow-x-auto font-mono text-data text-ink-2">{sql}</pre></Disclosure>}
+    </div>
+  );
 }

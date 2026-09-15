@@ -175,3 +175,28 @@ def test_last_entry_uuid_stays_none_when_sdk_events_omit_it() -> None:
     adapter.convert(AssistantMessage(content=[TextBlock(text="x")], model="x"))
 
     assert adapter.last_entry_uuid is None
+
+
+def _tool_result_events(payload, *, sdk_error=False):
+    adapter = AgentEventAdapter()
+    adapter.convert(AssistantMessage(content=[ToolUseBlock(
+        id="t1", name="mcp__planning__execute_sql", input={}
+    )], model="x"))
+    return adapter.convert(UserMessage(content=[ToolResultBlock(
+        tool_use_id="t1", content=json.dumps(payload), is_error=sdk_error
+    )]))
+
+
+def test_business_error_marks_progress_as_error():
+    payload = {"status": "error", "message": "조회할 수 없습니다."}
+    events = _tool_result_events(payload)
+    assert events[0].data == payload
+    assert events[1].data["status"] == "error"
+    assert "실패" in events[1].data["label"]
+
+
+def test_sdk_tool_error_does_not_expose_internal_content():
+    events = _tool_result_events({"text": "private-path-placeholder"}, sdk_error=True)
+    assert events[0].data["status"] == "error"
+    assert "private-path-placeholder" not in events[0].model_dump_json()
+    assert events[1].data["status"] == "error"
