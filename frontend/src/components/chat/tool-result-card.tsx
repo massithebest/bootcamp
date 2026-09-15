@@ -9,6 +9,8 @@
  * 도구 목록은 Backend `agent/sdk_tools.py` 의 `TOOL_NAMES`를 기준으로 유지한다.
  */
 
+import { useEffect, useState } from "react";
+
 import type { ToolResult } from "@/types/chat";
 import { toolResultError } from "@/lib/tool-result";
 import {
@@ -22,7 +24,7 @@ import { catalogSummary } from "./tool-results/catalog-data";
 import { DatabaseResult } from "./tool-results/database-result";
 import { KnowledgeResult } from "./tool-results/knowledge-result";
 import { SimulationResult } from "./tool-results/simulation-result";
-import { str } from "./tool-results/shared";
+import { asRecords, num, str } from "./tool-results/shared";
 
 type Kind = "database" | "knowledge" | "simulation" | "catalog" | "generic";
 
@@ -57,19 +59,66 @@ function resolveKind(result: ToolResult): { label: string; kind: Kind } {
   return { label: result.toolName || "도구 결과", kind: "generic" };
 }
 
-export function ToolResultCard({ result }: { result: ToolResult }) {
+/**
+ * 접힌 헤더에서도 결과의 핵심을 파악할 수 있도록 하는 한 줄 요약.
+ * catalog 외 종류도 행 수 · 지표 수 · 문서 수를 보여준다(agent-workspace 요구:
+ * "접힌 상태에서도 결과 종류, 상태, 행 수 또는 핵심 요약을 파악할 수 있어야 한다").
+ */
+function resultHeaderSummary(kind: Kind, data: Record<string, unknown>): string | null {
+  if (kind === "catalog") return catalogSummary(data);
+  if (kind === "database") {
+    const rowCount = num(data.row_count);
+    return rowCount !== null ? `${rowCount}행` : null;
+  }
+  if (kind === "simulation") {
+    const kpis = asRecords(data.kpis);
+    if (kpis.length > 0) return `지표 ${kpis.length}개`;
+    const results = asRecords(data.results);
+    return results.length > 0 ? `${results.length}건` : null;
+  }
+  if (kind === "knowledge") {
+    const documents = asRecords(data.documents);
+    return documents.length > 0 ? `문서 ${documents.length}건` : null;
+  }
+  return null;
+}
+
+export function ToolResultCard({
+  result,
+  isRunning,
+}: {
+  result: ToolResult;
+  /** 이 결과를 담은 assistant 메시지가 아직 실행 중인지. 실행 중에는 펼쳐서
+   *  진행 상황을 보여주고, 끝나면 접어 최종 답변의 위계를 회복한다
+   *  (AgentProgress와 동일한 open/touched 패턴). */
+  isRunning: boolean;
+}) {
   const { label, kind } = resolveKind(result);
   const data = result.data ?? {};
   const errorText = toolResultError(result);
 
-  // 지식 카드는 접힌 채로도 무엇을 참조했는지 보여야 한다.
-  const summary = kind === "catalog" ? catalogSummary(data) : null;
+  const summary = resultHeaderSummary(kind, data);
   const unverified = kind === "catalog" && data.verified === false;
   const title = [label, summary].filter(Boolean).join(" · ");
 
-  // 분석 한 번에 지식 조회가 4~6회 발생한다. 결과 영역을 차지하지 않도록 접어 둔다.
+  // 분석 한 번에 지식(catalog) 조회가 4~6회 발생하므로 항상 접어 둔다.
+  // 그 외 종류는 메시지가 실행 중일 때만 펼치고, 완료되면 접어 밀도를 되찾는다.
+  const autoOpen = kind === "catalog" ? false : isRunning;
+  const [open, setOpen] = useState(autoOpen);
+  const [touched, setTouched] = useState(false);
+  useEffect(() => {
+    if (!touched) setOpen(autoOpen);
+  }, [autoOpen, touched]);
+
   return (
-    <Tool defaultOpen={kind !== "catalog"} className="border-l border-line-strong pl-3">
+    <Tool
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        setTouched(true);
+      }}
+      className="border-l border-line-strong pl-3"
+    >
       <ToolHeader
         type={`tool-${result.toolName}`}
         state={errorText ? "output-error" : "output-available"}

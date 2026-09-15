@@ -1,6 +1,6 @@
 # Production Planning Agent 요구사항 및 Todo
 
-**상태: 진행 중. 마지막 갱신: 2026-09-15.**
+**상태: 진행 중. 마지막 갱신: 2026-09-16.**
 
 이 문서는 프로젝트 요구사항, 완료 현황, 수행할 일과 결정 대기 항목을 함께
 관리하는 단일 기준 문서다. 기능별 상세 설계와 완료 조건은 같은 폴더의 날짜형
@@ -42,6 +42,7 @@
 | 8 | SMT2020 SQLite 및 Mock 전환 | - | 완료 | 완료 | [SMT2020 Mock 데이터 계획](260915-smt2020-mock-data-plan.md) | 2026-09-15 |
 | - | Mock에서 실제 사내 서비스로 전환 | P3 | 진행 중 | 해당 없음 | [백엔드 폐쇄망 가이드](../backend/docs/CLOSED_NETWORK_SETUP.md) | - |
 | 6 | 문서 역할 분리와 Agent 공통 지침 | - | 완료 | 완료 | 완료 | 2026-09-15 |
+| 9 | frontend-design Skill 기반 3-pane 워크벤치 UI/UX 개선 | - | 해당 없음 | 완료 | [Frontend UI/UX 계획](260916-frontend-ui-ux-plan.md) | 2026-09-16 |
 
 P1~P3는 미수행 항목 간 상대적 우선순위이며 숫자가 낮을수록 먼저 착수한다.
 근거는 아래 "다음 우선순위"에 정리한다. 순번·수행일자는 git 커밋 이력 기준 실제
@@ -74,7 +75,7 @@ P1~P3는 미수행 항목 간 상대적 우선순위이며 숫자가 낮을수�
 - [x] assistant-ui 감사 계획의 6개 후속 개선 항목 구현
 - [ ] 실제 사내 DB·RAG·시뮬레이션 서비스를 `services/real`에 연결
 - [ ] Result Store의 후속 필터·재집계 기능과 저장 백엔드 전환 검토
-- [ ] Claude 프론트엔드 스킬(frontend-design)을 활용한 3-pane 워크벤치 UI/UX 개선
+- [x] Claude 프론트엔드 스킬(frontend-design)을 활용한 3-pane 워크벤치 UI/UX 개선
 - [ ] Codex(GPT-5.1 Astra 모델)를 활용한 백엔드·프론트엔드 전반 코드 리팩토링 및 개선
 
 ## 다음 우선순위
@@ -113,3 +114,4 @@ DB와 입력 정합성 mock으로 대체했다.
 - [차트 시각화](260915-chart-visualization-plan.md)
 - [SMT2020 SQLite 및 Mock 전환](260915-smt2020-mock-data-plan.md)
 - [전체 시스템 리팩토링](260915-full-stack-refactoring-plan.md)
+- [Frontend UI/UX 개선(frontend-design)](260916-frontend-ui-ux-plan.md)

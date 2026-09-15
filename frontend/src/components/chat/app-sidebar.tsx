@@ -101,6 +101,13 @@ export function AppSidebar({
         </button>
       </div>
 
+      {/* 세션 목록은 아직 영속 저장소가 아니다 — 제목·시각이 실제 이력처럼
+          보이지 않도록 분명히 밝힌다. 실제 persistence 계약 전까지는 이
+          문구를 지우지 않는다. */}
+      <p className="px-3 pb-1 text-2xs text-ink-3">
+        예시 세션 · 현재 대화만 유지됩니다
+      </p>
+
       <nav className="thin-scroll flex-1 overflow-y-auto px-2 pb-3">
         {GROUP_ORDER.map((group) => {
           const items = sessions.filter((s) => s.group === group);
@@ -161,10 +168,14 @@ export function AppSidebar({
               {CURRENT_USER.team}
             </span>
           </span>
+          {/* 설정 화면은 아직 연결되지 않았다 — 눌러도 동작하는 것처럼
+              보이지 않도록 비활성 상태와 이유를 함께 표시한다. */}
           <button
             type="button"
-            className="rounded p-1 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
-            aria-label="설정"
+            disabled
+            aria-label="설정 (준비 중)"
+            title="설정 화면은 아직 연결되지 않았습니다"
+            className="cursor-not-allowed rounded p-1 text-ink-3/50"
           >
             <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden>
               <circle

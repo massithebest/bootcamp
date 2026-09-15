@@ -139,6 +139,7 @@ function MetadataPanel() {
 
   return (
     <div className="flex flex-col gap-3">
+      <p className="text-2xs text-ink-3">현재 세션 실행 정보 예시 · 아직 실제 연결 값이 아닙니다</p>
       <dl className="flex flex-col gap-2">
         {rows.map(([k, v]) => (
           <div key={k} className="flex justify-between gap-3 text-ui">
@@ -159,42 +160,25 @@ function MetadataPanel() {
   );
 }
 
+/**
+ * System Prompt 읽기 전용 조회. 이전에는 편집 가능한 textarea + "저장" 버튼이
+ * 있었지만 실제 저장 API가 없어 눌러도 아무 일도 일어나지 않았다 — 동작하지
+ * 않는 기능을 동작하는 것처럼 보이는 대표적인 사례였다. 저장 계약이 생기기
+ * 전까지는 편집을 허용하지 않고 읽기 전용으로만 보여준다.
+ */
 function PromptPanel() {
-  const [content, setContent] = useState(SYSTEM_PROMPT.content);
-  const dirty = content !== SYSTEM_PROMPT.content;
   const latest = SYSTEM_PROMPT.revisions[0];
 
   return (
     <div className="flex flex-col gap-2">
       <p className="text-2xs text-ink-3">
-        마지막 수정 {latest.version} · {latest.editedAt} · {latest.editedBy}
+        읽기 전용 · 저장 기능 미연결 · 마지막 수정 {latest.version} · {latest.editedAt} ·{" "}
+        {latest.editedBy}
       </p>
 
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        spellCheck={false}
-        className="thin-scroll h-64 resize-none rounded border border-line-strong bg-canvas p-2.5 font-mono text-data leading-relaxed text-ink outline-none focus:border-accent"
-      />
-
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          disabled={!dirty}
-          className="rounded bg-accent px-2.5 py-1 text-2xs font-medium text-accent-ink transition-colors hover:bg-accent-hover disabled:bg-surface-2 disabled:text-ink-3"
-        >
-          저장
-        </button>
-        {dirty && (
-          <button
-            type="button"
-            onClick={() => setContent(SYSTEM_PROMPT.content)}
-            className="text-2xs text-ink-3 hover:text-ink"
-          >
-            되돌리기
-          </button>
-        )}
-      </div>
+      <pre className="thin-scroll h-64 overflow-auto whitespace-pre-wrap break-words rounded border border-line-strong bg-surface-2/50 p-2.5 font-mono text-data leading-relaxed text-ink-2">
+        {SYSTEM_PROMPT.content}
+      </pre>
 
       <Disclosure summary={`변경 이력 ${SYSTEM_PROMPT.revisions.length}건`} dense>
         <ul className="mt-1 flex flex-col gap-2 border-l border-line pl-3">

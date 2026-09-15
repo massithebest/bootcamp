@@ -5,7 +5,7 @@
  * 다룬다. 상태관리는 React 기본(useState)만 사용한다.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDownIcon } from "lucide-react";
 
 import {
@@ -41,10 +41,21 @@ export function ChatWindow() {
   const [inspectorOpen, setInspectorOpen] = useState(true);
 
   // 좁은 화면에서 패널을 자동으로 접는다 (자동으로 펼치지는 않는다).
+  // 임계값을 "아래로 통과하는 순간"에만 접는다 — 이미 임계값 아래인 채로
+  // 사용자가 직접 펼친 패널은, 그 폭에서 resize 이벤트가 더 발생해도
+  // (창을 드래그하는 동안 수십 번 발생) 다시 강제로 닫지 않는다.
+  const prevWidthRef = useRef<number | null>(null);
   useEffect(() => {
+    const INSPECTOR_BREAKPOINT = 1180;
+    const SIDEBAR_BREAKPOINT = 860;
     const apply = () => {
-      if (window.innerWidth < 1180) setInspectorOpen(false);
-      if (window.innerWidth < 860) setSidebarOpen(false);
+      const width = window.innerWidth;
+      const prev = prevWidthRef.current;
+      const crossedInspector = prev === null ? width < INSPECTOR_BREAKPOINT : prev >= INSPECTOR_BREAKPOINT && width < INSPECTOR_BREAKPOINT;
+      const crossedSidebar = prev === null ? width < SIDEBAR_BREAKPOINT : prev >= SIDEBAR_BREAKPOINT && width < SIDEBAR_BREAKPOINT;
+      if (crossedInspector) setInspectorOpen(false);
+      if (crossedSidebar) setSidebarOpen(false);
+      prevWidthRef.current = width;
     };
     apply();
     window.addEventListener("resize", apply);

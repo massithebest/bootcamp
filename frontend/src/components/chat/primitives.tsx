@@ -148,7 +148,11 @@ export function RuleLabel({ children }: { children: ReactNode }) {
   );
 }
 
-/** 데이터 표 — mono, tabular-nums, 얇은 행 구분. */
+/**
+ * 데이터 표 — mono, tabular-nums, 얇은 행 구분.
+ * 100행 이하 inline 결과라도 세로로 화면 전체를 덮지 않도록 높이를 제한하고
+ * 그 안에서만 스크롤한다(가로 스크롤은 기존과 동일하게 유지).
+ */
 export function DataTable({
   columns,
   rows,
@@ -157,7 +161,7 @@ export function DataTable({
   rows: string[][];
 }) {
   return (
-    <div className="thin-scroll overflow-x-auto">
+    <div className="thin-scroll max-h-96 overflow-x-auto overflow-y-auto">
       <table className="w-full border-collapse font-mono text-data tabular-nums">
         <thead>
           <tr className="border-b border-line-strong text-left text-ink-3">

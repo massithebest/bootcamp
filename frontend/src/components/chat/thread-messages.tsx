@@ -102,7 +102,7 @@ export function AssistantMessage() {
           {({ part }) => {
             if (part.type === "text") return <AssistantText />;
             if (part.type === "tool-call") {
-              return part.toolUI ?? <ToolPart {...part} />;
+              return part.toolUI ?? <ToolPart {...part} isRunning={isRunning} />;
             }
             return null;
           }}
@@ -174,12 +174,12 @@ function AssistantText() {
  * `ToolResultCard` 의 props 를 그대로 쓴다 — 그 안의 `tool_name`/`data.kind`
  * 분기는 무수정.
  */
-function ToolPart(props: ToolCallMessagePartProps) {
+function ToolPart(props: ToolCallMessagePartProps & { isRunning: boolean }) {
   const result = props.result as ToolResult | undefined;
   if (!result) return null;
   return (
     <div className="border-t border-line pt-3">
-      <ToolResultCard result={result} />
+      <ToolResultCard result={result} isRunning={props.isRunning} />
     </div>
   );
 }

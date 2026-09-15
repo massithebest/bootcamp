@@ -96,10 +96,10 @@ function Anchor(props: ComponentPropsWithoutRef<"a">) {
   );
 }
 
-/** 표 컨테이너 — `primitives.tsx` `DataTable` 과 동일한 스크롤 래퍼. */
+/** 표 컨테이너 — `primitives.tsx` `DataTable` 과 동일한 스크롤·높이 제한 래퍼. */
 function Table(props: ComponentPropsWithoutRef<"table">) {
   return (
-    <div className="thin-scroll overflow-x-auto">
+    <div className="thin-scroll max-h-96 overflow-x-auto overflow-y-auto">
       <table className="w-full border-collapse font-mono text-data tabular-nums">
         {props.children}
       </table>

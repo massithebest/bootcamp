@@ -18,6 +18,7 @@ export function MessageInput() {
         <div className="flex flex-1 flex-col rounded border border-line-strong bg-canvas focus-within:border-accent">
           <ComposerPrimitive.Input
             rows={1}
+            aria-label="메시지 입력"
             placeholder="SMT2020 데이터에 대해 질문하세요. 예: LVHM 제품별 WIP를 보여줘"
             className="max-h-44 resize-none bg-transparent px-3 py-2 text-ui text-ink outline-none placeholder:text-ink-3 disabled:opacity-60"
           />
