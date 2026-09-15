@@ -11,6 +11,7 @@ import { CheckIcon, CopyIcon, PencilIcon, RotateCcwIcon } from "lucide-react";
 import {
   ActionBarPrimitive,
   ComposerPrimitive,
+  ErrorPrimitive,
   MessagePrimitive,
   MessagePartPrimitive,
   useAuiState,
@@ -82,19 +83,19 @@ export function AssistantMessage() {
     s.message.role === "assistant" ? s.message.metadata.custom : undefined,
   );
   const hasContent = useAuiState((s) => s.message.content.length > 0);
+  const isRunning = useAuiState((s) => s.message.status?.type === "running");
   const meta = readAgentMetadata(metaCustom);
 
   const showThinking =
-    Boolean(meta?.streaming) &&
+    isRunning &&
     !hasContent &&
-    (meta?.statuses.length ?? 0) === 0 &&
-    !meta?.error;
+    (meta?.statuses.length ?? 0) === 0;
 
   return (
     <MessagePrimitive.Root>
       <div className="flex flex-col gap-3">
-        {meta && (meta.statuses.length > 0 || meta.streaming) && (
-          <AgentProgress statuses={meta.statuses} streaming={meta.streaming} />
+        {meta && (meta.statuses.length > 0 || isRunning) && (
+          <AgentProgress statuses={meta.statuses} isRunning={isRunning} />
         )}
 
         <MessagePrimitive.Parts>
@@ -111,11 +112,11 @@ export function AssistantMessage() {
           <p className="text-ui text-ink-3">응답을 준비하고 있습니다…</p>
         )}
 
-        {meta?.error && (
-          <div className="border-l-2 border-block-ink bg-block-weak px-3 py-2 text-ui text-block-ink">
-            {meta.error}
-          </div>
-        )}
+        <MessagePrimitive.Error>
+          <ErrorPrimitive.Root className="border-l-2 border-block-ink bg-block-weak px-3 py-2 text-ui text-block-ink">
+            <ErrorPrimitive.Message />
+          </ErrorPrimitive.Root>
+        </MessagePrimitive.Error>
 
         <ActionBarPrimitive.Root
           hideWhenRunning

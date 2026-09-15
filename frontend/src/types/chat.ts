@@ -82,6 +82,13 @@ export type MessagePart =
 
 export type ChatRole = "user" | "assistant";
 
+/** 개별 메시지의 실행 결과. 전역 요청 진행 여부와 분리해서 보관한다. */
+export type ChatMessageRunState =
+  | { type: "running" }
+  | { type: "complete" }
+  | { type: "cancelled" }
+  | { type: "error"; message: string };
+
 export interface ChatMessage {
   id: string;
   role: ChatRole;
@@ -91,10 +98,8 @@ export interface ChatMessage {
   parts: MessagePart[];
   /** Assistant 진행 상태(접이식 진행 블록). */
   statuses: StatusStep[];
-  /** 이 message 가 아직 streaming 중인지. */
-  streaming: boolean;
-  /** 사용자에게 보여줄 오류 메시지. */
-  error?: string | null;
+  /** 이 메시지의 실행 수명주기. 사용자 메시지는 항상 complete다. */
+  runState: ChatMessageRunState;
   /**
    * `done` Event 의 `data.turn_id` — 이 턴이 끝난 시점의 백엔드 포크 지점.
    * assistant 메시지에만 있다. 편집/재생성이 "이 턴 직전까지" 를 계산할 때

@@ -42,8 +42,7 @@ const emptyAssistant = (id: string): ChatMessage => ({
   content: "",
   parts: [],
   statuses: [],
-  streaming: true,
-  error: null,
+  runState: { type: "running" },
 });
 
 const freshUser = (text: string): ChatMessage => ({
@@ -52,8 +51,7 @@ const freshUser = (text: string): ChatMessage => ({
   content: text,
   parts: [],
   statuses: [],
-  streaming: false,
-  error: null,
+  runState: { type: "complete" },
 });
 
 /** 실패 시 재시도에 필요한 만큼만 기억한다. 편집/재생성 실패 후 "다시 시도"가
@@ -83,7 +81,6 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
 
   const conversationIdRef = useRef<string>("");
   const abortRef = useRef<AbortController | null>(null);
-  const turnHadOutputRef = useRef(false);
   const retryContextRef = useRef<RetryContext | null>(null);
 
   useEffect(() => {
@@ -99,12 +96,11 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
   );
 
   const applyEvent = useCallback(
-    (assistantId: string, event: AgentEvent) => {
+    (assistantId: string, event: AgentEvent): boolean => {
       switch (event.type) {
         case "text": {
           const delta = event.content ?? "";
-          if (!delta) return;
-          turnHadOutputRef.current = true;
+          if (!delta) return false;
           updateAssistant(assistantId, (m) => {
             const last = m.parts[m.parts.length - 1];
             // 마지막 조각이 텍스트면 이어붙이고, 아니면(도구 결과 뒤) 새 조각 시작.
@@ -118,31 +114,28 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
               parts: [...m.parts, { kind: "text", id: nextId("txt"), text: delta }],
             };
           });
-          return;
+          return true;
         }
         case "status": {
           const step = readStatusStep(event);
-          if (!step) return;
-          turnHadOutputRef.current = true;
+          if (!step) return false;
           updateAssistant(assistantId, (m) => ({
             ...m,
             statuses: upsertStatus(m.statuses, step),
           }));
-          return;
+          return true;
         }
         case "tool_call": {
           const step = readStatusStep(event, "running");
           if (step) {
-            turnHadOutputRef.current = true;
             updateAssistant(assistantId, (m) => ({
               ...m,
               statuses: upsertStatus(m.statuses, step),
             }));
           }
-          return;
+          return Boolean(step);
         }
         case "tool_result": {
-          turnHadOutputRef.current = true;
           const result: ToolResult = {
             id: nextId("tool"),
             toolName: event.tool_name ?? "tool",
@@ -158,25 +151,29 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
               ? annotateStatus(m.statuses, result.toolName, purpose)
               : m.statuses,
           }));
-          return;
+          return true;
         }
         case "error": {
+          const message =
+            event.content ?? "요청을 처리하는 중 오류가 발생했습니다.";
           updateAssistant(assistantId, (m) => ({
             ...m,
-            error:
-              event.content ?? "요청을 처리하는 중 오류가 발생했습니다.",
+            runState: { type: "error", message },
           }));
-          return;
+          return false;
         }
         case "done": {
           // turn_id 는 이 턴의 포크 지점 — 편집/재생성이 나중에 참조한다.
           const turnId = asString(event.data?.turn_id);
           updateAssistant(assistantId, (m) => ({
             ...m,
-            streaming: false,
+            runState:
+              m.runState.type === "running"
+                ? { type: "complete" }
+                : m.runState,
             turnId: turnId ?? m.turnId,
           }));
-          return;
+          return false;
         }
       }
     },
@@ -195,7 +192,7 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
       forkFromTurnId?: string,
     ): Promise<boolean> => {
       setStreaming(true);
-      turnHadOutputRef.current = false;
+      let turnHadOutput = false;
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -205,14 +202,24 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
         conversationId: conversationIdRef.current || undefined,
         forkFromTurnId,
         signal: controller.signal,
-        onEvent: (event) => applyEvent(assistantId, event),
+        onEvent: (event) => {
+          turnHadOutput = applyEvent(assistantId, event) || turnHadOutput;
+        },
       });
 
-      updateAssistant(assistantId, (m) => ({ ...m, streaming: false }));
-      setStreaming(false);
-      abortRef.current = null;
+      updateAssistant(assistantId, (m) =>
+        m.runState.type === "running"
+          ? { ...m, runState: { type: "complete" } }
+          : m,
+      );
+      // 취소 직후 새 요청이 시작됐으면 이전 요청의 정리 작업이 새 controller와
+      // 전역 running 상태를 덮어쓰지 않게 한다.
+      if (abortRef.current === controller) {
+        setStreaming(false);
+        abortRef.current = null;
+      }
 
-      return !turnHadOutputRef.current && !controller.signal.aborted;
+      return !turnHadOutput && !controller.signal.aborted;
     },
     [applyEvent, updateAssistant],
   );
@@ -283,7 +290,11 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
     abortRef.current = null;
     setStreaming(false);
     setMessages((prev) =>
-      prev.map((m) => (m.streaming ? { ...m, streaming: false } : m)),
+      prev.map((m) =>
+        m.runState.type === "running"
+          ? { ...m, runState: { type: "cancelled" } }
+          : m,
+      ),
     );
   }, []);
 

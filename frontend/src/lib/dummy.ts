@@ -128,15 +128,13 @@ export const SEED_CONVERSATION: ChatMessage[] = [
       "9월 A라인에서 KRA-1180 1,000개가 목표인데 달성 가능한지 봐줘. 자재 제약도 같이 확인해줘.",
     parts: [],
     statuses: [],
-    streaming: false,
-    error: null,
+    runState: { type: "complete" },
   },
   {
     id: "seed-a1",
     role: "assistant",
     content: "",
-    streaming: false,
-    error: null,
+    runState: { type: "complete" },
     statuses: [
       { step: "analyze", label: "요청 분석", status: "completed" },
       { step: "query_database", label: "생산 실적 조회", status: "completed" },

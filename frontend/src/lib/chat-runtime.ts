@@ -16,15 +16,18 @@
  *     짝지을 수 없다. 실행 중 표시는 진행 블록이 담당한다.
  */
 
-import type { ThreadMessageLike } from "@assistant-ui/react";
+import type { MessageStatus, ThreadMessageLike } from "@assistant-ui/react";
 
-import type { ChatMessage, StatusStep, ToolResult } from "@/types/chat";
+import type {
+  ChatMessage,
+  ChatMessageRunState,
+  StatusStep,
+  ToolResult,
+} from "@/types/chat";
 
 /** 어시스턴트 메시지의 `metadata.custom` 에 싣는 값. */
 export interface AgentMessageMetadata {
   statuses: StatusStep[];
-  streaming: boolean;
-  error?: string | null;
 }
 
 /** `metadata.custom` 을 우리 타입으로 좁힌다. 형태가 다르면 null. */
@@ -34,9 +37,24 @@ export function readAgentMetadata(
   if (!custom || !Array.isArray(custom.statuses)) return null;
   return {
     statuses: custom.statuses as StatusStep[],
-    streaming: custom.streaming === true,
-    error: typeof custom.error === "string" ? custom.error : null,
   };
+}
+
+function toAssistantStatus(runState: ChatMessageRunState): MessageStatus {
+  switch (runState.type) {
+    case "running":
+      return { type: "running" };
+    case "complete":
+      return { type: "complete", reason: "stop" };
+    case "cancelled":
+      return { type: "incomplete", reason: "cancelled" };
+    case "error":
+      return {
+        type: "incomplete",
+        reason: "error",
+        error: runState.message,
+      };
+  }
 }
 
 /** `tool-result-card.tsx` 의 판정식과 같게 유지한다. */
@@ -71,14 +89,10 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
             isError: isErrorResult(part.result),
           },
     ),
-    status: message.streaming
-      ? { type: "running" }
-      : { type: "complete", reason: "stop" },
+    status: toAssistantStatus(message.runState),
     metadata: {
       custom: {
         statuses: message.statuses,
-        streaming: message.streaming,
-        error: message.error ?? null,
       } satisfies AgentMessageMetadata,
     },
   };

@@ -52,14 +52,14 @@ const STEP_VIEW: Record<
 
 export function AgentProgress({
   statuses,
-  streaming,
+  isRunning,
 }: {
   statuses: StatusStep[];
-  streaming: boolean;
+  isRunning: boolean;
 }) {
   const running = statuses.find((s) => s.status === "running");
   const hasError = statuses.some((s) => s.status === "error");
-  const active = streaming && (Boolean(running) || statuses.length === 0);
+  const active = isRunning && (Boolean(running) || statuses.length === 0);
 
   // 진행 중에는 펼침, 완료되면 접힘. 사용자가 직접 토글하면 그 값을 유지.
   const [open, setOpen] = useState(active);
@@ -70,7 +70,7 @@ export function AgentProgress({
 
   if (statuses.length === 0 && !active) return null;
 
-  const summary = running
+  const summary = active && running
     ? `${running.label} 중…`
     : hasError
       ? "일부 도구 실행에 실패했습니다"
