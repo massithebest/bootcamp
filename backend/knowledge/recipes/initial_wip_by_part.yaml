@@ -1,0 +1,49 @@
+recipe_id: initial_wip_by_part
+name: SMT2020 Part별 초기 WIP
+description: dataset과 part grain에서 초기 WIP Lot 수, piece 수와 최초 납기를 계산한다.
+cte_name: initial_wip_by_part
+cte_sql: |
+  SELECT
+      w.dataset,
+      w.part,
+      COUNT(*) AS lot_count,
+      SUM(w.pieces) AS piece_count,
+      MIN(w.due) AS earliest_due
+  FROM wip w
+  GROUP BY w.dataset, w.part
+sources: [wip]
+when_to_use:
+  - HVLM 또는 LVHM의 Part별 초기 재공 규모를 비교할 때
+  - Lot 수와 wafer/piece 수를 구분해 조회할 때
+  - Part별 가장 빠른 초기 WIP 납기를 확인할 때
+output_grain: [dataset, part]
+output_columns:
+  - {name: dataset, role: category, desc: benchmark 구분}
+  - {name: part, role: category, desc: Part ID}
+  - {name: lot_count, role: measure, unit: lot, desc: 초기 WIP Lot 수}
+  - {name: piece_count, role: measure, unit: piece, desc: 초기 WIP pieces 합계}
+  - {name: earliest_due, role: time, desc: Part 내 가장 빠른 due 시각}
+aggregation_rules:
+  - CTE가 이미 dataset과 part grain이므로 Lot 수 재집계는 SUM(lot_count)를 사용한다
+  - HVLM/LVHM을 비교하지 않는 질문은 바깥 SELECT에서 dataset을 반드시 필터한다
+  - route_step과 조인해야 하면 이 CTE로 WIP를 먼저 집계해 Step 수만큼 중복되지 않게 한다
+visualization_hints:
+  - Part별 lot_count 또는 piece_count 비교에는 bar 차트가 적합하다
+  - earliest_due는 수량 축으로 사용하지 않는다
+sample_queries:
+  - description: LVHM Part별 초기 WIP
+    sql: |
+      SELECT dataset, part, lot_count, piece_count, earliest_due
+      FROM initial_wip_by_part
+      WHERE dataset = 'LVHM'
+      ORDER BY part
+  - description: benchmark별 초기 WIP 합계
+    sql: |
+      SELECT dataset, SUM(lot_count) AS lot_count, SUM(piece_count) AS piece_count
+      FROM initial_wip_by_part
+      GROUP BY dataset
+      ORDER BY dataset
+status: draft
+owner: ""
+updated: 2026-09-15
+source: SMT2020 WIP.txt와 생성 SQLite 검증

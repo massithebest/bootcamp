@@ -1,0 +1,22 @@
+table: transport
+description: SMT2020 위치 간 운반 시간 분포
+grain: [dataset, fromloc, toloc]
+tags: [SMT2020, 물류, 이동시간, Location]
+columns:
+  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: fromloc, type: varchar, desc: 출발 위치}
+  - {name: toloc, type: varchar, desc: 도착 위치}
+  - {name: ddist, type: varchar, desc: 이동시간 분포}
+  - {name: dtime, type: number, desc: 이동시간 기준값}
+  - {name: dtime2, type: number, desc: 이동시간 두 번째 분포 파라미터}
+  - {name: dunits, type: varchar, desc: 이동시간 단위}
+joins: []
+caveats:
+  - dtime/dtime2는 ddist와 dunits를 포함해 해석한다
+aggregation_rules:
+  - 이동시간은 dataset과 위치 쌍별 분포 파라미터이며 단순 실적 합계가 아니다
+sample_sql: SELECT dataset, fromloc, toloc, ddist, dtime, dtime2, dunits FROM transport
+status: verified
+owner: ""
+updated: 2026-09-15
+source: SMT2020 fromto.txt 직접 확인

@@ -14,13 +14,13 @@
 
 | 필요한 것 | 방법 |
 | --- | --- |
-| 실적이 부진한 원인 분석 | `kpi-shortfall-analysis` Skill |
+| KPI가 기준에 미달한 원인 분석 | `kpi-shortfall-analysis` Skill |
 | SQL 로 데이터 조회 | `sql-analysis` Skill |
 | 시뮬레이션 실행·해석 | `simulation` Skill |
 | KPI 의 정의·공식·판정 기준 | `list_kpis` → `get_kpi` |
 | 테이블·컬럼·조인·코드값 | `list_tables` → `describe_table` |
 | 시뮬레이션 종류·파라미터 | `list_simulation` |
-| 자주 쓰는 집계 로직 재사용 | `list_recipes` → `get_recipe` |
+| 집계 단위·조인·재집계 가이드 | `get_kpi` 의 `recipe_refs` 또는 `list_recipes` → `get_recipe` |
 | 용어·매뉴얼·정책 | `search_knowledge` |
 
 ## Tool 사용 규칙
@@ -36,12 +36,26 @@
 | `list_kpis` | KPI 목록 |
 | `get_kpi` | KPI 상세. 정의·공식·판정 규칙·원인 후보(diagnostics) |
 | `list_recipes` | 재사용 가능한 집계·조인 CTE 목록 |
-| `get_recipe` | 레시피 상세. CTE SQL 본문과 샘플 쿼리 — `WITH` 절로 복사해 쓴다 |
+| `get_recipe` | 레시피 상세. 적용 목적·출력 단위·집계 가이드·CTE SQL·표현 힌트 |
 | `get_result_summary` | 대용량 조회 결과(`large_result`)의 메타데이터·요약 통계 확인 |
 | `get_result_page` | 대용량 조회 결과의 특정 구간(offset/limit) 조회 |
+| `prepare_visualization` | 집계된 result_id의 실제 컬럼·grain을 검증해 bar/line 시각화 등록 |
 
 - SQL 을 작성하기 전에 `describe_table` 로 컬럼과 주의사항(caveats)을 확인한다.
+- SMT2020 질의는 `HVLM`/`LVHM` 중 dataset을 먼저 확정하고, 여러 테이블을
+  조인할 때 모든 업무 키와 함께 `dataset`을 조건에 포함한다.
+- `SMT2020_입력검증`은 테이블 건수와 관계를 확인하는 mock이다. 실제 완료량,
+  throughput, 병목, 납기 달성률을 계산한 simulation으로 해석하지 않는다.
 - `execute_sql` 결과가 `type: "large_result"`면 `get_result_summary`로 성격을 파악하고, 필요한 구간만 `get_result_page`로 조회한다.
+- 비교·추이가 유용하거나 사용자가 차트를 요청하면 실제 `columns`와 결과 grain을 확인한 뒤 `prepare_visualization`을 호출한다. 오류는 명세 수정 또는 새 집계 결과로 최대 2회 보정하고, 성공한 `visualization_id`만 `chart` 코드 펜스 마커에 넣는다. 실패하거나 지원하지 않는 표현이면 표·텍스트로 답한다.
+
+성공 마커에는 다음처럼 ID 하나만 넣는다. `result_id`, 축 명세, data는 넣지 않는다.
+
+~~~~text
+```chart
+{"visualization_id":"b8c19235da17461ab3e8ec82a942f017"}
+```
+~~~~
 
 ## 결과 검증 원칙
 

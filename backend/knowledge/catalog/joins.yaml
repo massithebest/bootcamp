@@ -1,11 +1,21 @@
-- name: 계획 대비 실적
-  from: PRODUCTION_PLAN
-  to: FGS_INBOUND_RESULT
-  on: [work_date, line_cd, product_id]
-  note: 실적은 status_cd <> 'X' 로 필터
-- name: 실적에 결품 붙이기
-  from: FGS_INBOUND_RESULT
-  to: MATERIAL_SHORTAGE
-  on: [work_date, product_id]
+- name: Part의 Route Step
+  from: part
+  to: route_step
+  on: [dataset, route]
   kind: left
-  note: 결품 행이 없는 날은 NULL
+  note: dataset이 빠지면 HVLM/LVHM의 동일 route가 교차 조인된다
+- name: Route Step의 설비 Family
+  from: route_step
+  to: tool
+  on: [dataset, stnfam]
+  kind: left
+- name: Part의 초기 WIP
+  from: part
+  to: wip
+  on: [dataset, part]
+  kind: left
+- name: Part의 신규 투입 Order
+  from: part
+  to: orders
+  on: [dataset, part]
+  kind: left

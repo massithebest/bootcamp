@@ -17,8 +17,8 @@ export function EmptyState() {
           무엇을 검토할까요?
         </h2>
         <p className="mt-1 text-ui leading-relaxed text-ink-2">
-          생산 실적 조회, 공정 문서 검색, 라인·자재·비교 시뮬레이션을 조합해
-          답변합니다. 근거가 되는 데이터와 수치를 함께 제시합니다.
+          SMT2020의 Part, Route, Tool, WIP를 조회하고 입력 관계를 검증합니다.
+          근거가 되는 데이터와 수치를 함께 제시합니다.
         </p>
       </div>
 

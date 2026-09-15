@@ -1,0 +1,41 @@
+scenario_id: lvhm_input_integrity
+name: SMT2020 LVHM 초기 WIP·Route 입력 검증
+description: LVHM의 초기 WIP 집계, Part별 Route 연결과 simulation 입력 정합성을 함께 확인한다.
+dataset: LVHM
+question: LVHM의 제품별 초기 WIP와 공정 Step 수를 조회하고 입력 관계가 완전한지 확인해줘.
+steps:
+  - action: recipe
+    ref: initial_wip_by_part
+    params: {dataset: LVHM}
+    expectation: 10개 Part의 합계가 2156 Lot, 53900 pieces다.
+  - action: recipe
+    ref: part_route_tool_summary
+    params: {dataset: LVHM}
+    expectation: 10개 Part와 4013개 Route Step이 조회되고 설비 Family 연결 차이가 없다.
+  - action: simulation
+    ref: SMT2020_입력검증
+    params: {dataset: LVHM}
+    expectation: 다섯 핵심 관계의 unmatched_rows가 모두 0이다.
+expected:
+  table_counts:
+    part: 10
+    route_step: 4013
+    tool: 106
+    orders: 21
+    wip: 2156
+    setup: 13
+    setup_group: 9
+    down_calendar: 11
+    pm_calendar: 292
+    calendar_attach: 303
+    transport: 1
+  unmatched_rows:
+    part_to_route_step: 0
+    route_step_to_tool: 0
+    wip_to_part: 0
+    orders_to_part: 0
+    wip_curstep_to_route_step: 0
+status: draft
+owner: ""
+updated: 2026-09-15
+source: SMT2020 LVHM 원본과 생성 SQLite의 고정 인수 기준

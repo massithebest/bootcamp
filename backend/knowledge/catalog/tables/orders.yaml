@@ -1,0 +1,32 @@
+table: orders
+description: SMT2020 simulation 시작 후 신규 투입되는 반복 Lot 계획
+grain: [dataset, lot]
+time_column: start
+tags: [SMT2020, Order, Lot, 투입, 납기]
+columns:
+  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: lot, type: varchar, desc: Lot ID}
+  - {name: part, type: varchar, desc: Part ID, ref: part.part}
+  - {name: prior, type: int, desc: Priority}
+  - {name: pieces, type: int, desc: Lot당 수량}
+  - {name: start, type: datetime, desc: 투입 시작 시각}
+  - {name: rdist, type: varchar, desc: 반복 주기 분포}
+  - {name: repeat, type: number, desc: 반복 투입 주기 값}
+  - {name: runits, type: varchar, desc: 반복 주기 단위}
+  - {name: rpt_no, type: int, desc: 반복 횟수 원문 값}
+  - {name: lotsperrpt, type: int, desc: 반복당 Lot 수}
+  - {name: due, type: datetime, desc: 납기 시각}
+  - {name: order_id, type: varchar, desc: Order ID}
+  - {name: hotlot, type: varchar, desc: Hot lot 표시}
+joins:
+  - {to: part, on: [dataset, part], kind: many-to-one}
+caveats:
+  - 한 행을 rpt_no만큼 물리적으로 확장하지 않은 원본 투입 정의다
+aggregation_rules:
+  - 행 수는 투입 정의 수이며 전체 생성 Lot 수와 동일하지 않다
+  - pieces를 총 투입량으로 해석하려면 repeat/rpt_no/lotsperrpt 규칙을 별도로 적용해야 한다
+sample_sql: SELECT dataset, lot, part, start, due FROM orders ORDER BY dataset, due
+status: verified
+owner: ""
+updated: 2026-09-15
+source: SMT2020 order.txt 직접 확인

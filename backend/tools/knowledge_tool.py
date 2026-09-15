@@ -34,7 +34,7 @@ async def list_tables(keyword: str | None = None, tag: str | None = None) -> dic
 
 
 async def describe_table(table: str) -> dict:
-    """Describe one catalog table: columns, keys, joins, code values, caveats.
+    """Describe one table: columns, grain, joins, caveats and aggregation rules.
 
     Always call this before writing SQL against a table.
     """
@@ -54,7 +54,7 @@ async def list_kpis(keyword: str | None = None) -> dict:
 
 async def get_kpi(kpi_id: str) -> dict:
     """Get one KPI: definition, formula, sources, baseline, shortfall rule,
-    SQL template and diagnostics (hypotheses to check when it falls short).
+    aggregation rules, recipe references, SQL template and diagnostics.
     """
 
     kpi = get_store().get_kpi(kpi_id)
@@ -68,14 +68,15 @@ async def list_recipes(keyword: str | None = None) -> dict:
     """List reusable CTE recipes, optionally filtered by keyword.
 
     Returns a summary only. Call `get_recipe` for the CTE SQL body
-    and sample queries.
+    and aggregation guide. Keywords also match the recipe's intended uses.
     """
 
     return _catalog("recipe_list", get_store().list_recipes(keyword))
 
 
 async def get_recipe(recipe_id: str) -> dict:
-    """Get one recipe: CTE alias, SQL body, source tables, sample queries.
+    """Get one recipe: intended uses, output grain/columns, aggregation rules,
+    visualization hints, CTE SQL, source tables and sample queries.
 
     Copy `cte_sql` into your own `WITH <cte_name> AS (...)` clause when
     writing `execute_sql` — this is not auto-substituted.

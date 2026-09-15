@@ -1,0 +1,25 @@
+table: pm_calendar
+description: SMT2020 설비 예방보전 주기와 정비 시간 조건
+grain: [dataset, pmcalname]
+tags: [SMT2020, 설비, 예방보전, PM, Calendar]
+columns:
+  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: pmcalname, type: varchar, desc: PM calendar 이름}
+  - {name: pmcaltype, type: varchar, desc: PM calendar 유형}
+  - {name: mtbpm, type: int, desc: 예방보전 간 평균 주기}
+  - {name: mtbpmunits, type: varchar, desc: 예방보전 주기 단위}
+  - {name: mttrdist, type: varchar, desc: 정비 시간 분포}
+  - {name: mttr, type: number, desc: 정비 시간 기준값}
+  - {name: mttr2, type: number, desc: 정비 시간 두 번째 분포 파라미터}
+  - {name: mttrunits, type: varchar, desc: 정비 시간 단위}
+  - {name: ignore_value, type: varchar, desc: 원본 IGNORE 분류 값}
+joins: []
+caveats:
+  - calendar_attach.calname과 연결할 때 caltype이 pm인지 함께 확인한다
+aggregation_rules:
+  - mtbpm과 mttr은 각각의 분포와 단위를 포함해 해석한다
+sample_sql: SELECT dataset, pmcalname, mtbpm, mtbpmunits, mttr, mttrunits FROM pm_calendar
+status: verified
+owner: ""
+updated: 2026-09-15
+source: SMT2020 pmcal.txt 직접 확인

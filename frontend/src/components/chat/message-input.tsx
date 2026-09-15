@@ -18,7 +18,7 @@ export function MessageInput() {
         <div className="flex flex-1 flex-col rounded border border-line-strong bg-canvas focus-within:border-accent">
           <ComposerPrimitive.Input
             rows={1}
-            placeholder="생산계획에 대해 질문하세요. 예: 9월 A라인에서 KRA-1180 1,000개 가능한가?"
+            placeholder="SMT2020 데이터에 대해 질문하세요. 예: LVHM 제품별 WIP를 보여줘"
             className="max-h-44 resize-none bg-transparent px-3 py-2 text-ui text-ink outline-none placeholder:text-ink-3 disabled:opacity-60"
           />
           <div className="px-3 pb-1.5 text-[0.625rem] text-ink-3">

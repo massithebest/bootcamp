@@ -1,0 +1,28 @@
+kpi_id: initial_wip
+name: 제품별 초기 WIP
+aliases: [초기 재공, 제품별 WIP, WIP Lot 수, WIP 수량]
+definition: SMT2020 simulation 시작 시점에 존재하는 초기 재공을 dataset과 Part별로 집계한다.
+formula: lot_count = COUNT(*), piece_count = SUM(wip.pieces)
+sources: [wip]
+grain: [dataset, part]
+baseline: wip의 원본 Lot과 pieces
+shortfall_rule: 입력 현황 지표이므로 부족 판정을 하지 않는다
+sql_template: |
+  SELECT dataset, part,
+         COUNT(*) AS lot_count,
+         SUM(pieces) AS piece_count
+    FROM wip
+   WHERE dataset = :dataset
+   GROUP BY dataset, part
+   ORDER BY part
+aggregation_rules:
+  - dataset을 먼저 확정하고 HVLM/LVHM을 섞지 않는다
+  - Lot 수는 COUNT(*), wafer/piece 수는 SUM(pieces)로 구분한다
+  - route_step과 조인하기 전에 WIP를 dataset과 part grain으로 먼저 집계해 Step 수만큼 중복되지 않게 한다
+recipe_refs: [initial_wip_by_part]
+diagnostics:
+  - {hypothesis: SMT2020 입력 테이블 관계가 완전함, how: simulation, ref: SMT2020_입력검증}
+status: verified
+owner: ""
+updated: 2026-09-15
+source: SMT2020 WIP.txt 직접 확인

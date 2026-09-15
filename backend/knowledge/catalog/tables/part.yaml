@@ -1,0 +1,25 @@
+table: part
+description: SMT2020 제품/Part와 공정 Route의 매핑
+grain: [dataset, part]
+tags: [SMT2020, 제품, Part, Route, 마스터]
+columns:
+  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: partgrp, type: varchar, desc: Part group}
+  - {name: partfam, type: varchar, desc: Part family}
+  - {name: part, type: varchar, desc: Part ID}
+  - {name: routefile, type: varchar, desc: 원본 route 파일명}
+  - {name: route, type: varchar, desc: Route ID, ref: route_step.route}
+joins:
+  - {to: route_step, on: [dataset, route], kind: one-to-many, note: "dataset과 route를 모두 사용"}
+  - {to: wip, on: [dataset, part], kind: one-to-many, note: "초기 WIP"}
+  - {to: orders, on: [dataset, part], kind: one-to-many, note: "신규 Lot 투입"}
+caveats:
+  - HVLM과 LVHM에 같은 part와 route ID가 있으므로 dataset 없는 JOIN은 금지한다
+aggregation_rules:
+  - Part 수는 dataset과 part의 조합으로 센다
+  - route_step과 조인한 뒤 Part 수를 셀 때는 중복 Step을 제거한다
+sample_sql: SELECT dataset, part, route FROM part ORDER BY dataset, part
+status: verified
+owner: ""
+updated: 2026-09-15
+source: SMT2020 part.txt 직접 확인

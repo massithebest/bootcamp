@@ -1,24 +1,36 @@
-- term: FGS
-  definition: Finished Goods Store. 완제품 창고. 생산이 끝난 제품이 입고되는 곳
-  aliases: [완제품 창고]
-  related_kpis: [fgs_inbound]
-  related_tables: [FGS_INBOUND_RESULT]
-  status: draft
-- term: 입고 실적
-  definition: 기간 내 FGS 에 입고 완료(status_cd = C)된 수량
-  aliases: [입고량, 입고 수량]
-  related_kpis: [fgs_inbound]
-  related_tables: [FGS_INBOUND_RESULT]
-  status: draft
-- term: MP
-  definition: Master Plan. 월 단위 확정 생산계획. 확정 후 변경되면 MP_VERSION.changed = 1
-  aliases: [마스터플랜, 확정 MP]
-  related_kpis: []
-  related_tables: [MP_VERSION, PRODUCTION_PLAN]
-  status: draft
-- term: 부진
-  definition: 계획 대비 달성률이 shortfall_rule 기준 미만인 상태
-  aliases: [미달, 실적 저조]
-  related_kpis: [fgs_inbound]
-  related_tables: []
-  status: draft
+- term: WIP
+  definition: Simulation 시작 시점에 이미 공정에 존재하는 초기 재공 Lot.
+  aliases: [재공, 초기 재공, Work In Process]
+  related_kpis: [initial_wip]
+  related_tables: [wip]
+  status: verified
+  updated: 2026-09-15
+  source: SMT2020 WIP.txt 설명
+- term: Route
+  definition: Part가 거치는 순서 있는 공정 Step의 집합.
+  aliases: [Routing, 공정 경로]
+  related_tables: [part, route_step]
+  status: verified
+  updated: 2026-09-15
+  source: SMT2020 part.txt와 route_*.txt 설명
+- term: STNFAM
+  definition: 공정 Step이 사용하는 station/equipment family 식별자.
+  aliases: [설비 Family, Station Family]
+  related_tables: [route_step, tool]
+  status: verified
+  updated: 2026-09-15
+  source: SMT2020 route_*.txt와 tool.txt.1l 설명
+- term: HVLM
+  definition: SMT2020 High Volume Low Mix benchmark. SQLite에서는 dataset='HVLM'으로 구분한다.
+  aliases: [High Volume Low Mix]
+  related_tables: [part, route_step, tool, orders, wip]
+  status: verified
+  updated: 2026-09-15
+  source: SMT2020_HVLM 폴더
+- term: LVHM
+  definition: SMT2020 Low Volume High Mix benchmark. SQLite에서는 dataset='LVHM'으로 구분한다.
+  aliases: [Low Volume High Mix]
+  related_tables: [part, route_step, tool, orders, wip]
+  status: verified
+  updated: 2026-09-15
+  source: SMT2020_LVHM 폴더

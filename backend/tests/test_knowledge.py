@@ -16,95 +16,119 @@ def _write(path: Path, body: str) -> None:
 @pytest.fixture()
 def root(tmp_path: Path) -> Path:
     _write(
-        tmp_path / "catalog/tables/FGS_INBOUND_RESULT.yaml",
+        tmp_path / "catalog/tables/wip.yaml",
         """
-        table: FGS_INBOUND_RESULT
-        description: FGS 일별 입고 실적
-        grain: [work_date, line_cd]
-        time_column: work_date
-        tags: [실적, 입고]
+        table: wip
+        description: SMT2020 초기 재공
+        grain: [dataset, lot]
+        time_column: due
+        tags: [WIP, 재공]
         columns:
-          - {name: work_date, type: date, desc: 작업일}
-          - {name: line_cd, type: varchar, desc: 라인 코드, ref: LINE_MASTER.line_cd}
-          - {name: status_cd, type: varchar, desc: 상태, codes: {C: 완료, X: 취소}}
+          - {name: dataset, type: varchar, desc: 데이터셋}
+          - {name: lot, type: varchar, desc: Lot ID}
+          - {name: part, type: varchar, desc: Part ID, ref: part.part}
         joins:
-          - {to: LINE_MASTER, on: line_cd, kind: many-to-one}
-        caveats: ["status_cd = 'X' 는 제외"]
-        sample_sql: SELECT * FROM FGS_INBOUND_RESULT
+          - {to: part, on: [dataset, part], kind: many-to-one}
+        caveats: ["JOIN에 dataset을 포함"]
+        sample_sql: SELECT * FROM wip
         status: verified
         """,
     )
     _write(
-        tmp_path / "catalog/tables/LINE_MASTER.yaml",
+        tmp_path / "catalog/tables/part.yaml",
         """
-        table: LINE_MASTER
-        description: 생산 라인 마스터
-        grain: [line_cd]
+        table: part
+        description: Part 마스터
+        grain: [dataset, part]
         tags: [마스터]
         columns:
-          - {name: line_cd, type: varchar, desc: 라인 코드}
+          - {name: dataset, type: varchar, desc: 데이터셋}
+          - {name: part, type: varchar, desc: Part ID}
         status: draft
         """,
     )
     _write(
-        tmp_path / "kpi/fgs_inbound.yaml",
+        tmp_path / "kpi/initial_wip.yaml",
         """
-        kpi_id: fgs_inbound
-        name: FGS 입고 실적
-        aliases: [입고 실적]
-        definition: 기간 내 입고 완료 수량
-        formula: SUM(inbound_qty)
-        sources: [FGS_INBOUND_RESULT]
-        grain: [work_date]
-        baseline: PRODUCTION_PLAN.plan_qty
-        shortfall_rule: 달성률 < 0.9 이면 부진
-        sql_template: SELECT 1 FROM FGS_INBOUND_RESULT
+        kpi_id: initial_wip
+        name: 초기 WIP
+        aliases: [재공]
+        definition: 초기 재공 Lot 수
+        formula: COUNT(*)
+        sources: [wip]
+        grain: [dataset, part]
+        baseline: wip 원본
+        shortfall_rule: 부족 판정 없음
+        sql_template: SELECT 1 FROM wip
         diagnostics:
-          - {hypothesis: 자재 결품, how: sql, ref: MATERIAL_SHORTAGE}
+          - {hypothesis: Route 연결, how: sql, ref: part}
         status: draft
         """,
     )
     _write(
-        tmp_path / "simulations/MP_확정조회.yaml",
+        tmp_path / "simulations/SMT2020_입력검증.yaml",
         """
-        type: MP_확정조회
-        name: 확정 MP 조회
-        aliases: [확정 MP]
-        when_to_use: 계획 변경 확인
+        type: SMT2020_입력검증
+        name: 입력 검증
+        aliases: [정합성 검증]
+        when_to_use: simulation 입력 확인
         params:
-          fixedPlanMonth: {required: false, description: 조회 연월, example: "202609"}
+          dataset: {required: true, description: 데이터셋, example: LVHM}
         output_schema:
-          mpVersion: {type: string, desc: 버전}
+          results: {type: array, desc: 관계 검사}
         status: verified
         """,
     )
     _write(
         tmp_path / "glossary.yaml",
         """
-        - term: FGS
-          definition: 완제품 창고
-          aliases: [완제품 창고]
-          related_kpis: [fgs_inbound]
-          related_tables: [FGS_INBOUND_RESULT]
+        - term: WIP
+          definition: 초기 재공
+          aliases: [재공]
+          related_kpis: [initial_wip]
+          related_tables: [wip]
           status: draft
         """,
     )
     _write(
-        tmp_path / "recipes/plan_vs_actual.yaml",
+        tmp_path / "recipes/wip_by_part.yaml",
         """
-        recipe_id: plan_vs_actual
-        name: 계획 대비 실적
-        description: FGS 입고 실적과 라인 마스터를 조인해 라인별로 집계하는 CTE
-        cte_name: plan_vs_actual
+        recipe_id: wip_by_part
+        name: Part별 WIP
+        description: WIP와 Part 마스터를 dataset과 part로 조인하는 CTE
+        cte_name: wip_by_part
         cte_sql: |
-          SELECT r.work_date, r.line_cd, SUM(1) AS cnt
-          FROM FGS_INBOUND_RESULT r
-          JOIN LINE_MASTER l ON l.line_cd = r.line_cd
-          GROUP BY r.work_date, r.line_cd
-        sources: [FGS_INBOUND_RESULT, LINE_MASTER]
+          SELECT w.dataset, w.part, COUNT(*) AS cnt
+          FROM wip w
+          JOIN part p ON p.dataset = w.dataset AND p.part = w.part
+          GROUP BY w.dataset, w.part
+        sources: [wip, part]
         sample_queries:
-          - description: 라인별 합계
-            sql: SELECT line_cd, SUM(cnt) FROM plan_vs_actual GROUP BY line_cd
+          - description: 데이터셋별 합계
+            sql: SELECT dataset, SUM(cnt) FROM wip_by_part GROUP BY dataset
+        status: draft
+        """,
+    )
+    _write(
+        tmp_path / "scenarios/lvhm_input_integrity.yaml",
+        """
+        scenario_id: lvhm_input_integrity
+        name: LVHM 입력 검증
+        description: recipe와 simulation을 함께 확인
+        dataset: LVHM
+        question: LVHM WIP와 Route 관계를 검증해줘
+        steps:
+          - action: recipe
+            ref: wip_by_part
+            params: {dataset: LVHM}
+            expectation: Part별 WIP가 조회된다
+          - action: simulation
+            ref: SMT2020_입력검증
+            params: {dataset: LVHM}
+            expectation: unmatched가 0이다
+        expected:
+          table_counts: {part: 10, wip: 2156}
+          unmatched_rows: {wip_to_part: 0}
         status: draft
         """,
     )
@@ -118,7 +142,8 @@ def test_load_reads_all_kinds(root: Path) -> None:
     assert len(store.list_kpis()) == 1
     assert len(store.list_simulations()) == 1
     assert len(store.list_recipes()) == 1
-    assert store.table_names() == {"FGS_INBOUND_RESULT", "LINE_MASTER"}
+    assert len(store.list_scenarios()) == 1
+    assert store.table_names() == {"wip", "part"}
 
 
 def test_invalid_yaml_error_includes_filename(root: Path) -> None:
@@ -133,16 +158,16 @@ def test_invalid_yaml_error_includes_filename(root: Path) -> None:
 def test_list_tables_keyword_and_tag_filter(root: Path) -> None:
     store = KnowledgeStore.load(root)
 
-    assert [t["table"] for t in store.list_tables(keyword="입고")] == ["FGS_INBOUND_RESULT"]
+    assert [t["table"] for t in store.list_tables(keyword="재공")] == ["wip"]
     # 컬럼명 부분일치
-    assert [t["table"] for t in store.list_tables(keyword="status_cd")] == ["FGS_INBOUND_RESULT"]
-    assert [t["table"] for t in store.list_tables(tag="마스터")] == ["LINE_MASTER"]
+    assert [t["table"] for t in store.list_tables(keyword="lot")] == ["wip"]
+    assert [t["table"] for t in store.list_tables(tag="마스터")] == ["part"]
     assert store.list_tables(keyword="존재하지않는") == []
 
 
 def test_list_tables_summary_shape(root: Path) -> None:
     (row,) = store_rows = [
-        t for t in KnowledgeStore.load(root).list_tables(tag="실적")
+        t for t in KnowledgeStore.load(root).list_tables(tag="WIP")
     ]
     assert set(row) == {"table", "description", "grain", "tags", "verified"}
     assert store_rows[0]["verified"] is True
@@ -151,12 +176,12 @@ def test_list_tables_summary_shape(root: Path) -> None:
 def test_describe_table_full_and_verified(root: Path) -> None:
     store = KnowledgeStore.load(root)
 
-    described = store.describe_table("FGS_INBOUND_RESULT")
+    described = store.describe_table("wip")
     assert described["verified"] is True
-    assert described["caveats"] == ["status_cd = 'X' 는 제외"]
-    assert described["columns"][2]["codes"] == {"C": "완료", "X": "취소"}
+    assert described["caveats"] == ["JOIN에 dataset을 포함"]
+    assert described["columns"][2]["ref"] == "part.part"
 
-    assert store.describe_table("LINE_MASTER")["verified"] is False
+    assert store.describe_table("part")["verified"] is False
 
 
 def test_describe_table_unknown_returns_error(root: Path) -> None:
@@ -170,15 +195,15 @@ def test_describe_table_unknown_returns_error(root: Path) -> None:
 def test_list_kpis_keyword_matches_alias(root: Path) -> None:
     store = KnowledgeStore.load(root)
 
-    assert [k["kpi_id"] for k in store.list_kpis(keyword="입고 실적")] == ["fgs_inbound"]
+    assert [k["kpi_id"] for k in store.list_kpis(keyword="재공")] == ["initial_wip"]
     assert set(store.list_kpis()[0]) == {"kpi_id", "name", "aliases", "verified"}
 
 
 def test_get_kpi_full_and_unknown(root: Path) -> None:
     store = KnowledgeStore.load(root)
 
-    kpi = store.get_kpi("fgs_inbound")
-    assert kpi["shortfall_rule"].startswith("달성률")
+    kpi = store.get_kpi("initial_wip")
+    assert kpi["shortfall_rule"].startswith("부족")
     assert kpi["diagnostics"][0]["how"] == "sql"
     assert kpi["verified"] is False
 
@@ -190,8 +215,8 @@ def test_get_kpi_full_and_unknown(root: Path) -> None:
 def test_get_simulation_merges_params(root: Path) -> None:
     store = KnowledgeStore.load(root)
 
-    sim = store.get_simulation("MP_확정조회")
-    assert sim["params"]["fixedPlanMonth"]["required"] is False
+    sim = store.get_simulation("SMT2020_입력검증")
+    assert sim["params"]["dataset"]["required"] is True
     assert sim["verified"] is True
     assert store.get_simulation("없음")["status"] == "error"
 
@@ -199,7 +224,7 @@ def test_get_simulation_merges_params(root: Path) -> None:
 def test_glossary_loaded(root: Path) -> None:
     store = KnowledgeStore.load(root)
 
-    assert [g["term"] for g in store.list_glossary()] == ["FGS"]
+    assert [g["term"] for g in store.list_glossary()] == ["WIP"]
 
 
 def test_missing_directory_loads_empty(tmp_path: Path) -> None:
@@ -208,13 +233,14 @@ def test_missing_directory_loads_empty(tmp_path: Path) -> None:
     assert store.list_tables() == []
     assert store.table_names() == set()
     assert store.list_recipes() == []
+    assert store.list_scenarios() == []
 
 
 def test_list_recipes_keyword_filter(root: Path) -> None:
     store = KnowledgeStore.load(root)
 
-    assert [r["recipe_id"] for r in store.list_recipes(keyword="계획 대비")] == [
-        "plan_vs_actual"
+    assert [r["recipe_id"] for r in store.list_recipes(keyword="Part별")] == [
+        "wip_by_part"
     ]
     assert set(store.list_recipes()[0]) == {
         "recipe_id",
@@ -229,10 +255,10 @@ def test_list_recipes_keyword_filter(root: Path) -> None:
 def test_get_recipe_full_and_verified(root: Path) -> None:
     store = KnowledgeStore.load(root)
 
-    recipe = store.get_recipe("plan_vs_actual")
-    assert recipe["cte_name"] == "plan_vs_actual"
-    assert recipe["sources"] == ["FGS_INBOUND_RESULT", "LINE_MASTER"]
-    assert recipe["sample_queries"][0]["description"] == "라인별 합계"
+    recipe = store.get_recipe("wip_by_part")
+    assert recipe["cte_name"] == "wip_by_part"
+    assert recipe["sources"] == ["wip", "part"]
+    assert recipe["sample_queries"][0]["description"] == "데이터셋별 합계"
     assert recipe["verified"] is False
 
 
@@ -242,3 +268,56 @@ def test_get_recipe_unknown_returns_error(root: Path) -> None:
     assert result["status"] == "error"
     assert "no_such" in result["message"]
     assert "list_recipes" in result["message"]
+
+
+def test_list_and_get_scenarios(root: Path) -> None:
+    store = KnowledgeStore.load(root)
+
+    assert [row["scenario_id"] for row in store.list_scenarios("LVHM")] == [
+        "lvhm_input_integrity"
+    ]
+    assert store.list_scenarios("존재하지않는") == []
+    scenario = store.get_scenario("LVHM_INPUT_INTEGRITY")
+    assert scenario["dataset"] == "LVHM"
+    assert scenario["steps"][0]["ref"] == "wip_by_part"
+    assert scenario["expected"]["table_counts"]["wip"] == 2156
+    assert scenario["verified"] is False
+
+
+def test_get_scenario_unknown_returns_error(root: Path) -> None:
+    result = KnowledgeStore.load(root).get_scenario("no_such")
+
+    assert result["status"] == "error"
+    assert "list_scenarios" in result["message"]
+
+
+def test_legacy_yaml_without_aggregation_guide_still_loads(root: Path) -> None:
+    store = KnowledgeStore.load(root)
+
+    assert store.describe_table("wip")["aggregation_rules"] == []
+    assert store.get_kpi("initial_wip")["recipe_refs"] == []
+    recipe = store.get_recipe("wip_by_part")
+    assert recipe["output_grain"] == []
+    assert recipe["output_columns"] == []
+    assert recipe["aggregation_rules"] == []
+
+
+@pytest.mark.parametrize(
+    "guide",
+    [
+        "output_grain: [missing]\noutput_columns: [{name: qty, role: measure}]",
+        "output_grain: [qty]",
+        "output_columns: [{name: qty, role: measure}, {name: qty, role: measure}]",
+        "output_columns: [{name: qty, role: invalid}]",
+        "aggregation_rules: SUM(qty)",
+    ],
+)
+def test_invalid_recipe_guide_reports_filename(root: Path, guide: str) -> None:
+    _write(
+        root / "recipes/invalid.yaml",
+        "recipe_id: invalid\nname: invalid\ndescription: invalid\n"
+        "cte_name: invalid\ncte_sql: SELECT 1 AS qty\nsources: []\n" + guide,
+    )
+
+    with pytest.raises(ValueError, match="invalid.yaml"):
+        KnowledgeStore.load(root)

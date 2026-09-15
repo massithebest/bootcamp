@@ -1,0 +1,57 @@
+recipe_id: part_route_tool_summary
+name: SMT2020 Part별 Route·설비 연결 요약
+description: Part의 Route Step 수와 요구·연결된 설비 Family 수를 dataset-safe JOIN으로 계산한다.
+cte_name: part_route_tool_summary
+cte_sql: |
+  SELECT
+      p.dataset,
+      p.part,
+      p.route,
+      COUNT(r.step) AS step_count,
+      COUNT(DISTINCT r.stnfam) AS required_tool_family_count,
+      COUNT(DISTINCT CASE WHEN t.stnfam IS NOT NULL THEN r.stnfam END) AS matched_tool_family_count
+  FROM part p
+  LEFT JOIN route_step r
+    ON r.dataset = p.dataset
+   AND r.route = p.route
+  LEFT JOIN tool t
+    ON t.dataset = r.dataset
+   AND t.stnfam = r.stnfam
+  GROUP BY p.dataset, p.part, p.route
+sources: [part, route_step, tool]
+when_to_use:
+  - Part별 전체 공정 Step 수를 조회할 때
+  - Route가 요구하는 설비 Family가 tool master에 연결되는지 확인할 때
+  - HVLM과 LVHM의 Route 복잡도를 비교할 때
+output_grain: [dataset, part, route]
+output_columns:
+  - {name: dataset, role: category, desc: benchmark 구분}
+  - {name: part, role: category, desc: Part ID}
+  - {name: route, role: category, desc: Route ID}
+  - {name: step_count, role: measure, unit: step, desc: Route의 공정 Step 수}
+  - {name: required_tool_family_count, role: measure, unit: family, desc: Route가 참조하는 고유 STNFAM 수}
+  - {name: matched_tool_family_count, role: measure, unit: family, desc: tool master에 연결된 고유 STNFAM 수}
+aggregation_rules:
+  - part→route_step과 route_step→tool JOIN 모두 dataset을 키에 포함한다
+  - step_count는 Part·Route별 값이며 Part 간 합계는 공정 정의 비교 목적일 때만 사용한다
+  - tool.stnqty를 이 결과에 바로 합산하면 Route Step만큼 중복되므로 별도 tool grain에서 집계한다
+visualization_hints:
+  - Part별 step_count 비교에는 bar 차트가 적합하다
+  - 연결 누락은 required_tool_family_count와 matched_tool_family_count의 차이로 표에 표시한다
+sample_queries:
+  - description: LVHM Part별 Route Step과 설비 Family 수
+    sql: |
+      SELECT *
+      FROM part_route_tool_summary
+      WHERE dataset = 'LVHM'
+      ORDER BY part
+  - description: 설비 Family 연결이 완전하지 않은 Part
+    sql: |
+      SELECT *
+      FROM part_route_tool_summary
+      WHERE required_tool_family_count <> matched_tool_family_count
+      ORDER BY dataset, part
+status: draft
+owner: ""
+updated: 2026-09-15
+source: SMT2020 part.txt, route_*.txt, tool.txt.1l과 생성 SQLite 검증

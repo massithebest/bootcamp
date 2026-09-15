@@ -1,0 +1,37 @@
+table: tool
+description: SMT2020 설비 Family와 station 수량 및 운영 규칙
+grain: [dataset, stnfam]
+tags: [SMT2020, 설비, Tool, Station, Capacity]
+columns:
+  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: stnfam, type: varchar, desc: 설비 Family ID}
+  - {name: stn, type: varchar, desc: Station ID}
+  - {name: rule, type: varchar, desc: Dispatching rule}
+  - {name: fwlrank, type: varchar, desc: 원본 FWLRANK 값}
+  - {name: wakeresrank, type: varchar, desc: 원본 WAKERESRANK 값}
+  - {name: batchcritf, type: varchar, desc: Batch 기준 식별자}
+  - {name: batchper, type: varchar, desc: Batch 기준 단위}
+  - {name: ltime, type: number, desc: Load time}
+  - {name: ltunits, type: varchar, desc: Load time 단위}
+  - {name: ultime, type: number, desc: Unload time}
+  - {name: ultunits, type: varchar, desc: Unload time 단위}
+  - {name: stncap, type: number, desc: Station capacity 원문 값}
+  - {name: stnqty, type: number, desc: 설비 수량}
+  - {name: stngrp, type: varchar, desc: 설비/공정 Group}
+  - {name: stnfamstep_actlist, type: varchar, desc: Station family action list}
+  - {name: stnfamloc, type: varchar, desc: 설비 위치}
+  - {name: prerulerwl, type: varchar, desc: 원본 PRERULERWL 값}
+  - {name: setupgrp, type: varchar, desc: Setup group}
+joins:
+  - {to: route_step, on: [dataset, stnfam], kind: one-to-many}
+  - {to: setup_group, on: [dataset, setupgrp], kind: many-to-one}
+caveats:
+  - stnqty는 원본이 실수 표기이며 실제 개별 장비 행이 아니라 Family별 수량이다
+aggregation_rules:
+  - 설비 수량은 dataset과 stnfam grain에서 stnqty를 한 번만 합산한다
+  - route_step과 조인한 뒤 stnqty를 합산하면 Step 수만큼 중복되므로 먼저 설비 grain으로 집계한다
+sample_sql: SELECT dataset, stngrp, SUM(stnqty) AS tool_qty FROM tool GROUP BY dataset, stngrp
+status: verified
+owner: ""
+updated: 2026-09-15
+source: SMT2020 tool.txt.1l 직접 확인

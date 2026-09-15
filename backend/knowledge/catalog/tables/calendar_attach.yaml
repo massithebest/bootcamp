@@ -1,0 +1,23 @@
+table: calendar_attach
+description: SMT2020 breakdown/PM calendar와 설비 자원의 연결
+grain: [dataset, calname, restype, resname]
+tags: [SMT2020, 설비, Calendar, Breakdown, PM]
+columns:
+  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: calname, type: varchar, desc: 연결할 calendar 이름}
+  - {name: caltype, type: varchar, desc: "calendar 유형 (down/pm)"}
+  - {name: restype, type: varchar, desc: 자원 유형}
+  - {name: resname, type: varchar, desc: 자원 이름}
+  - {name: foadist, type: varchar, desc: First occurrence 분포}
+  - {name: foa, type: number, desc: First occurrence 값}
+  - {name: foaunits, type: varchar, desc: First occurrence 단위}
+joins: []
+caveats:
+  - caltype에 따라 calname을 down_calendar.downcalname 또는 pm_calendar.pmcalname과 연결한다
+aggregation_rules:
+  - 자원 연결 수는 dataset, calname, restype, resname grain에서 센다
+sample_sql: SELECT dataset, caltype, restype, COUNT(*) AS attachment_count FROM calendar_attach GROUP BY dataset, caltype, restype
+status: verified
+owner: ""
+updated: 2026-09-15
+source: SMT2020 attach.txt 직접 확인

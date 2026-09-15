@@ -1,0 +1,30 @@
+table: wip
+description: SMT2020 simulation 시작 시점의 초기 재공 Lot
+grain: [dataset, lot]
+time_column: due
+tags: [SMT2020, WIP, 재공, Lot, 납기]
+columns:
+  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: lot, type: varchar, desc: Lot ID}
+  - {name: part, type: varchar, desc: Part ID, ref: part.part}
+  - {name: prior, type: int, desc: Priority}
+  - {name: pieces, type: int, desc: Lot 수량}
+  - {name: start, type: datetime, desc: 원본 시작 시각}
+  - {name: curstep, type: int, desc: 현재 Route Step}
+  - {name: due, type: datetime, desc: 납기 시각}
+  - {name: order_id, type: varchar, desc: Order ID}
+  - {name: hotlot, type: varchar, desc: Hot lot 표시}
+  - {name: trace, type: varchar, desc: Trace 표시}
+joins:
+  - {to: part, on: [dataset, part], kind: many-to-one}
+caveats:
+  - curstep은 part의 route를 거쳐 route_step과 연결한다
+  - 빈 hotlot/trace는 NULL이며 일반 Lot 여부를 별도 값으로 보정하지 않는다
+aggregation_rules:
+  - 초기 WIP Lot 수는 dataset과 part별 COUNT(*)로 센다
+  - 초기 WIP piece 수는 dataset과 part별 SUM(pieces)로 센다
+sample_sql: SELECT dataset, part, COUNT(*) AS lot_count, SUM(pieces) AS piece_count FROM wip GROUP BY dataset, part
+status: verified
+owner: ""
+updated: 2026-09-15
+source: SMT2020 WIP.txt 직접 확인

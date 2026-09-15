@@ -1,0 +1,16 @@
+type: SMT2020_입력검증
+name: SMT2020 simulation 입력 검증
+aliases: [SMT2020 검증, 입력 데이터 검증, benchmark 정합성]
+when_to_use: 실제 simulation을 호출하기 전에 선택한 HVLM/LVHM 입력의 테이블 건수와 핵심 관계를 확인할 때.
+params:
+  dataset: {required: true, description: "검증할 benchmark (HVLM 또는 LVHM, 대소문자 무관)", example: LVHM}
+output_schema:
+  kpis: {type: array, desc: "part, route step, tool family, 초기 WIP lot 건수"}
+  table: {type: object, desc: "11개 입력 테이블의 row count 표"}
+  results: {type: array, desc: "핵심 관계별 source/matched/unmatched 건수"}
+  summary: {type: string, desc: 실제 DES 결과가 아닌 입력 정합성 mock 설명}
+follows: []
+status: verified
+owner: ""
+updated: 2026-09-15
+source: SMT2020 SQLite 변환 결과의 결정적 관계 검사

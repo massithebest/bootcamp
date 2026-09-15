@@ -3,7 +3,7 @@
 `knowledge/` 아래의 YAML(카탈로그·KPI·시뮬레이션·용어집·시나리오·레시피)을 읽어
 pydantic 으로 검증하고, tool/서비스/API 가 함께 쓰는 조회 인터페이스를 제공한다.
 
-설계: docs/domain-knowledge.md §3
+관리 기준: backend/docs/domain-knowledge-management.md
 - YAML 이 카탈로그·KPI·시뮬레이션 정의의 source of truth 다.
 - 에이전트는 tools/knowledge_tool.py 를 통해서만 이 데이터에 접근한다.
 """
@@ -69,6 +69,7 @@ class KnowledgeTable(KnowledgeMeta):
     columns: list[Column]
     joins: list[Join] = []
     caveats: list[str] = []
+    aggregation_rules: list[str] = []
     sample_sql: str = ""
 
 
@@ -89,6 +90,8 @@ class KnowledgeKpi(KnowledgeMeta):
     baseline: str
     shortfall_rule: str
     sql_template: str
+    aggregation_rules: list[str] = []
+    recipe_refs: list[str] = []
     diagnostics: list[Diagnostic] = []
 
 
@@ -116,18 +119,32 @@ class GlossaryEntry(KnowledgeMeta):
     related_tables: list[str] = []
 
 
-class Scenario(BaseModel):
-    """합성 시드 DB 에 심을 이상치 정의. 시드 스크립트와 테스트가 공유한다."""
+class ScenarioStep(BaseModel):
+    """검증 시나리오가 참조하는 recipe 또는 simulation 한 단계."""
 
+    action: Literal["recipe", "simulation"]
+    ref: str
+    params: dict[str, str] = {}
+    expectation: str
+
+
+class ScenarioExpected(BaseModel):
+    """고정 benchmark에서 바뀌면 안 되는 최소 기대값."""
+
+    table_counts: dict[str, int] = {}
+    unmatched_rows: dict[str, int] = {}
+
+
+class KnowledgeScenario(KnowledgeMeta):
+    """원본을 변형하지 않고 recipe/simulation을 관통 검증하는 QA 시나리오."""
+
+    scenario_id: str
     name: str
     description: str
-    period: tuple[date, date]
-    line_cd: str
-    product_id: str
-    drop_ratio: float
-    cause: Literal["material_shortage", "plan_change", "production_shortfall"]
-    unchanged: list[str] = []
-    expected_diagnosis: str
+    dataset: Literal["HVLM", "LVHM"]
+    question: str
+    steps: list[ScenarioStep]
+    expected: ScenarioExpected
 
 
 class RecipeSample(BaseModel):
@@ -135,6 +152,15 @@ class RecipeSample(BaseModel):
 
     description: str
     sql: str
+
+
+class RecipeOutputColumn(BaseModel):
+    """CTE 출력 컬럼의 의미. role/unit 은 작성자가 명시한 집계 가이드다."""
+
+    name: str
+    role: Literal["category", "measure", "time"]
+    unit: str | None = None
+    desc: str = ""
 
 
 class KnowledgeRecipe(KnowledgeMeta):
@@ -150,7 +176,24 @@ class KnowledgeRecipe(KnowledgeMeta):
     cte_name: str  # WITH 절에서 쓸 별칭
     cte_sql: str  # `WITH <cte_name> AS (` 와 `)` 사이에 들어갈 본문
     sources: list[str]  # cte_sql 이 읽는 실제 카탈로그 테이블
+    when_to_use: list[str] = []
+    output_grain: list[str] = []
+    output_columns: list[RecipeOutputColumn] = []
+    aggregation_rules: list[str] = []
+    visualization_hints: list[str] = []
     sample_queries: list[RecipeSample] = []
+
+    @model_validator(mode="after")
+    def _validate_output_contract(self) -> KnowledgeRecipe:
+        if self.output_columns:
+            names = [column.name for column in self.output_columns]
+            if len(names) != len(set(names)):
+                raise ValueError("output_columns 에 중복 컬럼명이 있습니다")
+            if not set(self.output_grain) <= set(names):
+                raise ValueError("output_grain 은 output_columns 에 있는 컬럼이어야 합니다")
+        elif self.output_grain:
+            raise ValueError("output_grain 을 지정하면 output_columns 도 필요합니다")
+        return self
 
 
 # ---- 로더 ----
@@ -190,15 +233,17 @@ class KnowledgeStore:
         kpis: list[KnowledgeKpi],
         simulations: list[KnowledgeSimulation],
         glossary: list[GlossaryEntry],
-        scenarios: list[Scenario],
         recipes: list[KnowledgeRecipe] | None = None,
+        scenarios: list[KnowledgeScenario] | None = None,
     ) -> None:
         self.tables = {table.table: table for table in tables}
         self.kpis = {kpi.kpi_id: kpi for kpi in kpis}
         self.simulations = {sim.type: sim for sim in simulations}
         self.glossary = glossary
-        self.scenarios = {scenario.name: scenario for scenario in scenarios}
         self.recipes = {recipe.recipe_id: recipe for recipe in (recipes or [])}
+        self.scenarios = {
+            scenario.scenario_id: scenario for scenario in (scenarios or [])
+        }
 
     # -- 로드 --
 
@@ -220,13 +265,13 @@ class KnowledgeStore:
             _parse(KnowledgeSimulation, _read_yaml(path), path)
             for path in sorted(root.glob("simulations/*.yaml"))
         ]
-        scenarios = [
-            _parse(Scenario, _read_yaml(path), path)
-            for path in sorted(root.glob("scenarios/*.yaml"))
-        ]
         recipes = [
             _parse(KnowledgeRecipe, _read_yaml(path), path)
             for path in sorted(root.glob("recipes/*.yaml"))
+        ]
+        scenarios = [
+            _parse(KnowledgeScenario, _read_yaml(path), path)
+            for path in sorted(root.glob("scenarios/*.yaml"))
         ]
 
         glossary_path = root / "glossary.yaml"
@@ -237,7 +282,7 @@ class KnowledgeStore:
                 raise ValueError(f"{glossary_path.name}: 최상위가 리스트여야 합니다.")
             glossary = [_parse(GlossaryEntry, item, glossary_path) for item in raw]
 
-        return cls(tables, kpis, simulations, glossary, scenarios, recipes)
+        return cls(tables, kpis, simulations, glossary, recipes, scenarios)
 
     # -- 조회 (tool / API 공용) --
 
@@ -309,14 +354,15 @@ class KnowledgeStore:
             for entry in self.glossary
         ]
 
-    def list_scenarios(self) -> list[Scenario]:
-        return list(self.scenarios.values())
-
     def list_recipes(self, keyword: str | None = None) -> list[dict]:
         rows = []
         for recipe in self.recipes.values():
             if keyword and not _contains(
-                keyword, recipe.recipe_id, recipe.name, recipe.description
+                keyword,
+                recipe.recipe_id,
+                recipe.name,
+                recipe.description,
+                recipe.when_to_use,
             ):
                 continue
             rows.append(
@@ -334,6 +380,37 @@ class KnowledgeStore:
         found = self.recipes.get(recipe_id) or self._find_ci(self.recipes, recipe_id)
         if found is None:
             return self._not_found("레시피", recipe_id, "list_recipes")
+        return {**found.model_dump(mode="json"), "verified": self._verified(found)}
+
+    def list_scenarios(self, keyword: str | None = None) -> list[dict]:
+        rows = []
+        for scenario in self.scenarios.values():
+            if keyword and not _contains(
+                keyword,
+                scenario.scenario_id,
+                scenario.name,
+                scenario.description,
+                scenario.dataset,
+                scenario.question,
+            ):
+                continue
+            rows.append(
+                {
+                    "scenario_id": scenario.scenario_id,
+                    "name": scenario.name,
+                    "dataset": scenario.dataset,
+                    "question": scenario.question,
+                    "verified": self._verified(scenario),
+                }
+            )
+        return rows
+
+    def get_scenario(self, scenario_id: str) -> dict:
+        found = self.scenarios.get(scenario_id) or self._find_ci(
+            self.scenarios, scenario_id
+        )
+        if found is None:
+            return self._not_found("시나리오", scenario_id, "list_scenarios")
         return {**found.model_dump(mode="json"), "verified": self._verified(found)}
 
     def table_names(self) -> set[str]:

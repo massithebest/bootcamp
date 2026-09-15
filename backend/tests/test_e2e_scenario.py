@@ -11,13 +11,10 @@ import os
 
 import pytest
 
-from core.config import KNOWLEDGE_DIR
-from services.knowledge_service import KnowledgeStore
-
 pytestmark = pytest.mark.e2e
 
 
-QUERY = "FGS 입고 실적이 부진한 원인을 찾아줘. 기간은 2026년 9월."
+QUERY = "SMT2020 LVHM에서 제품별 초기 WIP를 조회하고 simulation 입력 관계도 검증해줘."
 
 
 def _require_api_key() -> None:
@@ -33,12 +30,14 @@ def agent_run(tmp_path_factory):
 
     import asyncio
 
-    from scripts.seed_sample_db import main as seed_main
+    from scripts.build_smt2020_db import DEFAULT_SOURCE_ROOT, main as build_smt2020_db
     from core import config
 
-    db_path = seed_main(tmp_path_factory.mktemp("e2e") / "sample.sqlite")
-    original = config.SAMPLE_DB_PATH
-    config.SAMPLE_DB_PATH = db_path
+    db_path = build_smt2020_db(
+        DEFAULT_SOURCE_ROOT, tmp_path_factory.mktemp("e2e") / "smt2020.db"
+    )
+    original = config.SMT2020_DB_PATH
+    config.SMT2020_DB_PATH = db_path
 
     monkeypatched_fake = os.environ.pop("PLANNING_AGENT_FAKE", None)
 
@@ -50,7 +49,7 @@ def agent_run(tmp_path_factory):
     try:
         events = asyncio.run(collect())
     finally:
-        config.SAMPLE_DB_PATH = original
+        config.SMT2020_DB_PATH = original
         if monkeypatched_fake is not None:
             os.environ["PLANNING_AGENT_FAKE"] = monkeypatched_fake
 
@@ -76,33 +75,18 @@ def test_kpi_definition_is_read_before_querying(agent_run) -> None:
     )
 
 
-def test_query_is_decomposed(agent_run) -> None:
-    """부진 판정 후 라인·품목 분해까지 갔는지."""
-
-    assert agent_run["tool_calls"].count("execute_sql") >= 2
+def test_input_validation_is_run(agent_run) -> None:
+    assert "run_simulation" in agent_run["tool_calls"]
 
 
-def test_answer_names_the_seeded_cause(agent_run) -> None:
-    """답변이 심어둔 원인을 지목했는가 — Phase 1 완료 기준."""
-
-    scenario = KnowledgeStore.load(KNOWLEDGE_DIR).scenarios[
-        "fgs_line_b_material_shortage"
-    ]
+def test_answer_names_dataset_and_wip(agent_run) -> None:
     answer = agent_run["answer"]
-
-    # 표현 흔들림(결품/부족)까지 실패로 보면 지식이 아니라 문구를 맞추게 된다.
-    assert scenario.expected_diagnosis in answer or "자재 부족" in answer, (
-        f"답변이 심어둔 원인({scenario.expected_diagnosis})을 지목하지 않았다"
-    )
-    assert scenario.line_cd in answer and scenario.product_id in answer, (
-        "부진이 집중된 라인·품목을 특정하지 못했다"
-    )
+    assert "LVHM" in answer
+    assert "WIP" in answer or "재공" in answer
 
 
-def test_rejected_hypothesis_is_reported(agent_run) -> None:
-    """기각 근거(확정 MP 변경 없음)도 답변에 남는지 — Skill 규칙."""
-
-    assert "MP" in agent_run["answer"]
+def test_answer_does_not_claim_real_des(agent_run) -> None:
+    assert "입력" in agent_run["answer"] or "정합" in agent_run["answer"]
 
 
 def test_no_error_events(agent_run) -> None:

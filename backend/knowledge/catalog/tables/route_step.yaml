@@ -1,0 +1,49 @@
+table: route_step
+description: SMT2020의 모든 route 파일을 통합한 Route별 공정 Step
+grain: [dataset, route, step]
+tags: [SMT2020, Route, 공정, Step, 설비]
+columns:
+  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: route, type: varchar, desc: Route ID}
+  - {name: step, type: int, desc: Route 내 공정 Step 번호}
+  - {name: description, type: varchar, desc: 공정 설명}
+  - {name: stnfam, type: varchar, desc: 사용하는 설비 Family, ref: tool.stnfam}
+  - {name: pdist, type: varchar, desc: Processing time 분포}
+  - {name: ptime, type: number, desc: Processing time 기준값}
+  - {name: ptime2, type: number, desc: Processing time 두 번째 분포 파라미터}
+  - {name: ptunits, type: varchar, desc: Processing time 단위}
+  - {name: ptper, type: varchar, desc: "시간 적용 기준 (per_piece/per_lot/per_batch)"}
+  - {name: batchmn, type: int, desc: Batch 최소 크기}
+  - {name: batchmx, type: int, desc: Batch 최대 크기}
+  - {name: setup, type: varchar, desc: Setup 식별자}
+  - {name: when_value, type: varchar, desc: Setup 적용 조건 원문}
+  - {name: stime, type: int, desc: Setup time}
+  - {name: stunits, type: varchar, desc: Setup time 단위}
+  - {name: svestn, type: varchar, desc: 원본 SVESTN 값}
+  - {name: forstep, type: int, desc: 원본 FORSTEP 값}
+  - {name: batch_interval, type: number, desc: Batch interval}
+  - {name: batch_int_units, type: varchar, desc: Batch interval 단위}
+  - {name: part_interval, type: number, desc: Part interval}
+  - {name: part_int_units, type: varchar, desc: Part interval 단위}
+  - {name: rwkstep, type: int, desc: Rework 대상 Step}
+  - {name: rework, type: number, desc: Rework 조건 값}
+  - {name: rwktype, type: varchar, desc: Rework 유형}
+  - {name: step_percent, type: int, desc: Step 비율 원문 값}
+  - {name: step_cqt, type: int, desc: CQT 기준 Step}
+  - {name: cqt, type: int, desc: Queue time 제한}
+  - {name: cqtunits, type: varchar, desc: Queue time 단위}
+  - {name: ignore_value, type: varchar, desc: 원본 IGNORE 분류 값}
+joins:
+  - {to: part, on: [dataset, route], kind: many-to-one}
+  - {to: tool, on: [dataset, stnfam], kind: many-to-one}
+caveats:
+  - ptime과 관련 시간은 ptunits/ptper 및 분포 파라미터와 함께 해석한다
+  - 빈 optional 필드를 0으로 간주하지 않는다
+aggregation_rules:
+  - 공정 Step 수는 dataset과 route별 COUNT(step)으로 센다
+  - 서로 다른 ptper 또는 시간 단위의 ptime을 바로 합산하지 않는다
+sample_sql: SELECT dataset, route, COUNT(step) AS step_count FROM route_step GROUP BY dataset, route
+status: verified
+owner: ""
+updated: 2026-09-15
+source: SMT2020 route_*.txt 직접 확인

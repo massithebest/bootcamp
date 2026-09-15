@@ -1,0 +1,21 @@
+table: setup
+description: SMT2020 setup 상태 변경과 소요 시간
+grain: [dataset, cursetup, newsetup, ignore_value]
+tags: [SMT2020, Setup, Changeover]
+columns:
+  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: cursetup, type: varchar, desc: 현재 setup}
+  - {name: newsetup, type: varchar, desc: 변경할 setup}
+  - {name: stime, type: int, desc: Setup 변경 시간}
+  - {name: stunits, type: varchar, desc: Setup 시간 단위}
+  - {name: ignore_value, type: varchar, desc: 원본 IGNORE 분류 값}
+joins: []
+caveats:
+  - 빈 cursetup은 NULL로 보존하며 이전 행의 값을 채우지 않는다
+aggregation_rules:
+  - stime은 stunits가 같은 행끼리만 비교하거나 합산한다
+sample_sql: SELECT dataset, cursetup, newsetup, stime, stunits FROM setup ORDER BY dataset, ignore_value
+status: verified
+owner: ""
+updated: 2026-09-15
+source: SMT2020 setup.txt 직접 확인

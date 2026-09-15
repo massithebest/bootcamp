@@ -37,3 +37,7 @@ npm-debug.log*
 
 # ── 작업용 스크린샷/산출물 (커밋 금지) ─────────────────────
 artifacts/
+
+# 로컬 SMT2020 원본·생성 DB 및 데이터 변환 스크립트
+/backend/datasets/
+/backend/scripts/

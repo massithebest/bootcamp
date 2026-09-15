@@ -66,6 +66,12 @@ def test_kpi_sources_exist(store: KnowledgeStore) -> None:
             assert source in store.tables, f"KPI {kpi.kpi_id} 의 원천 테이블이 없다: {source}"
 
 
+def test_kpi_recipe_references_resolve(store: KnowledgeStore) -> None:
+    for kpi in store.kpis.values():
+        for ref in kpi.recipe_refs:
+            assert ref in store.recipes, f"KPI {kpi.kpi_id} 의 레시피가 없다: {ref}"
+
+
 def test_kpi_sql_template_tables_are_declared_sources(store: KnowledgeStore) -> None:
     for kpi in store.kpis.values():
         used = _referenced_tables(kpi.sql_template)
@@ -125,6 +131,25 @@ def test_recipe_sample_queries_reference_declared_or_own_cte(store: KnowledgeSto
                 f"레시피 {recipe.recipe_id} 의 샘플 쿼리가 선언되지 않은 대상을 쓴다: "
                 f"{used - allowed} (샘플: {sample.description})"
             )
+
+
+def test_scenario_references_resolve(store: KnowledgeStore) -> None:
+    for scenario in store.scenarios.values():
+        for step in scenario.steps:
+            if step.action == "recipe":
+                assert step.ref in store.recipes, (
+                    f"시나리오 {scenario.scenario_id}가 없는 recipe를 참조: {step.ref}"
+                )
+            else:
+                assert step.ref in store.simulations, (
+                    f"시나리오 {scenario.scenario_id}가 없는 simulation을 참조: {step.ref}"
+                )
+        for table, count in scenario.expected.table_counts.items():
+            assert table in store.tables, (
+                f"시나리오 {scenario.scenario_id}가 없는 테이블을 참조: {table}"
+            )
+            assert count >= 0
+        assert all(count >= 0 for count in scenario.expected.unmatched_rows.values())
 
 
 def test_glossary_links_resolve(store: KnowledgeStore) -> None:

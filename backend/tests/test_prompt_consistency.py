@@ -107,3 +107,17 @@ def test_no_deleted_simulate_tools_remain() -> None:
 
     for path in [CLAUDE_MD, *_skill_files()]:
         assert "simulate_" not in path.read_text(encoding="utf-8"), path
+
+
+def test_chart_procedure_requires_validated_visualization_marker() -> None:
+    claude_text = CLAUDE_MD.read_text(encoding="utf-8")
+    sql_skill = (SKILLS_DIR / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
+    simulation_skill = (SKILLS_DIR / "simulation" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+
+    for text in (claude_text, sql_skill, simulation_skill):
+        assert "prepare_visualization" in text
+        assert "visualization_id" in text
+        assert "최대 2회" in text
+    assert "result_id +" not in claude_text

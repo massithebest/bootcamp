@@ -1,0 +1,25 @@
+table: down_calendar
+description: SMT2020 설비 breakdown의 MTTF/MTTR 조건
+grain: [dataset, downcalname]
+tags: [SMT2020, 설비, 고장, Calendar, MTTF, MTTR]
+columns:
+  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: downcalname, type: varchar, desc: Breakdown calendar 이름}
+  - {name: downcaltype, type: varchar, desc: Breakdown calendar 유형}
+  - {name: mttfdist, type: varchar, desc: MTTF 분포}
+  - {name: mttf, type: int, desc: MTTF 값}
+  - {name: mttfunits, type: varchar, desc: MTTF 단위}
+  - {name: mttrdist, type: varchar, desc: MTTR 분포}
+  - {name: mttr, type: number, desc: MTTR 값}
+  - {name: mttrunits, type: varchar, desc: MTTR 단위}
+  - {name: ignore_value, type: varchar, desc: 원본 IGNORE 분류 값}
+joins: []
+caveats:
+  - calendar_attach.calname과 연결할 때 caltype이 down인지 함께 확인한다
+aggregation_rules:
+  - MTTF/MTTR은 각각의 분포와 단위를 포함해 해석하며 서로 다른 단위를 바로 합산하지 않는다
+sample_sql: SELECT dataset, downcalname, mttf, mttfunits, mttr, mttrunits FROM down_calendar
+status: verified
+owner: ""
+updated: 2026-09-15
+source: SMT2020 downcal.txt 직접 확인
