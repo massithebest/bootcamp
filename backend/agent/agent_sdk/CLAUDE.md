@@ -37,9 +37,11 @@
 | `get_kpi` | KPI 상세. 정의·공식·판정 규칙·원인 후보(diagnostics) |
 | `list_recipes` | 재사용 가능한 집계·조인 CTE 목록 |
 | `get_recipe` | 레시피 상세. CTE SQL 본문과 샘플 쿼리 — `WITH` 절로 복사해 쓴다 |
+| `get_result_summary` | 대용량 조회 결과(`large_result`)의 메타데이터·요약 통계 확인 |
+| `get_result_page` | 대용량 조회 결과의 특정 구간(offset/limit) 조회 |
 
 - SQL 을 작성하기 전에 `describe_table` 로 컬럼과 주의사항(caveats)을 확인한다.
-- `execute_sql` 결과의 `truncated` 가 true 면 집계나 조건을 좁혀 다시 조회한다.
+- `execute_sql` 결과가 `type: "large_result"`면 `get_result_summary`로 성격을 파악하고, 필요한 구간만 `get_result_page`로 조회한다.
 
 ## 결과 검증 원칙
 

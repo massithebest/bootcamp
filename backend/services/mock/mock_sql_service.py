@@ -9,12 +9,17 @@ from __future__ import annotations
 import logging
 import sqlite3
 
+import pandas as pd
+
+from services.chart_inference import infer_chart
 from services.knowledge_service import get_store
 from services.mock._sqlite import MISSING_DB_MESSAGE, SampleDbMissingError, connect
+from services.result_store import get_result_store, summarize_dataframe
 from services.sql_guard import MAX_ROWS, SqlGuardError, check_sql
 
 
 logger = logging.getLogger(__name__)
+INLINE_ROW_THRESHOLD = 200
 
 
 def _error(message: str, sql: str) -> dict:
@@ -50,18 +55,36 @@ class MockSQLService:
         finally:
             conn.close()
 
-        truncated = len(fetched) > MAX_ROWS
         rows = [list(row) for row in fetched[:MAX_ROWS]]
+        meta = get_result_store().save(
+            columns,
+            rows,
+            source="execute_sql",
+            conversation_id=None,
+        )
 
-        return {
+        result = {
             "status": "ok",
             "kind": "database",
+            "type": "inline" if len(rows) <= INLINE_ROW_THRESHOLD else "large_result",
+            "result_id": meta.result_id,
             "sql": sql,
             "purpose": purpose,
-            "table": {"columns": columns, "rows": rows},
             "row_count": len(rows),
-            "truncated": truncated,
         }
+        if len(rows) <= INLINE_ROW_THRESHOLD:
+            result["table"] = {"columns": columns, "rows": rows}
+        else:
+            result["columns"] = [
+                {"name": column.name, "dtype": column.dtype, "role": column.role}
+                for column in meta.columns
+            ]
+            result["sample_rows"] = rows[:5]
+            result["summary"] = summarize_dataframe(pd.DataFrame(rows, columns=columns))
+        chart = infer_chart(columns, rows)
+        if chart is not None:
+            result["chart"] = chart
+        return result
 
 
 _service = MockSQLService()

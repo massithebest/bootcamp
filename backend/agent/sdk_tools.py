@@ -21,6 +21,7 @@ from tools.knowledge_tool import (
     list_tables,
 )
 from tools.rag_tool import search_knowledge
+from tools.result_tool import get_result_page, get_result_summary
 from tools.simulation_tool import list_simulation, run_simulation
 from tools.sql_tool import execute_sql
 
@@ -39,6 +40,8 @@ TOOL_NAMES = [
     f"mcp__{MCP_SERVER_NAME}__get_kpi",
     f"mcp__{MCP_SERVER_NAME}__list_recipes",
     f"mcp__{MCP_SERVER_NAME}__get_recipe",
+    f"mcp__{MCP_SERVER_NAME}__get_result_summary",
+    f"mcp__{MCP_SERVER_NAME}__get_result_page",
 ]
 
 
@@ -162,6 +165,30 @@ async def _get_recipe(args: dict[str, Any]) -> dict[str, Any]:
     return _ok(await get_recipe(recipe_id=args["recipe_id"]))
 
 
+@tool(
+    "get_result_summary",
+    "저장된 대용량 조회 결과의 메타데이터와 숫자 컬럼 요약 통계를 확인한다.",
+    {"result_id": str},
+)
+async def _get_result_summary(args: dict[str, Any]) -> dict[str, Any]:
+    return _ok(await get_result_summary(result_id=args["result_id"]))
+
+
+@tool(
+    "get_result_page",
+    "저장된 대용량 조회 결과에서 직접 확인할 특정 구간의 행을 조회한다.",
+    {"result_id": str, "offset": int, "limit": int},
+)
+async def _get_result_page(args: dict[str, Any]) -> dict[str, Any]:
+    return _ok(
+        await get_result_page(
+            result_id=args["result_id"],
+            offset=args["offset"],
+            limit=args["limit"],
+        )
+    )
+
+
 def build_planning_mcp_server():
     """생산계획 Tool 을 담은 in-process MCP Server 를 생성한다."""
 
@@ -179,5 +206,7 @@ def build_planning_mcp_server():
             _get_kpi,
             _list_recipes,
             _get_recipe,
+            _get_result_summary,
+            _get_result_page,
         ],
     )

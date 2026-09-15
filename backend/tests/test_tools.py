@@ -7,6 +7,8 @@ import pytest
 
 from agent.sdk_tools import TOOL_NAMES
 from scripts.seed_sample_db import main as seed_main
+from services import result_store
+from services.result_store import LocalParquetResultStore
 from tools.knowledge_tool import (
     describe_table,
     get_kpi,
@@ -16,6 +18,7 @@ from tools.knowledge_tool import (
     list_tables,
 )
 from tools.rag_tool import search_knowledge
+from tools.result_tool import get_result_page, get_result_summary
 from tools.simulation_tool import list_simulation, run_simulation
 from tools.sql_tool import execute_sql
 
@@ -31,6 +34,8 @@ ALL_TOOLS = (
     get_kpi,
     list_recipes,
     get_recipe,
+    get_result_summary,
+    get_result_page,
 )
 
 
@@ -38,6 +43,9 @@ ALL_TOOLS = (
 def seeded_db(tmp_path, monkeypatch):
     db_path = seed_main(tmp_path / "sample.sqlite")
     monkeypatch.setattr("core.config.SAMPLE_DB_PATH", db_path)
+    monkeypatch.setattr(
+        result_store, "_store", LocalParquetResultStore(tmp_path / "results")
+    )
     return db_path
 
 
@@ -135,3 +143,25 @@ def test_get_kpi_exposes_diagnostics() -> None:
         "sql",
         "simulation",
     ]
+
+
+def test_get_result_summary_unknown_id_is_error() -> None:
+    result = asyncio.run(get_result_summary("missing"))
+
+    assert result["status"] == "error"
+    assert "만료" in result["message"]
+
+
+def test_get_result_page_returns_slice(seeded_db) -> None:
+    saved = asyncio.run(
+        execute_sql(
+            "SELECT line_cd, line_nm FROM LINE_MASTER ORDER BY line_cd",
+            purpose="라인 목록 확인",
+        )
+    )
+
+    result = asyncio.run(get_result_page(saved["result_id"], offset=1, limit=2))
+
+    assert result["status"] == "ok"
+    assert result["rows"] == [["B", "2라인"], ["C", "3라인"]]
+    assert result["row_count"] == 4

@@ -1,13 +1,16 @@
 """Mock service 입력/출력 계약 검증."""
 
 import asyncio
+import re
 
 import pytest
 
 from scripts.seed_sample_db import main as seed_main
+from services import result_store
 from services.mock import mock_rag_service
 from services.mock import mock_simulation_service
 from services.mock import mock_sql_service
+from services.result_store import LocalParquetResultStore
 
 
 @pytest.fixture()
@@ -16,6 +19,9 @@ def seeded_db(tmp_path, monkeypatch):
 
     db_path = seed_main(tmp_path / "sample.sqlite")
     monkeypatch.setattr("core.config.SAMPLE_DB_PATH", db_path)
+    monkeypatch.setattr(
+        result_store, "_store", LocalParquetResultStore(tmp_path / "results")
+    )
     return db_path
 
 
@@ -33,18 +39,46 @@ def test_mock_execute_sql_returns_table_payload(seeded_db) -> None:
     assert result["table"]["columns"] == ["line_cd", "line_nm"]
     assert result["table"]["rows"][0] == ["A", "1라인"]
     assert result["row_count"] == 4
-    assert result["truncated"] is False
+    assert result["type"] == "inline"
+    assert re.fullmatch(r"[0-9a-f]{32}", result["result_id"])
 
 
-def test_mock_execute_sql_truncates_over_max_rows(seeded_db) -> None:
+def test_mock_execute_sql_respects_max_rows_guardrail(seeded_db) -> None:
     result = asyncio.run(
         mock_sql_service.execute_sql(
             "SELECT * FROM FGS_INBOUND_RESULT", purpose="전체 실적"
         )
     )
 
-    assert result["truncated"] is True
     assert result["row_count"] == 500
+    assert "truncated" not in result
+
+
+def test_mock_execute_sql_large_result_omits_rows(seeded_db, monkeypatch) -> None:
+    monkeypatch.setattr(mock_sql_service, "INLINE_ROW_THRESHOLD", 1)
+
+    result = asyncio.run(
+        mock_sql_service.execute_sql(
+            "SELECT line_cd, line_nm FROM LINE_MASTER ORDER BY line_cd",
+            purpose="라인 목록 확인",
+        )
+    )
+
+    assert result["type"] == "large_result"
+    assert "table" not in result
+    assert result["sample_rows"]
+    assert result["columns"]
+    assert "summary" in result
+
+
+def test_mock_execute_sql_result_retrievable_via_store(seeded_db) -> None:
+    result = asyncio.run(
+        mock_sql_service.execute_sql(
+            "SELECT line_cd FROM LINE_MASTER", purpose="라인 확인"
+        )
+    )
+
+    assert result_store.get_result_store().get_meta(result["result_id"]) is not None
 
 
 def test_mock_execute_sql_rejects_write(seeded_db) -> None:
@@ -129,6 +163,35 @@ def test_mock_run_simulation_performance_lookup(seeded_db) -> None:
     assert isinstance(result["results"], list)
     assert {row["line"] for row in result["results"]} == {"A", "B", "C", "D"}
     assert all(row["workMonth"] == "202608" for row in result["results"])
+
+
+def test_mock_run_simulation_performance_lookup_gets_result_id(seeded_db) -> None:
+    result = asyncio.run(
+        mock_simulation_service.run_simulation(
+            simulation_type="실적_조회",
+            params={"workMonthFrom": "202608", "workMonthTo": "202608"},
+        )
+    )
+
+    assert result["type"] == "inline"
+    assert re.fullmatch(r"[0-9a-f]{32}", result["result_id"])
+    assert {row["line"] for row in result["results"]} == {"A", "B", "C", "D"}
+
+
+def test_mock_run_simulation_large_result_uses_sample(seeded_db, monkeypatch) -> None:
+    monkeypatch.setattr(mock_simulation_service, "INLINE_ROW_THRESHOLD", 1)
+
+    result = asyncio.run(
+        mock_simulation_service.run_simulation(
+            simulation_type="실적_조회",
+            params={"workMonthFrom": "202608", "workMonthTo": "202608"},
+        )
+    )
+
+    assert result["type"] == "large_result"
+    assert "results" not in result
+    assert len(result["sample_rows"]) == 4
+    assert result["summary"]["qty"]["null_count"] == 0
 
 
 def test_mock_run_simulation_reflects_scenario(seeded_db) -> None:

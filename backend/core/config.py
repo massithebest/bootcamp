@@ -30,6 +30,17 @@ KNOWLEDGE_DIR = Path(os.getenv("KNOWLEDGE_DIR") or BACKEND_DIR / "knowledge")
 #: 합성 시드 SQLite 경로. `python -m scripts.seed_sample_db` 산출물이며 git 추적 대상이 아니다.
 SAMPLE_DB_PATH = Path(os.getenv("SAMPLE_DB_PATH") or BACKEND_DIR / "data" / "sample.sqlite")
 
+#: 조회 결과(parquet) 저장 디렉터리. git 추적 대상이 아니다.
+RESULT_STORE_DIR = Path(
+    os.getenv("RESULT_STORE_DIR") or BACKEND_DIR / "data" / "results"
+)
+
+#: 조회 결과 보존 시간과 결과 저장소의 최대 디스크 사용량.
+RESULT_STORE_TTL_HOURS = int(os.getenv("RESULT_STORE_TTL_HOURS") or "24")
+RESULT_STORE_MAX_BYTES = int(
+    os.getenv("RESULT_STORE_MAX_BYTES") or str(500 * 1024 * 1024)
+)
+
 #: CORS 허용 Origin 목록. 개발 환경의 Frontend dev 서버만 허용한다.
 #: 콤마로 구분해 환경변수(CORS_ALLOW_ORIGINS)로 재정의할 수 있다.
 CORS_ALLOW_ORIGINS = [

@@ -7,7 +7,11 @@ SQL 결과와 시뮬레이션 결과가 모순되면 에이전트가 잘못된 �
 
 from __future__ import annotations
 
+import pandas as pd
+
+from services.chart_inference import infer_chart_from_records
 from services.mock._sqlite import MISSING_DB_MESSAGE, SampleDbMissingError, connect
+from services.result_store import get_result_store, summarize_dataframe
 from services.simulation_registry import (
     list_simulation_types,
     validate_simulation_request,
@@ -15,6 +19,7 @@ from services.simulation_registry import (
 
 
 DEFAULT_PLAN_MONTH = "202609"
+INLINE_ROW_THRESHOLD = 200
 
 
 def _performance_lookup(params: dict) -> dict:
@@ -121,9 +126,38 @@ class MockSimulationService:
             return {"status": "error", "message": error}
 
         try:
-            return _mock_result(simulation_type, params)
+            result = _mock_result(simulation_type, params)
         except SampleDbMissingError:
             return {"status": "error", "message": MISSING_DB_MESSAGE}
+
+        records = result.get("results")
+        if result.get("status") == "ok" and isinstance(records, list) and records:
+            chart = infer_chart_from_records(records)
+            if chart is not None:
+                result["chart"] = chart
+            columns = list(records[0].keys())
+            rows = [[record[column] for column in columns] for record in records]
+            meta = get_result_store().save(
+                columns,
+                rows,
+                source=f"run_simulation:{simulation_type}",
+                conversation_id=None,
+            )
+            result["result_id"] = meta.result_id
+            if len(records) <= INLINE_ROW_THRESHOLD:
+                result["type"] = "inline"
+            else:
+                result["type"] = "large_result"
+                result.pop("results")
+                result["columns"] = [
+                    {"name": column.name, "dtype": column.dtype, "role": column.role}
+                    for column in meta.columns
+                ]
+                result["sample_rows"] = rows[:5]
+                result["summary"] = summarize_dataframe(
+                    pd.DataFrame(rows, columns=columns)
+                )
+        return result
 
 
 _service = MockSimulationService()

@@ -1,15 +1,52 @@
 """Production Planning Agent FastAPI application entry point."""
 
+import asyncio
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes_chat import router as chat_router
 from api.routes_knowledge import router as knowledge_router
 from core.config import CORS_ALLOW_ORIGINS
+from services.result_store import cleanup_expired
+
+
+logger = logging.getLogger("uvicorn.error")
+RESULT_CLEANUP_INTERVAL_SECONDS = 60 * 60
+
+
+async def _result_cleanup_loop() -> None:
+    while True:
+        try:
+            deleted = cleanup_expired()
+            if deleted:
+                logger.info("조회 결과 정리 완료: deleted=%d", deleted)
+        except Exception:
+            logger.exception("조회 결과 정리 중 오류가 발생했습니다")
+        await asyncio.sleep(RESULT_CLEANUP_INTERVAL_SECONDS)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """조회 결과 정리 태스크의 시작과 종료를 관리한다."""
+
+    logger.info("조회 결과 정리 태스크를 시작합니다")
+    cleanup_task = asyncio.create_task(_result_cleanup_loop())
+    try:
+        yield
+    finally:
+        cleanup_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await cleanup_task
+        logger.info("조회 결과 정리 태스크를 종료했습니다")
 
 
 app = FastAPI(
     title="Production Planning Agent API",
+    lifespan=lifespan,
 )
 
 # 개발 환경의 Frontend dev 서버(Origin)만 허용한다.
@@ -36,8 +73,3 @@ app.include_router(
 async def health_check() -> dict:
     """Return backend health status."""
     return {"status": "ok"}
-
-
-# TODO:
-# Claude Agent SDK에서 애플리케이션 단위 초기화가 필요한 경우
-# FastAPI lifespan을 사용하여 추가한다.
