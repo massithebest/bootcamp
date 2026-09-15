@@ -9,11 +9,9 @@
 
 import { SquareIcon } from "lucide-react";
 
-import { ComposerPrimitive, useAuiState } from "@assistant-ui/react";
+import { AuiIf, ComposerPrimitive } from "@assistant-ui/react";
 
 export function MessageInput() {
-  const isRunning = useAuiState((s) => s.thread.isRunning);
-
   return (
     <ComposerPrimitive.Root className="border-t border-line bg-canvas px-4 py-3">
       <div className="mx-auto flex max-w-reading items-end gap-2">
@@ -28,18 +26,19 @@ export function MessageInput() {
           </div>
         </div>
 
-        {isRunning ? (
+        <AuiIf condition={(s) => s.thread.isRunning}>
           <ComposerPrimitive.Cancel
             className="grid h-9 w-9 shrink-0 place-items-center rounded border border-line-strong text-ink-2 transition-colors hover:bg-surface-2"
             aria-label="중단"
           >
             <SquareIcon className="size-3.5" fill="currentColor" />
           </ComposerPrimitive.Cancel>
-        ) : (
+        </AuiIf>
+        <AuiIf condition={(s) => !s.thread.isRunning}>
           <ComposerPrimitive.Send className="h-9 shrink-0 rounded bg-accent px-3.5 text-ui font-medium text-accent-ink transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-3">
             전송
           </ComposerPrimitive.Send>
-        )}
+        </AuiIf>
       </div>
     </ComposerPrimitive.Root>
   );

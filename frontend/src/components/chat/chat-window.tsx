@@ -8,7 +8,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDownIcon } from "lucide-react";
 
-import { AssistantRuntimeProvider, ThreadPrimitive } from "@assistant-ui/react";
+import {
+  AssistantRuntimeProvider,
+  AuiIf,
+  ThreadPrimitive,
+} from "@assistant-ui/react";
 
 import { SEED_CONVERSATION, SESSIONS } from "@/lib/dummy";
 import { useAgentChat } from "@/hooks/use-agent-chat";
@@ -24,7 +28,6 @@ const SEED_SESSION_ID = SESSIONS[0]?.id ?? null;
 export function ChatWindow() {
   const {
     runtime,
-    messages,
     streaming,
     retryPrompt,
     handleRetry,
@@ -64,11 +67,10 @@ export function ChatWindow() {
 
   const activeSession =
     SESSIONS.find((s) => s.id === activeSessionId) ?? null;
-  const isEmpty = messages.length === 0;
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-    <div className="grid h-screen w-full grid-cols-[auto_1fr_auto] overflow-hidden bg-canvas text-ink">
+      <div className="grid h-screen w-full grid-cols-[auto_1fr_auto] overflow-hidden bg-canvas text-ink">
       {/* 좌측 사이드바 */}
       <aside
         className={`h-full overflow-hidden border-r border-line transition-[width] duration-200 ease-panel ${
@@ -119,9 +121,10 @@ export function ChatWindow() {
 
         <ThreadPrimitive.Root className="relative flex min-h-0 flex-1 flex-col">
           <ThreadPrimitive.Viewport className="thin-scroll min-h-0 flex-1 overflow-y-auto px-4">
-            {isEmpty ? (
+            <AuiIf condition={(s) => s.thread.isEmpty}>
               <EmptyState />
-            ) : (
+            </AuiIf>
+            <AuiIf condition={(s) => !s.thread.isEmpty}>
               <div className="mx-auto flex max-w-reading flex-col gap-6 py-6">
                 <ThreadPrimitive.Messages>
                   {({ message }) => {
@@ -132,7 +135,7 @@ export function ChatWindow() {
                   }}
                 </ThreadPrimitive.Messages>
               </div>
-            )}
+            </AuiIf>
 
             {retryPrompt && (
               <div className="mx-auto max-w-reading pb-4">
@@ -164,7 +167,7 @@ export function ChatWindow() {
           <ContextInspector onCollapse={() => setInspectorOpen(false)} />
         </div>
       </aside>
-    </div>
+      </div>
     </AssistantRuntimeProvider>
   );
 }
