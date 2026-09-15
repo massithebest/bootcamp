@@ -403,6 +403,20 @@ assistant-ui 0.15의 `MessagePrimitive.Parts`에는 reasoning+tool-call
 채택하지 않았다 — `ChainOfThoughtComponents`는 `tools?: never`라 tool
 렌더링 전체를 가져가버려 도구 결과 카드 4종이 본문 흐름에서 사라진다.
 
+**재검증 (2026-09-15):** 설치 버전이 그대로 `0.15.19`라 바뀔 이유는
+없었지만, `ai-elements`(`tool.tsx`/`chain-of-thought.tsx`)와
+assistant-ui가 겹치는 것 아니냐는 재질문을 받고 `node_modules`의
+`.d.ts`를 다시 직접 읽어 확인했다. 결론 불변 — `tools?: never` 제약이
+`MessageParts.d.ts:139`에 그대로 있다. 다만 그 사이 문서에 없던 사실을
+하나 더 확인했다: `ChainOfThoughtComponents.ChainOfThought` 필드 자체도
+`@deprecated`로 표시되어 있고(`MessageParts.d.ts:132-137`), JSDoc이
+`<MessagePrimitive.GroupedParts>`를 `groupBy`가 `["group-thought", ...]`
+를 반환하도록 써서 대체하라고 안내한다. 즉 assistant-ui 쪽 그룹핑
+API 자체가 세대교체 중 — 이 프로젝트가 그 변형을 채택하지 않은 것과는
+별개로, 향후 `GroupedParts` API가 안정화되면 AI Elements
+`ChainOfThought` 유지 여부를 다시 재볼 트리거로 아래 "재검토 트리거"에
+추가한다.
+
 #### Q2. `MessagePart[]` → `ThreadMessageLike.content` 매핑
 
 `parts` 배열을 인덱스 대 인덱스로 그대로 옮긴다 — 도착 순서 보존은 이
@@ -577,6 +591,11 @@ remark-gfm@4.0.1` — caret 없이 고정. `npx assistant-ui init/create`는
   `BranchPickerPrimitive` + `messageRepository` 도입을 별도 결정.
 - `AgentEvent`에 `tool_call_id`가 추가되면(계약 변경) `tool_call`만 온
   중간 상태에서도 진행 중 툴 카드를 표시하도록 Q2 매핑을 다시 검토.
+- assistant-ui를 마이너 이상 업그레이드하면 `ChainOfThoughtComponents`
+  자체가 deprecated(→ `MessagePrimitive.GroupedParts` 권장, Q1 재검증
+  2026-09-15 참고)인 점을 감안해 `agent-progress.tsx`의 AI Elements
+  `ChainOfThought` 유지 여부를 다시 검토. `tools?: never` 제약이
+  `GroupedParts`에서도 유지되는지가 관건.
 
 ### 관련 문서
 

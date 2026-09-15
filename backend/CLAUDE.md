@@ -143,7 +143,7 @@ python -m pytest -q
 - [docs/CLOSED_NETWORK_SETUP.md](docs/CLOSED_NETWORK_SETUP.md) — 폐쇄망 구축 절차 + pntfp 실제 서비스 이식 가이드
 - [plan/](plan/) — 실행 계획 문서 모음 ([plan/CLAUDE.md](plan/CLAUDE.md) 참고)
   - [plan/domain-knowledge-plan.md](plan/domain-knowledge-plan.md) — 도메인 지식(카탈로그·KPI·Skill·합성 시드 DB) Phase 1 실행 계획. 설계는 최상위 [docs/domain-knowledge.md](../docs/domain-knowledge.md)
-- [backend-scaffold-instructions.md](backend-scaffold-instructions.md) — 최초 스캐폴딩 지시서 (역사적 참고용)
+  - [plan/260915-result-store-plan.md](plan/260915-result-store-plan.md) — Result Store 1차 실행 계획. 설계는 최상위 [docs/result-store.md](../docs/result-store.md)
 - [README.md](README.md) — 실행/테스트 명령어 요약
 
 새로운 아키텍처/의존성 결정을 내리면 이 `docs/` 아래 문서를 갱신하고, 이

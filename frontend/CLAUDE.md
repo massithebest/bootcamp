@@ -7,6 +7,7 @@ Production Planning Agent의 Vite + React SPA 프론트엔드 (2026-09-14 Next.j
 - Vite 7 · React 18 · TypeScript. **App Router가 아니다** — `src/app/`이라는 디렉토리명은 Next 시절 잔재이며 (아래 "구조" 참고), 라우터 없는 단일 페이지 SPA다.
 - Tailwind CSS **v4** (`@tailwindcss/vite` 플러그인 경유, v3에서 마이그레이션됨, 2026-09-11 — [docs/decisions.md#shadcnui-도입](docs/decisions.md#shadcnui-도입))
 - shadcn/ui 컴포넌트 (2026-09-11 도입, 그 이전엔 custom Tailwind만 사용하는 게 원칙이었음 — [docs/decisions.md#shadcnui-도입](docs/decisions.md#shadcnui-도입))
+- **Recharts** (shadcn `chart` 컴포넌트 경유, 2026-09-15 도입) — `execute_sql`/`run_simulation` 결과의 선택적 `chart` 필드를 bar/line으로 그린다. 배경: [../docs/chart-visualization.md](../docs/chart-visualization.md). 간트·pie는 범위 밖으로 보류.
 - 상태관리: React 기본(`useState`/`useRef`)만 사용, 외부 상태관리 라이브러리 없음
 - **AI Elements** (2026-09-14 채택) — `src/components/ai-elements/`에 shadcn CLI로 복사된 소스(`chain-of-thought`, `tool`, `task`). **컴포넌트만 쓰고 `useChat`/`@ai-sdk/react`/`streamdown`은 도입하지 않는다.** 복사된 소스는 우리 코드로 취급해 토큰·한국어 라벨로 다듬었고, `code-block`(shiki)·radix 훅 의존은 제거했다(로컬 `hooks/use-controllable-state.ts`). 배경과 assistant-ui 비교는 [docs/decisions.md#ai-sdk-및-채팅-ui-라이브러리-도입-검토](docs/decisions.md#ai-sdk-및-채팅-ui-라이브러리-도입-검토).
 - **Vercel AI SDK(`ai`)는 도입하지 않는다.** AI Elements `tool.tsx`가 예전엔 `ToolUIPart`/`DynamicToolUIPart` 타입만 import했지만, Vite 이관(2026-09-14) 때 실제로 쓰는 표면(`type`/`state`)만 로컬 타입으로 옮기고 `ai` 의존성 자체를 제거했다 (`ai` + `@ai-sdk/*` 트리 ~12.6MB, `@ai-sdk/gateway`에 외부 URL 하드코딩 — 폐쇄망 반입 대상에서 뺐다). **외부 LLM provider(OpenAI/Anthropic 등)를 프론트에서 직접 호출하지 않는다** — 반드시 사내 백엔드(`lib/chat-api.ts`)를 경유한다.
@@ -27,7 +28,7 @@ Production Planning Agent의 Vite + React SPA 프론트엔드 (2026-09-14 Next.j
 ## 디자인 토큰 / 스타일 규칙
 
 - 색상은 `src/app/globals.css`의 CSS 변수로 정의하고 `tailwind.config.ts`에서 semantic 이름으로 매핑한다. **컴포넌트에 색을 하드코딩하지 않는다.**
-- 표면 3단계(`--canvas` > `--surface` > `--surface-2`), 텍스트 3단계(`--ink`/`--ink-2`/`--ink-3`), 액센트는 파란색 1개(`--accent`, 활성 세션/포커스/주요 액션 한정), 상태는 저채도 3색(`--ok-*`/`--warn-*`/`--block-*`)만 쓴다. 새 색을 함부로 추가하지 않는다.
+- 표면 3단계(`--canvas` > `--surface` > `--surface-2`), 텍스트 3단계(`--ink`/`--ink-2`/`--ink-3`), 액센트는 파란색 1개(`--accent`, 활성 세션/포커스/주요 액션 한정), 상태는 저채도 3색(`--ok-*`/`--warn-*`/`--block-*`)만 쓴다. 새 색을 함부로 추가하지 않는다. 예외: 차트 다계열 구분용 `--chart-1`~`--chart-5`(2026-09-15 도입 — [docs/chart-visualization.md](../docs/chart-visualization.md)) — `--accent`를 다계열 구분색으로 전용하지 않기 위해 별도 팔레트로 분리했다. 이 팔레트는 차트 시리즈 색상에만 쓴다.
 - 산문은 sans, 데이터/SQL/코드/숫자는 mono로 명확히 구분한다.
 - **shadcn 컴포넌트는 자체 팔레트를 쓰지 않는다.** 모든 shadcn CSS 변수는 `--shadcn-*`로 네임스페이스가 분리되어 있고 위 프로젝트 토큰에 재매핑되어 있다 (`globals.css`의 `@theme inline` 블록 참고). 새 shadcn 컴포넌트를 추가했을 때 새 `--shadcn-*` 변수가 생기면, 반드시 기존 토큰에 매핑할 것 — shadcn 기본값(oklch 팔레트)을 그대로 두지 않는다.
 - 라이트 테마만 지원한다. `.dark` 관련 코드를 추가하지 않는다.
@@ -57,7 +58,9 @@ src/
 │   │   ├── message-input.tsx     입력창 (ComposerPrimitive — 전송/Enter/자동높이/취소 라이브러리 위임)
 │   │   ├── tool-result-card.tsx  Tool 결과 — AI Elements `Tool` 래퍼 안에서 tool_name 별 분기
 │   │   └── tool-results/         DB/지식(RAG)/카탈로그/시뮬레이션 결과 전용 컴포넌트
-│   └── ui/                       shadcn/ui 컴포넌트 (자동 생성, 직접 로직 추가 지양)
+│   │       ├── chart-block.tsx   data.chart 타입 분기 스위치 (bar/line, 2026-09-15)
+│   │       └── charts/           bar-chart-view.tsx / line-chart-view.tsx (Recharts, shadcn chart 기반)
+│   └── ui/                       shadcn/ui 컴포넌트 (자동 생성, 직접 로직 추가 지양 — chart.tsx 포함)
 ├── hooks/
 │   ├── use-agent-chat.ts         대화 상태 · SSE Streaming · AgentEvent 처리 · assistant-ui 런타임(useExternalStoreRuntime) 생성 · 편집/재생성 포크
 │   ├── use-controllable-state.ts AI Elements chain-of-thought 훅 의존 로컬 구현
@@ -107,5 +110,6 @@ ai SDK/채팅 UI 라이브러리 검토):
 - [docs/closed-network.md](docs/closed-network.md) — 폐쇄망 원칙과 의존성 검증 체크리스트
 - [plan/](plan/) — 실행 계획 문서 모음 ([plan/CLAUDE.md](plan/CLAUDE.md) 참고)
   - [plan/domain-knowledge-plan.md](plan/domain-knowledge-plan.md) — 도메인 지식 연동 계획. 백엔드 Phase 1([backend/plan/domain-knowledge-plan.md](../backend/plan/domain-knowledge-plan.md)) 완료 후 착수
+  - [plan/260915-result-store-plan.md](plan/260915-result-store-plan.md) — Result Store 연동 계획. 백엔드([backend/plan/260915-result-store-plan.md](../backend/plan/260915-result-store-plan.md)) Task 0~4 완료 후 착수
 
 새로운 아키텍처/의존성 결정을 내리면 이 `docs/` 아래 문서를 갱신하고, 이 CLAUDE.md에서 필요한 부분만 요약해서 반영한다.
