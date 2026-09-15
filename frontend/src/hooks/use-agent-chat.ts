@@ -343,7 +343,9 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
     messages,
     isRunning: streaming,
     convertMessage,
-    setMessages: (next) => setMessages(next as ChatMessage[]),
+    // 선형 대화만 지원한다. setMessages를 제공하면 assistant-ui가 branch/delete
+    // capability를 활성화하므로, branch repository와 persistence를 함께 설계하기
+    // 전에는 노출하지 않는다.
     onNew: handleNew,
     onCancel: handleCancel,
     onEdit: handleEdit,

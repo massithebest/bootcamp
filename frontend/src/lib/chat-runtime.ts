@@ -1,7 +1,7 @@
 /**
  * `ChatMessage` (우리 상태) -> `ThreadMessageLike` (assistant-ui) 어댑터.
  *
- * 메시지 상태의 소유권은 계속 `chat-window.tsx` 가 갖는다. assistant-ui 는
+ * 메시지 상태의 소유권은 계속 `hooks/use-agent-chat.ts` 가 갖는다. assistant-ui 는
  * `useExternalStoreRuntime` 으로 이 변환 결과만 읽는다.
  *
  * 설계 결정은 docs/decisions.md 참고:
