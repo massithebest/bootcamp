@@ -28,7 +28,8 @@ venv/
 .DS_Store
 .idea/
 .vscode/
-.claude/settings.local.json
+.claude/
+.playwright-mcp/
 
 # ── 로그 / 임시 ───────────────────────────────────────────
 *.log

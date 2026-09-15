@@ -136,12 +136,12 @@ cp .env.example .env
 
 최소한 아래를 채워야 서버가 정상 기동한다:
 
-| 키                                                | 값                                              | 비고                                                                                                                                                    |
-| ------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SERVICE_MODE`                                  | `mock` (최초 검증) → `real` (Part 2 완료 후) | Part 2 참고                                                                                                                                            |
-| `LLM_PROVIDER`                                  | `anthropic` 또는 `openrouter`               | 사내 LLM 반입 정책에 따름                                                                                                                               |
-| `ANTHROPIC_API_KEY` 또는 `OPENROUTER_API_KEY` | 사내 발급 값                                    | 폐쇄망에서 실제 외부 API 호출이 안 되면 사내 LLM 게이트웨이 주소로 대체 필요 — 이 경우`core/config.py`의 `agent_provider_env()` 수정이 별도로 필요 |
-| `CLAUDE_CLI_PATH`                               | PATH에 없을 때만                                | 1-4 참고                                                                                                                                                |
+| 키                                                | 값                                                | 비고                                                                                                                                                    |
+| ------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SERVICE_MODE`                                  | `mock` (최초 검증) → `real` (Part 2 완료 후) | Part 2 참고                                                                                                                                             |
+| `LLM_PROVIDER`                                  | `anthropic` 또는 `openrouter`                 | 사내 LLM 반입 정책에 따름                                                                                                                               |
+| `ANTHROPIC_API_KEY` 또는 `OPENROUTER_API_KEY` | 사내 발급 값                                      | 폐쇄망에서 실제 외부 API 호출이 안 되면 사내 LLM 게이트웨이 주소로 대체 필요 — 이 경우`core/config.py`의 `agent_provider_env()` 수정이 별도로 필요 |
+| `CLAUDE_CLI_PATH`                               | PATH에 없을 때만                                  | 1-4 참고                                                                                                                                                |
 
 `real` 서비스 관련 환경변수(DB/Milvus/Simulation MCP 접속 정보)는
 `SERVICE_MODE=real` 전환 시점에 Part 2 §2-3을 따라 추가한다.
@@ -157,7 +157,7 @@ curl http://localhost:8000/health   # {"status":"ok"}
 흐름만 검증한다 (`backend/README.md` "Agent 실행 모드" 참고):
 
 ```bash
-PLANNING_AGENT_FAKE=1 uvicorn main:app --reload --port 8000
+PLANNING_AGENT_FAKE=1 uvicorn main:app --port 8000
 curl -N -X POST localhost:8000/api/chat \
   -H 'content-type: application/json' \
   -d '{"message":"9월에 A라인에서 1000개 생산 가능한가?","conversation_id":"c1"}'
@@ -311,7 +311,7 @@ class RealSimulationService:
 ### 카테고리 매핑 가이드
 
 | pntfp config.dev.yaml 영역                         | 이식 위치                                                                                                                         | 비고                                              |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
 | DB 접속 정보 (host, port, user, password, db name) | `.env`: `SQL_DB_HOST`, `SQL_DB_PORT`, `SQL_DB_USER`, `SQL_DB_PASSWORD`, `SQL_DB_NAME`                                 | 이름은 프로젝트 컨벤션에 맞게 조정 가능           |
 | Milvus 접속 정보 (host, port, collection)          | `.env`: `MILVUS_HOST`, `MILVUS_PORT`, `MILVUS_COLLECTION`                                                                 |                                                   |
 | Simulation MCP 서버 주소                           | `.env`: `SIMULATION_MCP_URL` (또는 host/port 분리)                                                                            |                                                   |
