@@ -1,45 +1,43 @@
-# P&T FP agent
+# P&T FP Agent
 
-제조 생산계획을 자연어로 질의·시뮬레이션하는 사내 에이전트 도구.
+제조 생산계획 데이터를 자연어로 조회·분석·시뮬레이션하는 폐쇄망용 Agent 도구다.
 
-```
-production-planning-agent/
-├── backend/    FastAPI + Claude Agent SDK. /api/chat 에서 AgentEvent 를 SSE 로 스트리밍
-└── frontend/   Vite + React SPA 워크스페이스 UI. 커스텀 Tailwind, 폐쇄망 대응
+```text
+Frontend(Vite + React)
+  → POST /api/chat (SSE)
+  → Backend(FastAPI + Claude Agent SDK)
+  → Knowledge / SQL / Simulation / Result Store / Visualization
 ```
 
 ## 실행
 
-**Backend** (`backend/README.md` 참고)
+Backend:
+
 ```bash
 cd backend
-pip install -r requirements.txt
-cp .env.example .env        # 값 채우기
-uvicorn main:app --reload --port 8000
+conda env create -f environment.yml
+conda activate production-planning
+pip install -r requirements-dev.txt
+cp .env.example .env
+python -m scripts.build_smt2020_db
+PLANNING_AGENT_FAKE=1 uvicorn main:app --reload --port 8000
 ```
 
-**Frontend** (`frontend/README.md` 참고)
+Frontend:
+
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local  # VITE_API_BASE_URL 을 backend 주소로
-npm run dev                 # http://localhost:3000
+cp .env.example .env.local
+npm run dev
 ```
 
-## 아키텍처
+비밀값은 `backend/.env`와 `frontend/.env.local`에만 두며 커밋하지 않는다.
 
-```
-Frontend → POST /api/chat → FastAPI → Claude Agent SDK
-                              ↓
-                          AgentEvent (text / status / tool_call / tool_result / error / done)
-                              ↓ SSE
-                          Frontend (진행 상태 · 답변 · 도구 결과 렌더)
-```
+## 문서
 
-비밀값은 `backend/.env`, `frontend/.env.local` 에만 두며 커밋하지 않는다.
-
-assistant-ui/react : 0.15.15
-react-langgraph 0.14.24
-react-markdwon : 0.14.11
-langgraph-sdk : 1.9.0
-redux : 5.0.1
+- [프로젝트 현황](plan/Todo.md)
+- [전체 요구사항과 기능별 계획](plan/)
+- [Backend 실행·운영](backend/README.md)
+- [Frontend 실행·운영](frontend/README.md)
+- [Agent 작업 지침](AGENTS.md)

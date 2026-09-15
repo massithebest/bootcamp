@@ -67,7 +67,7 @@ pip download -r requirements-dev.txt -d ./offline-packages \
 ### Claude Agent SDK 실행 바이너리 (Node.js + Claude Code CLI)
 
 `claude-agent-sdk`(Python 패키지)는 **Node.js 런타임과 `claude` CLI 실행 파일이
-그 밖에 별도로 필요**하다 (`backend/README.md` §"claude CLI 경로" 참고). 이건
+그 밖에 별도로 필요**하다. 이건
 PyPI wheel 안에 들어있지 않으므로 별도로 챙겨야 한다.
 
 - Node.js LTS 바이너리(tar.gz 또는 사내 표준 배포판)
@@ -251,16 +251,15 @@ class RealSimulationService:
 ```
 
 - pntfp의 Simulation MCP Server 호출 로직을 이식한다.
-- 시뮬레이션 종류는 라인 capacity/자재 제약/라인 비교 전용 함수가 아니라,
-  `services/simulation_registry.py`의 `SIMULATION_TYPES` 레지스트리
-  (`실적_조회`, `MP_최신조회`, `MP_확정조회`, `SWAP_결과조회`)를 기준으로
+- 시뮬레이션 종류는 `knowledge/simulations/*.yaml`과
+  `services/simulation_registry.py`를 기준으로
   `run_simulation(simulation_type, params)` 하나의 진입점에서 분기 처리한다.
-- 폐쇄망에 위 4종 외의 시뮬레이션이 더 있다면 `SIMULATION_TYPES` /
-  `PARAM_SCHEMA`에 항목을 추가한다 (mock/real 공용 모듈이므로 한 곳만 수정하면 됨).
+- 현재 mock의 `SMT2020_입력검증`은 실제 DES가 아니라 입력 관계 검증이다.
+  폐쇄망의 실제 simulation 종류는 동일한 YAML registry에 추가한다.
 - `run_simulation` 내부에서 `simulation_type`/필수 파라미터 검증은
   이미 `validate_simulation_request()`가 처리하므로 중복 검증하지 않는다.
-- 반환 dict 구조는 대응하는 `mock_simulation_service.py`의
-  `_mock_result()` 케이스별 키 구조를 참고해 맞춘다.
+- 반환 dict 구조는 대응하는 `mock_simulation_service.py`의 Result Store와
+  simulation payload 계약을 참고해 맞춘다.
 - Simulation MCP 서버 주소/포트는 §2-3의 환경변수로 주입한다.
 - 모듈 하단의 `_service = RealSimulationService()` 인스턴스와
   `list_simulation()` / `run_simulation(simulation_type, params)` 모듈 함수
@@ -343,7 +342,7 @@ uvicorn main:app --reload --port 8000
    테스트해서 real 서비스가 정상 호출되는지 확인:
    - SQL 조회가 필요한 질문 (예: 생산 실적 조회)
    - RAG 검색이 필요한 질문 (예: 공정 매뉴얼 질의)
-   - Simulation이 필요한 질문 (예: 실적_조회, MP_확정조회 등)
+   - Simulation이 필요한 질문 (등록된 실제 simulation type 사용)
 6. 문제 발생 시 `SERVICE_MODE=mock`으로 되돌려 프론트/에이전트 흐름
    자체는 정상인지 먼저 격리해서 확인한다.
 

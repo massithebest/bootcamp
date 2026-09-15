@@ -1,56 +1,67 @@
-# Backend Guidelines
+# Backend 작업 지침
 
-## Closed-Network Requirement
+Python 3.11 FastAPI 서비스다. `main.py`가 앱을 만들고 `/api/chat`은 Claude Agent
+SDK 이벤트를 SSE로 전달한다. 코드 변경 전 상위 `../AGENTS.md`와 관련
+`../plan/` 문서를 함께 확인한다.
 
-The backend is ultimately deployed in a closed network without public internet access. Before changing dependencies, provider integrations, environment configuration, or deployment steps, read and follow the [closed-network setup and migration guide](docs/CLOSED_NETWORK_SETUP.md). Keep offline installation, internal endpoint substitution, and secret-handling requirements compatible with that guide.
+## 계층과 계약
 
-## Architecture References
+- 흐름은 route → agent → SDK tool → tool → service → DB/외부 provider 순서다.
+  route에는 SQL, provider 설정, 시각화 검증과 업무 로직을 넣지 않는다.
+- `api/schemas.py`가 API 계약, `agent/event_adapter.py`가 SDK 이벤트 변환,
+  `agent/sdk_tools.py::TOOL_NAMES`가 등록 tool 목록의 기준이다.
+- `knowledge/` YAML이 catalog, join, KPI, recipe/CTE, simulation, glossary와
+  scenario의 source of truth다. 로드·검증은 `services/knowledge_service.py`,
+  Agent 접근은 등록된 지식 tool을 통한다.
+- SQL은 `services/sql_guard.py`의 읽기 전용 검사를 통과해야 한다. 카탈로그
+  스키마 변경 시 YAML, 시드 스크립트와 테스트를 함께 갱신한다.
+- `services/mock`과 `services/real`의 함수 시그니처와 결과 형태를 같게 유지하고
+  mock 구현을 삭제하지 않는다.
 
-The implemented domain-knowledge architecture is documented in [the repository-level domain knowledge guide](../docs/domain-knowledge.md). Chart response v1 is documented in [the chart visualization guide](../docs/chart-visualization.md). `../docs/result-store.md` and chart v2 sections describe future work; do not present them as implemented behavior.
+## Agent와 결과 처리
 
-## Architecture & Directory Layout
+- 안정적인 `AgentEvent` 종류는 `text`, `status`, `tool_call`, `tool_result`,
+  `error`, `done`이다. 성공한 `done.data.turn_id`와
+  `ChatRequest.fork_from_turn_id`의 포크 계약을 유지한다.
+- 포크 anchor에는 transcript에 존재하는 `AssistantMessage` 또는 `UserMessage`
+  UUID만 사용한다. `ResultMessage.uuid`를 `resume_session_at`에 전달하지 않는다.
+  fork ID 생략은 계속 진행, 빈 문자열은 새 대화, 알 수 없는 ID는 오류 후 안전한
+  새 대화 fallback이라는 구분을 유지한다.
+- streaming 오류는 내부 예외를 숨기고 `error` 다음 `done` 이벤트를 보낸다.
+- 조회 결과는 `services/result_store.py`로 저장하며 내부 parquet 경로를 tool
+  payload에 노출하지 않는다.
+- 차트는 `prepare_visualization`이 실제 `result_id`와 grain을 검증해 등록한다.
+  `/api/visualizations/{id}`만 조회 진입점으로 사용하고 SQL·시뮬레이션 결과에
+  자동 차트를 붙이지 않는다.
+- 환경변수는 `core/config.py`에서만 읽는다. 새 키는 실제 값 없이
+  `.env.example`에도 추가한다.
 
-The backend is a Python 3.11 FastAPI service. `main.py` creates the app; `api/routes_chat.py` streams chat events over SSE, `api/routes_knowledge.py` exposes read-only knowledge summaries, and `api/schemas.py` owns Pydantic API contracts. Agent orchestration belongs in `agent/`, SDK event translation in `agent/event_adapter.py`, conversation/session anchors in `agent/session_store.py`, tool input boundaries in `tools/`, configuration in `core/`, and external I/O in `services/`.
+## 폐쇄망과 지식 관리
 
-Structured domain knowledge under `knowledge/` is the source of truth for catalogs, joins, KPIs, recipes, simulations, glossary terms, and seed scenarios. Load and validate it through `services/knowledge_service.py`; the runtime agent accesses it only through the registered knowledge tools. `scripts/seed_sample_db.py` builds the untracked `data/sample.sqlite` used by mock SQL and simulation services. Query results are persisted by `services/result_store.py` and exposed through result summary/page tools; never expose internal parquet paths in tool payloads.
+- 의존성·provider·환경·배포 또는 real 서비스 작업 전
+  [폐쇄망 배포 및 이식 가이드](docs/CLOSED_NETWORK_SETUP.md)를 읽는다.
+- table, KPI, recipe/CTE, RAG 지식을 추가하거나 검토할 때는
+  [도메인 지식 관리 지침](docs/domain-knowledge-management.md)을 따른다.
+- API 키, 비밀번호, 사내 URL을 코드·로그·문서·예시 설정에 넣지 않는다.
 
-`services/chart_inference.py` implements the current v1 deterministic bar/line chart inference. Mock SQL and simulation services may attach an optional `chart` payload derived directly from returned rows. Keep chart inference independent of the LLM and keep unsupported shapes table-only.
+## 명령과 검증
 
-Preserve these flows: route/controller -> agent -> SDK tool -> tool -> service -> database/external provider, and route/controller -> knowledge service for read-only inspector APIs. Do not put SQL, provider configuration, chart inference, or business logic in routes. This project has no separate repository/ORM layer; add one beneath `services/` if persistence grows complex. Keep mock and real service function signatures and result shapes identical. The real SQL, RAG, and simulation implementations remain closed-network migration stubs; do not remove the mock implementations.
-
-## Development & Tooling Commands
-
-Run commands from `backend/`:
+`backend/`에서 실행한다.
 
 ```bash
 conda env create -f environment.yml
 conda activate production-planning
 pip install -r requirements-dev.txt
 cp .env.example .env
-python -m scripts.seed_sample_db
+python -m scripts.build_smt2020_db
 PLANNING_AGENT_FAKE=1 uvicorn main:app --reload --port 8000
 python -m pytest -q
 python -m pytest -m e2e
 ```
 
-The e2e suite requires working CLI/provider credentials. No migration, linter, formatter, or coverage command is currently configured; do not claim one in changes. Add its configuration and documentation before making it required.
-
-## Coding & API Design Standards
-
-Follow PEP 8, use explicit type hints, small async route handlers, and Pydantic models at API boundaries. Keep SDK-specific event translation in `agent/event_adapter.py`. Use appropriate HTTP status codes and FastAPI's `{"detail": ...}` error shape for non-streaming failures. Streaming failures must emit the stable `AgentEvent` shape (`error`, then `done`) without exception details. Coordinate event-contract changes with the frontend.
-
-The stable event types are `text`, `status`, `tool_call`, `tool_result`, `error`, and `done`. A successful `done` event carries `data.turn_id`. `ChatRequest.fork_from_turn_id` lets frontend edit/reload actions fork a prior SDK transcript: `session_store.py` maps the public turn ID to the SDK session and last resumable assistant/user message UUID. Never use a `ResultMessage` UUID as `resume_session_at`. Preserve the distinction between an omitted fork ID (continue), an empty string (restart), and an unknown ID (emit an error and safely fall back).
-
-`agent/sdk_tools.py::TOOL_NAMES` is the canonical registered-tool list. It currently covers SQL, RAG, simulation discovery/execution, table/KPI lookup, recipe lookup, and stored-result summary/page retrieval. When adding or renaming a tool, update its tool wrapper, runtime instructions, prompt-consistency tests, fake-runner coverage, and frontend tool-result metadata together.
-
-Use catalog table/column names consistently. SQL execution is read-only and must pass `services/sql_guard.py`. Schema changes currently require updating catalog YAML, the seed script, and affected tests together; do not edit generated `data/sample.sqlite` as a migration.
-
-Keep knowledge APIs read-only until the documented authoring workflow is implemented. `/api/knowledge/skills`, `/api/knowledge/catalog`, and `/api/knowledge/kpis` are inspector endpoints, not alternate sources of truth.
-
-## Testing & Verification
-
-Write pytest unit tests for tools, services, guards, knowledge integrity, chart inference, session anchors, and SDK adapters; use `TestClient` for API/SSE and knowledge endpoint integration tests. Prefer `monkeypatch`, the fake runner, and mock services over network calls. Regenerate the sample DB before scenario-dependent checks. Add e2e tests only for behavior that cannot be validated locally. Run the default suite before submitting; new or changed behavior must be covered, with no fixed percentage target currently enforced.
-
-## Environment & Security Considerations
-
-Read environment values only through `core/config.py`; add new keys, without secrets, to `.env.example`. Never commit `.env`, tokens, passwords, or internal URLs. Verify provider/auth tokens server-side, validate all external input with Pydantic and service guards, keep CORS origins explicit, and return sanitized client errors while logging details server-side.
+- 기본 테스트는 mock 서비스와 fake runner를 우선한다. E2E는 실제 CLI/provider
+  인증이 필요한 동작에만 사용한다.
+- 새 tool은 wrapper, 런타임 지침, prompt 정합성 테스트, fake runner와
+  프론트 tool 메타데이터를 함께 갱신한다.
+- 현재 별도 linter, formatter와 coverage 기준은 없다. 설정 없이 필수라고
+  문서화하지 않는다.

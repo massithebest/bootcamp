@@ -1,101 +1,31 @@
-# Production Planning Agent — Frontend
+# Production Planning Agent Frontend
 
-Claude Agent SDK 기반 Backend와 통신하는 질의응답형 3-pane 에이전트 워크벤치 (사이드바 / 대화 / 컨텍스트 인스펙터).
+Backend의 SSE `AgentEvent`를 표시하는 Vite 7·React 18·TypeScript 기반 3-pane
+워크벤치다. Backend는 기본적으로 `http://localhost:8000`, Frontend는
+`http://localhost:3000`을 사용한다.
 
-## 스택
-
-- Vite 7 (SPA, App Router 아님) · React 18 · TypeScript (2026-09-14 Next.js 14에서 이관 — [docs/decisions.md#nextjs--vite-이관](docs/decisions.md#nextjs--vite-이관))
-- Tailwind CSS **v4** + shadcn/ui 컴포넌트 (2026-09-11 도입, `@tailwindcss/vite` 플러그인 경유)
-- **AI Elements** (2026-09-14 채택) — `src/components/ai-elements/`에 소스로 복사해 우리 코드로 관리한다(`chain-of-thought` / `tool` / `task`). 컴포넌트만 쓰고 `useChat`·`@ai-sdk/react`·`streamdown`은 도입하지 않는다.
-- **assistant-ui** (2026-09-14 도입, 이전 기각 결정을 뒤집음) — `@assistant-ui/react` + `@assistant-ui/react-markdown` + `remark-gfm`을 **상태·UI 플럼빙 계층**으로 쓴다. 메시지 상태 소유권은 `useExternalStoreRuntime`으로 계속 우리(`hooks/use-agent-chat.ts`)가 갖는다. `@ai-sdk/react`·`useChat`·AI SDK 데이터 스트림 프로토콜은 도입하지 않는다 — 백엔드가 그 포맷을 쓰지 않는다. 자동 스크롤 앵커링·취소·복사·재생성·편집(백엔드 세션 포크, 실제 Claude CLI로 검증)까지 전부 구현 완료. 자세한 배경·설계 결정은 [docs/decisions.md#assistant-ui-도입](docs/decisions.md#assistant-ui-도입) 참고.
-- 아이콘은 `lucide-react` (npm 번들, 외부 CDN 아님)
-- 상태관리: React 기본(`useState`/`useRef`)만 사용
-- Vercel AI SDK(`ai`)는 도입하지 않는다. AI Elements `tool.tsx`가 예전엔 `ToolUIPart` 타입만 import했지만 Vite 이관 때 로컬 타입 선언으로 대체하고 의존성 자체를 제거했다. 프론트는 외부 LLM provider를 직접 호출하지 않고 항상 사내 백엔드(`src/lib/chat-api.ts`)를 경유한다.
-
-## 실행
+## 설치와 실행
 
 ```bash
 npm install
-cp .env.example .env.local   # VITE_API_BASE_URL 확인
-npm run dev      # http://localhost:3000
+cp .env.example .env.local
+npm run dev
+```
+
+`.env.local`의 `VITE_API_BASE_URL`을 Backend 주소로 설정한다.
+
+## 검증
+
+```bash
 npm run build
 npm run lint
+npm run preview
 ```
 
-Backend 주소는 `.env.local`의 `VITE_API_BASE_URL` (기본 `http://localhost:8000`).
-Browser가 FastAPI를 직접 호출한다 (BFF 없음). Backend에 `localhost:3000`
-Origin 허용 CORS 설정이 필요하다 — `vite.config.ts`가 dev/preview 포트를
-3000으로 고정(`strictPort: true`)해 이 CORS 설정과 어긋나지 않게 한다.
-연결에 실패하면 대화 내용을 유지한 채 `connection-banner.tsx`가 요청
-주소와 확인할 항목을 안내한다.
+## 참고
 
-## 구조
-
-```
-index.html                        Vite 엔트리 HTML — title/description/favicon
-src/
-├── main.tsx                      ReactDOM 엔트리 (globals.css import, <React.StrictMode>)
-├── App.tsx                       루트 컴포넌트 (<ChatWindow /> 렌더링)
-├── vite-env.d.ts                 ImportMetaEnv 타입 선언
-├── app/                          globals.css / icon.svg (Next 시절 경로를 그대로 유지)
-├── components/
-│   ├── ai-elements/              AI Elements 복사 소스 (chain-of-thought / tool / task) — 우리 코드로 취급
-│   ├── chat/                     3-pane 워크벤치
-│   │   ├── agent-progress.tsx    진행 단계 블록 (ChainOfThought 기반, 진행 중 펼침 · 완료 후 접힘)
-│   │   ├── app-sidebar.tsx       세션 목록 사이드바 (커스텀 구현 — shadcn sidebar 아님)
-│   │   ├── chat-window.tsx       3-pane 셸 조립 · 패널 토글 · 세션 선택 (상태는 hooks/use-agent-chat.ts 로 이전)
-│   │   ├── connection-banner.tsx 백엔드 연결 실패 안내 · 재시도
-│   │   ├── context-inspector.tsx Skills(실 API) / Metadata / Prompt 탭
-│   │   ├── empty-state.tsx       대화 시작 전 예시 질문 (ThreadPrimitive.Suggestion)
-│   │   ├── markdown-text.tsx     `@assistant-ui/react-markdown` 기반 마크다운 렌더러 (remark-gfm, 표/코드블록 등 스타일 슬롯)
-│   │   ├── thread-messages.tsx   `ThreadPrimitive.Messages`에 등록하는 UserMessage/AssistantMessage/UserEditComposer — 진행 블록·도구 카드·복사/재생성/편집 액션바 배치
-│   │   ├── message-input.tsx     입력창 (ComposerPrimitive — 전송/Enter/자동높이/취소 라이브러리 위임)
-│   │   ├── primitives.tsx        공용 UI 조각 (StatusDot 등, 직접 작성)
-│   │   ├── tool-result-card.tsx  AI Elements `Tool` 래퍼 안에서 tool_name 별 분기
-│   │   └── tool-results/         database / knowledge / catalog / simulation 전용 렌더러
-│   └── ui/                       shadcn/ui 컴포넌트 (자동 생성)
-├── hooks/
-│   ├── use-agent-chat.ts         대화 상태 · SSE Streaming · AgentEvent 처리 · assistant-ui 런타임(useExternalStoreRuntime) 생성 · 편집/재생성 포크
-│   ├── use-controllable-state.ts AI Elements chain-of-thought 훅 의존 로컬 구현
-│   └── use-mobile.ts             shadcn sidebar 반응형 훅 (미사용 sidebar.tsx 부속)
-├── lib/
-│   ├── chat-api.ts               POST /api/chat · SSE 파싱 · AbortController — 백엔드 통신 유일 창구
-│   ├── chat-runtime.ts           `ChatMessage` -> assistant-ui `ThreadMessageLike` 변환 (convertMessage)
-│   ├── knowledge-api.ts          GET /api/knowledge/* 읽기 전용 조회
-│   ├── dummy.ts                  사이드바/인스펙터/시드 대화용 더미 데이터
-│   └── utils.ts                  shadcn 표준 `cn()` 헬퍼
-└── types/
-    ├── chat.ts                   Backend `api/schemas.py` AgentEvent 와 동일 Contract
-    └── workspace.ts              프론트 전용 UI 타입 (Session / Skill / SessionMetadata …)
-```
-
-## 데이터 소스
-
-실제 백엔드에 붙은 것과 아직 더미인 것이 섞여 있다.
-
-| 영역 | 소스 |
-| --- | --- |
-| 대화 · 진행 상태 · 도구 결과 | 실 API (`POST /api/chat`, SSE) |
-| 인스펙터 Skills 탭 | 실 API (`GET /api/knowledge/skills`) |
-| 세션 목록 · 사용자 · Metadata · Prompt · 시드 대화 · 예시 질문 | `lib/dummy.ts` 하드코딩 |
-
-## AgentEvent Contract
-
-`text` `status` `tool_call` `tool_result` `error` `done` — Backend `api/schemas.py`
-와 동일하다. 바꿀 때는 `backend/agent/event_adapter.py`와 함께 맞춰야 한다.
-
-- `status` Event는 `data: { step, label?, status }` 형태를 가정하며 같은 `step`은 갱신된다.
-- `tool_result`는 `data.kind`로 렌더러가 갈린다 — `database`(표) / `knowledge`(RAG 인용) / `catalog`(카탈로그·KPI, **기본 접힘**) / `simulation`. `execute_sql` 결과의 컬럼·행은 `data.table.{columns,rows}` 아래에 온다.
-- `done` Event는 `data: { turn_id }`를 싣는다 — 그 턴이 끝난 시점의 백엔드 포크 지점. `ChatMessage.turnId`에 저장해뒀다가 편집/재생성 시 `ChatRequestBody.fork_from_turn_id`로 되돌려 보낸다(`hooks/use-agent-chat.ts`).
-- 어시스턴트 메시지는 단일 `content` 문자열이 아니라 `parts: MessagePart[]` (text/tool, 도착 순서)로 표현한다 — 도구 호출 전 내레이션과 최종 답변이 하나로 뭉개지지 않게 하기 위함. `lib/chat-runtime.ts`가 이 배열을 그대로 assistant-ui `ThreadMessageLike.content`로 옮긴다(순서 보존).
-
-## 폐쇄망 원칙
-
-외부 Font / CDN / 외부 Script / Telemetry 없음. FastAPI Backend 주소 외 외부 Network 호출 없음 (`npm run build` 후 `grep -rE "https?://" dist/`로 검증). System Font만 사용. shadcn·AI Elements처럼 CLI가 레지스트리에서 소스를 받아오는 도구는 인터넷 환경에서 미리 받아 커밋해 둔다. 새 의존성 도입 시 검증 절차는 [docs/closed-network.md](docs/closed-network.md) 참고.
-
-## 문서
-
-- [docs/decisions.md](docs/decisions.md) — 아키텍처 결정과 그 배경 (워크벤치 리디자인 · shadcn 도입/Tailwind v4 · AI Elements 채택 · Next.js → Vite 이관 · assistant-ui 도입)
-- [docs/closed-network.md](docs/closed-network.md) — 폐쇄망 원칙과 의존성 검증 체크리스트
-- [plan/](plan/) — 실행 계획 문서
-- [CLAUDE.md](CLAUDE.md) — Claude Code로 이 디렉토리에서 작업할 때의 규칙
+- [Frontend 작업 지침](AGENTS.md)
+- [기술 결정 기록](docs/decisions.md)
+- [폐쇄망 운영 원칙](docs/closed-network.md)
+- [Frontend 실행 계획](plan/)
+- [전체 기능 계획](../plan/)

@@ -1,6 +1,6 @@
 # 도메인 지식 Phase 1 실행 계획 (백엔드)
 
-**상태: 완료 (2026-09-14).** Task 0~10 전부 실행하고 E2E 통과. 설계는 [docs/domain-knowledge.md](../../docs/domain-knowledge.md)에 있다. 이 문서는 그 설계의 Phase 1을 **저비용 모델 세션이 순서대로 실행**할 수 있게 쓴 작업 목록이다. 설계 판단은 여기서 다시 하지 않는다.
+**상태: 완료 (2026-09-14).** Task 0~10 전부 실행하고 E2E 통과. 상위 요구사항은 [도메인 지식 통합 계획](../../plan/260914-domain-knowledge-plan.md), 작성 기준은 [도메인 지식 관리 지침](../docs/domain-knowledge-management.md)을 따른다. 이 문서는 Phase 1 실행 이력이다.
 
 ## 실행 세션 시작 방법
 
@@ -12,9 +12,10 @@ claude --model sonnet
 첫 프롬프트:
 
 ```
-backend/plan/domain-knowledge-plan.md 를 읽고 Task 0부터 순서대로 진행해.
+backend/plan/260914-domain-knowledge-plan.md 를 읽고 Task 0부터 순서대로 진행해.
 각 Task 는 테스트를 먼저 쓰고, 완료 시 "검증" 절의 명령을 실행해 결과를 보여줘.
-설계 판단이 필요하면 docs/domain-knowledge.md 를 따르고, 거기에도 없으면 멈추고 질문해.
+설계 판단이 필요하면 상위 계획과 backend/docs/domain-knowledge-management.md를 따르고,
+거기에도 없으면 멈추고 질문해.
 ```
 
 - Haiku는 다중 파일 작업에 부족하다. Sonnet 5를 쓴다.
@@ -227,7 +228,7 @@ async def execute_sql(sql: str, purpose: str) -> dict
 - `check_sql(sql, get_store().table_names())` → `SqlGuardError`면 `{"status": "error", "kind": "database", "message": str(e), "sql": sql}`.
 - `sqlite3.connect(SAMPLE_DB_PATH)`(없으면 `{"status":"error","message":"sample DB 가 없습니다. python -m scripts.seed_sample_db 를 실행하세요."}`), `row_factory = sqlite3.Row`.
 - 결과 `MAX_ROWS`개까지만 담고 초과면 `truncated: True`.
-- 반환: `{"status": "ok", "kind": "database", "sql": sql, "purpose": purpose, "table": {"columns": [...], "rows": [[...], ...]}, "row_count": n, "truncated": bool}`. `rows`는 리스트의 리스트(chart-visualization.md §2 형태).
+- 반환: `{"status": "ok", "kind": "database", "sql": sql, "purpose": purpose, "table": {"columns": [...], "rows": [[...], ...]}, "row_count": n, "truncated": bool}`. `rows`는 리스트의 리스트다. 이 내용은 실행 당시 계약이며 현재 Result Store 계약은 상위 계획을 따른다.
 - SQLite 오류는 `{"status":"error", "kind":"database", "message": f"SQL 실행 오류: {e}", "sql": sql}`.
 - `purpose`는 `logging.getLogger(__name__).info("execute_sql purpose=%s", purpose)`.
 
@@ -385,7 +386,7 @@ pytest tests/test_api.py -v
 curl -s localhost:8000/api/knowledge/skills | python -m json.tool
 ```
 
-**완료 기준**: 세 엔드포인트가 200과 설계 §7 형태를 반환. 이 시점에 프론트 작업([frontend/plan/domain-knowledge-plan.md](../../frontend/plan/domain-knowledge-plan.md))을 시작할 수 있다.
+**완료 기준**: 세 엔드포인트가 200과 상위 계획의 계약 형태를 반환. 이 시점에 프론트 작업([frontend 계획](../../frontend/plan/260914-domain-knowledge-plan.md))을 시작할 수 있다.
 
 ## 최종 검증
 
@@ -403,7 +404,7 @@ Phase 1 완료 후 별도 요청으로 추가한 지식 종류. 자세한 설계
 `/home/bsy/.claude/plans/with-serialized-truffle.md` 참고(세션 로컬 계획 파일).
 
 - `knowledge/recipes/*.yaml` — `KnowledgeRecipe`(재사용 가능 CTE) 신규 지식 종류.
-  `docs/domain-knowledge.md`가 `recipes/<slug>.md`로 설계했으나 미구현 상태였던
+  당시 설계가 `recipes/<slug>.md`로 두었으나 미구현 상태였던
   것을 순수 YAML로 구현해 대체했다 (다른 지식 종류와 동일한 저장 패턴 유지).
 - 실행 연결은 자동 치환이 아니라 **에이전트가 `cte_sql`을 읽어 직접 `WITH` 절로
   조합**하는 방식 — `sql_guard.py`는 변경하지 않았다(이미 즉석 CTE를 허용).

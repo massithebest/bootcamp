@@ -1,6 +1,6 @@
 # 도메인 지식 연동 계획 (프론트엔드)
 
-**상태: 완료 (2026-09-14).** 백엔드 Phase 1 완료 후 작업 1~4 전부 실행. 설계는 [docs/domain-knowledge.md](../../docs/domain-knowledge.md) §7, 백엔드 실행 계획은 [backend/plan/domain-knowledge-plan.md](../../backend/plan/domain-knowledge-plan.md).
+**상태: 완료 (2026-09-14).** 백엔드 Phase 1 완료 후 작업 1~4 전부 실행. 상위 요구사항은 [도메인 지식 통합 계획](../../plan/260914-domain-knowledge-plan.md), 백엔드 실행 이력은 [백엔드 계획](../../backend/plan/260914-domain-knowledge-plan.md)을 따른다.
 
 ## 왜 기다리나
 

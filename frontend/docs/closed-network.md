@@ -1,39 +1,99 @@
-# 폐쇄망(closed-network) 운영 원칙
+# Frontend 폐쇄망 반입·운영 지침
 
-이 프로젝트의 프론트엔드는 최종적으로 인터넷이 차단된 폐쇄망 환경에 배포된다. 스캐폴딩 시점부터 유지해 온 원칙이며, 새 의존성이나 라이브러리를 추가할 때마다 이 기준으로 검토한다.
+Frontend는 외부 인터넷 없이 설치·빌드·실행할 수 있어야 한다. 패키지나 UI
+도구를 추가할 때는 이 문서의 준비, 반입, 설치와 검증 절차를 함께 갱신한다.
 
-## 원칙
+## 운영 원칙
 
-1. **외부 폰트 미사용** — 빌드/런타임에 외부에서 폰트를 fetch하는 방식은 금지. 시스템 폰트(`-apple-system`, `Segoe UI`, `Noto Sans KR`, `맑은 고딕` 등)만 사용한다. (`src/app/globals.css`의 `--font-sans` / `--font-mono` 참고)
-2. **외부 CDN 미사용** — 스크립트/스타일시트를 CDN에서 로드하지 않는다. 필요한 라이브러리는 npm 의존성으로 번들에 포함시킨다.
-3. **런타임에 원격 리소스를 호출하는 라이브러리는 도입 전 반드시 검증** — 설치 시점(postinstall)뿐 아니라 런타임에도 하드코딩된 외부 URL이 없는지 확인한다. (예: shadcn CLI의 `ui.shadcn.com`. 실제로 사용하지 않는 provider/게이트웨이 코드 경로는 문제 없음 — 단, "쓰지 않으니 괜찮다"로 정리했던 `ai` SDK의 `@ai-sdk/gateway`는 2026-09-14 Vite 이관에서 의존성 자체를 제거했다. [decisions.md#nextjs--vite-이관](./decisions.md#nextjs--vite-이관) 참고.)
-4. **마크다운 렌더러 등 흔한 라이브러리도 자체 구현 우선 검토** — `src/components/chat/markdown.tsx`는 외부 라이브러리(remark 등) 대신 직접 구현한 최소 뷰어다. 의존성 트리가 커지고 폐쇄망 반입 대상이 늘어나는 것을 피하기 위함.
-5. **LLM 호출은 백엔드를 경유** — 프론트엔드는 사내 백엔드 API만 호출한다. 외부 LLM provider(OpenAI/Anthropic 등)를 프론트에서 직접 호출하지 않는다. 현재 백엔드는 개발 단계라 OpenRouter를 임시로 사용 중이며, 폐쇄망 반입 시 로컬 LLM 엔드포인트로 교체 예정이다 (백엔드 측 `core/config.py` 및 `agent/agent.py`의 `agent_provider_env()` 참고).
+- 외부 font, CDN script·stylesheet, image와 telemetry를 사용하지 않는다.
+- 브라우저는 사내 Backend만 호출하며 외부 LLM provider에 직접 연결하지 않는다.
+- 모든 runtime 라이브러리는 npm bundle에 포함한다.
+- shadcn과 AI Elements처럼 별도 registry에서 소스를 받는 CLI는 인터넷 환경에서
+  미리 실행하고 생성 소스를 commit한다. 폐쇄망에서는 해당 CLI fetch를 실행하지 않는다.
+- package와 lockfile은 함께 반입하고 설치할 때 lockfile 버전을 기준으로 한다.
+- Nexus URL, 인증 token과 사내 도메인은 저장소에 기록하지 않고 폐쇄망 환경에서
+  로컬 npm 설정과 `.env.local`로 주입한다.
 
-## 의존성 도입 시 체크리스트
+## 인터넷 환경에서 준비
 
-새 npm 패키지나 CLI 도구를 추가하기 전에 확인한다.
+1. `package.json`과 lockfile이 일치하는지 확인한다.
+2. 사내 npm registry에 정확한 버전과 모든 전이 의존성이 있는지 확인한다.
+3. registry에 없는 패키지는 사내 반입 승인을 거쳐 tarball로 준비하거나 미러링한다.
+4. 대상 폐쇄망과 같은 OS·CPU에서 필요한 native optional package를 확인한다.
+   Vite build에는 esbuild와 Rollup의 플랫폼별 패키지가 필요할 수 있다.
+5. 깨끗한 cache와 lockfile로 설치·빌드한다.
 
-1. **설치 방식이 순수 npm인가, 아니면 별도 레지스트리/CDN에서 코드를 받아오는가?**
-   - 순수 npm 패키지 → 사내 레지스트리(Nexus/Artifactory 등) 미러링만 되면 문제 없음
-   - shadcn/ui처럼 CLI가 자체 레지스트리에서 소스를 fetch하는 방식 → 인터넷 환경에서 미리 받아 커밋해두고, 폐쇄망에는 CLI 실행 없이 반입 ([decisions.md#shadcnui-도입](./decisions.md#shadcnui-도입) 참고)
+```bash
+cd frontend
+npm ci
+npm run build
+npm run lint
+```
 
-2. **postinstall/preinstall 스크립트가 외부 리소스(바이너리, 폰트 등)를 받아오는가?**
-   ```bash
-   node -e "console.log(require('./node_modules/<pkg>/package.json').scripts)"
-   ```
+사내 registry가 아직 없다면 승인된 임시 npm cache 또는 tarball 묶음을 만든다.
+`node_modules` 자체 반입은 OS·Node.js·package manager 버전이 완전히 같을 때만
+대안으로 사용한다.
 
-3. **번들된 코드 안에 하드코딩된 외부 URL이 있는가?**
-   ```bash
-   grep -rEo 'https?://[a-zA-Z0-9._-]+' node_modules/<pkg>/dist | sort -u
-   ```
-   찾은 도메인이 실제로 이 프로젝트가 사용하는 코드 경로에서 호출되는지 확인한다 (import는 됐지만 실제 사용하지 않는 하위 모듈이면 문제 없음).
+## 패키지 도입 점검
 
-4. **`npm run build`를 오프라인 조건으로 재현해서 실패하는지 확인** — 가장 확실한 검증. 네트워크를 끊거나 `/etc/hosts`로 의심 도메인을 막고 빌드해본다.
+새 패키지마다 다음을 확인한다.
 
-## 실제 발견 사례
+```bash
+npm view <package>@<version> dependencies optionalDependencies peerDependencies
+node -e "console.log(require('./node_modules/<package>/package.json').scripts)"
+grep -rEo 'https?://[a-zA-Z0-9._-]+' node_modules/<package>/dist | sort -u
+```
 
-- shadcn init이 `next/font/google`(Geist)을 자동으로 `layout.tsx`에 추가 → 빌드 시 `Unknown font 'Geist'`로 즉시 실패 확인, 제거함. ([decisions.md#shadcnui-도입](./decisions.md#shadcnui-도입))
-- `@ai-sdk/gateway` 패키지에 `https://ai-gateway.vercel.sh`가 기본 baseURL로 하드코딩되어 있음을 확인. 당시엔 "provider를 import/사용하지 않으니 실제 호출 경로에 안 들어감"으로 정리했으나, 2026-09-14 Vite 이관 때 `ai` 의존성 자체가 타입 3개 때문이었다는 게 드러나 로컬 타입 선언으로 대체하고 의존성을 제거했다 — 트리 자체가 빠졌다. ([decisions.md#nextjs--vite-이관](./decisions.md#nextjs--vite-이관))
-- Next.js → Vite 이관(2026-09-14) 후 `npm run build` 산출물(`dist/`) 전체를 `grep -rE "https?://" dist/`로 스캔했다. 매치된 건 전부 SVG/XML 네임스페이스 식별자(`w3.org/*`), 우리 `API_BASE_URL` 폴백(`localhost:8000`), React/`@base-ui/react`가 프로덕션 에러 메시지에 박아두는 표준 에러 디코더 링크(`reactjs.org/docs/error-decoder.html`, `base-ui.com/production-error` — 텍스트로만 조립되고 fetch되지 않음)뿐이었다. `vite`/`@vitejs/plugin-react`/`@tailwindcss/vite`는 postinstall/preinstall 스크립트가 없다. 네이티브 바이너리 반입 대상이 `@next/swc-linux-x64-gnu`에서 `@esbuild/linux-x64` + `@rollup/rollup-linux-x64-gnu`로 바뀌었다 — 사내 npm 미러 갱신 시 참고.
-- assistant-ui 도입(2026-09-14, [decisions.md#assistant-ui-도입](./decisions.md#assistant-ui-도입)) — `@assistant-ui/react@0.15.19` + `@assistant-ui/react-markdown@0.14.15` + `remark-gfm@4.0.1`(caret 없이 고정, `npx assistant-ui init/create` 미실행). 신규 npm 패키지 179개, 전부 postinstall/preinstall 스크립트 없음 확인. `npm run build` 후 `dist/` 스캔 결과 신규 외부 URL 유입 0건 — `assistant-ui`의 의존성인 `assistant-cloud` 패키지에 `https://backend.assistant-api.com` 하드코딩이 있었으나(과거 이 URL 때문에 assistant-ui를 기각했었다) `AssistantCloud`를 생성하는 코드 경로가 없어 트리셰이킹으로 dist에서 완전히 제거됨을 확인했다. `github.com/remarkjs/react-markdown/...`·`github.com/syntax-tree/hast-util-to-jsx-runtime` 2건이 새로 보이지만 기존 `reactjs.org/docs/error-decoder.html` 사례와 같은 패턴(TypeError 메시지에 박힌 문서 링크 텍스트, fetch 안 됨). `radix-ui` 메타 패키지가 `@radix-ui/*` 60개를 끌고 와 사내 미러링 대상은 실제로 늘어난다(번들 자체는 셰이킹됨) — 서브패스 import로 좁힐 수 있는지는 재검토 트리거로 남겨둠.
+- preinstall/postinstall에서 binary, font나 model을 내려받는지 확인한다.
+- hardcoded URL이 실제 실행 경로에서 fetch되는지 bundle과 코드로 확인한다.
+- `npm run build` 이후 `dist/`의 URL을 검사한다. 문서 링크나 XML namespace 문자열과
+  실제 network 호출을 구분한다.
+- 새 package가 없어도 CLI가 자동으로 dependency, font나 config를 추가할 수 있으므로
+  실행 직후 diff를 검토한다.
+
+## 폐쇄망으로 이전
+
+1. 검토된 source archive와 `package.json`, lockfile, 필요한 package tarball 또는
+   registry 목록을 보안 반입 절차로 옮긴다.
+2. `.env.local`, npm token과 내부 URL은 source와 별도 승인 채널로 전달한다.
+3. 폐쇄망의 Node.js와 npm 버전을 준비 환경과 맞춘다.
+4. 사내 registry 또는 오프라인 cache만 사용해 설치한다.
+
+```bash
+cd frontend
+npm config set registry <INTERNAL_NPM_REGISTRY>
+npm ci --offline
+cp .env.example .env.local
+npm run build
+```
+
+`npm ci --offline`을 지원할 cache가 없고 사내 registry를 사용한다면 `--offline`은
+생략하되 방화벽 로그로 외부 접속이 발생하지 않는지 확인한다. 실제 registry 주소는
+명령 이력 공유나 문서에 남기지 않는다.
+
+## 기동과 인수 검증
+
+```bash
+npm run preview
+```
+
+- `dist/`가 3000 포트에서 열리고 외부 font·asset 요청이 없어야 한다.
+- `.env.local`의 `VITE_API_BASE_URL`이 폐쇄망 Backend를 가리켜야 한다.
+- chat SSE, 취소, retry, 편집·재생성, tool card와 chart marker 조회를 확인한다.
+- Backend의 CORS origin과 credential 설정이 Frontend 주소와 일치해야 한다.
+- browser Network 탭이나 사내 proxy 로그에서 허용된 Backend 외 outbound 요청이
+  없어야 한다.
+
+## 현재 확인된 주의점
+
+- shadcn 초기화는 font나 registry 의존 설정을 자동 추가할 수 있으므로 생성 결과를
+  그대로 반입하지 않는다.
+- AI SDK gateway는 외부 endpoint 기본값을 포함할 수 있어 의존성에서 제거했다.
+- assistant-ui는 현재 `useExternalStoreRuntime` 경로만 사용한다. 설치 트리에 cloud
+  관련 코드가 있어도 production bundle과 runtime network에 포함되지 않는지 새 버전마다
+  다시 확인한다.
+- native package가 준비 환경과 폐쇄망의 OS·CPU에 맞지 않으면 설치 또는 build가
+  실패하므로 `node_modules` 복사보다 사내 registry를 통한 재설치를 우선한다.
+
+관련 아키텍처 결정은 [Frontend 기술 결정 기록](decisions.md), Backend와 Agent SDK
+반입은 [Backend 폐쇄망 가이드](../../backend/docs/CLOSED_NETWORK_SETUP.md)를 따른다.

@@ -1,7 +1,7 @@
 # 차트 v2 연동 계획 (프론트엔드)
 
-**상태: 백엔드 계약 대기.** 기준 설계는
-[docs/chart-visualization.md](../../docs/chart-visualization.md)이고,
+**상태: 완료 (2026-09-15).** 상위 요구사항은
+[차트 시각화 통합 계획](../../plan/260915-chart-visualization-plan.md)이고,
 백엔드 구현 순서는 [backend 차트 v2 계획](../../backend/plan/260915-chart-v2-plan.md)을 따른다.
 
 프론트는 LLM이 만든 HTML이나 원시 축 명세를 실행하지 않는다.
@@ -27,6 +27,15 @@
 - 접근 scope의 브라우저 전달 방식과 credentials 설정이 정해져 있다.
 - 오류 상태, 표시 한도, schema_version, TTL이 확정되어 있다.
 - inline/large SQL 및 표형 시뮬레이션 결과가 동일한 컬럼 메타데이터를 제공한다.
+
+**Task 0 확정값 (2026-09-15, [상위 차트 계획](../../plan/260915-chart-visualization-plan.md)):**
+access scope는 `pp_session_scope` HttpOnly 쿠키(서버 발급 uuid4)로 전달된다.
+`POST /api/chat`과 `GET /api/visualizations/{id}` 모두 이 쿠키를 쓰므로
+프론트의 두 호출 모두 `credentials: "include"`를 명시해야 한다
+(`fetch`의 기본값은 same-origin이라 명시하지 않으면 쿠키가 빠진다).
+표시 한도는 포인트 500 / 시리즈 8, 초과 시 `DISPLAY_LIMIT_EXCEEDED`.
+오류는 404(잘못된 ID·access scope 불일치, 존재 비노출)/410(원본 만료·삭제)이며
+본문은 `{"detail": {"code": ..., "message": ...}}` 형태다.
 
 ~~~json
 {
@@ -336,4 +345,20 @@ composer submit/cancel, 편집/재생성, 복사, 자동 스크롤, tool 카드 
 
 ## 실행 기록
 
-*(실행 세션이 설계에 없던 판단을 내릴 때마다 여기에 남긴다.)*
+- `markdown` Skill과 assistant-ui 공식 문서를 확인하고, 설치 버전
+  `@assistant-ui/react@0.15.19` / `@assistant-ui/react-markdown@0.14.15`의
+  타입 선언을 대조했다. 설치 버전은 fenced code를 내부 override한 뒤
+  `componentsByLanguage`의 `SyntaxHighlighter` 슬롯으로 위임하므로, `chart`
+  언어만 이 공식 슬롯에서 `ChartMarker`로 연결했다. 메시지 상태는 기존
+  `useAuiState(s => s.message.status)`에서 읽도록 했다. `useExternalStoreRuntime`과
+  custom SSE transport는 변경하지 않았다.
+- access scope는 HttpOnly라 브라우저 JavaScript가 변경을 관찰할 수 없다.
+  따라서 성공 응답 메모리 캐시는 두지 않고 동일 ID의 진행 중 요청만 합쳐
+  scope 간 캐시 공유 가능성을 없앴다. 마지막 구독자 해제 시 실제 GET을 취소한다.
+- `npm run build`와 `npm run lint`를 통과했다. lint에는 기존 Fast Refresh 경고
+  4건만 남고 오류는 없다.
+- Fake Runner dev 서버를 브라우저로 검증해 chat SSE → `prepare_visualization`
+  → ID 마커 → credentials 포함 GET → 다중 line 차트가 이어지는 것을 확인했다.
+  `chart` 펜스가 `<pre>` 셸 없이 렌더되고, 400px 폭에서 가로 스크롤로
+  데이터가 유지되며, 동일 ID GET이 StrictMode에서도 한 번만 발생하고 콘솔
+  오류가 없음을 확인했다.

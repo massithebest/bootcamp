@@ -1,6 +1,6 @@
 # 차트 v2 실행 계획 (백엔드)
 
-**상태: 착수 대기.** 기준 설계는 [docs/chart-visualization.md](../../docs/chart-visualization.md)다.
+**상태: 완료 (2026-09-15).** 상위 요구사항은 [차트 시각화 통합 계획](../../plan/260915-chart-visualization-plan.md)을 따른다.
 이 계획은 다음 흐름의 백엔드 작업만 다룬다.
 
 ~~~text
@@ -23,7 +23,7 @@ Task 7의 v1 제거는 프론트 전환과 같은 변경 단위에서 수행한�
 
 - [Result Store 계획](260915-result-store-plan.md)의 구현이 완료되어
   ResultStore, LocalParquetResultStore, result_id, 결과 조회 tool이 동작한다.
-- [집계 가이드](../../docs/aggregation-guide.md)의 catalog + kpi + recipes 필드와
+- [도메인 지식·CTE 관리 지침](../docs/domain-knowledge-management.md)의 catalog + kpi + recipes 필드와
   검증 테스트가 반영되어 있다.
 - Task 0의 미확정 계약을 기준 설계 문서와 이 계획에 기록하기 전에는 구현을 시작하지 않는다.
 
@@ -60,7 +60,7 @@ backend 디렉터리에서 시작한다. 첫 요청에는 다음 내용을 포�
 
 ## Task 0. 구현 계약 확정
 
-**파일:** docs/chart-visualization.md, 이 계획, frontend/plan/260915-chart-v2-plan.md
+**파일:** 상위 차트 계획, 이 계획, frontend/plan/260915-chart-v2-plan.md
 
 **스펙:**
 
@@ -117,6 +117,15 @@ JSON 필드명과 null/생략 규칙을 확정한 뒤 프론트 계획에도 똑
 - 결정한 한도·수명·접근 방식이 기준 설계의 구현 전 확정 사항에 기록되어 있다.
 
 **완료 기준:** 구현자가 추가 설계 판단 없이 모델·API·UI 타입을 작성할 수 있다.
+
+**완료 (2026-09-15).** 확정한 값은 [상위 차트 계획](../../plan/260915-chart-visualization-plan.md)에
+기록했다 — 요약: 포인트 500/시리즈 8 한도, 고정 오류 코드 12종과
+`DISPLAY_LIMIT_EXCEEDED` 메시지 방향, `VISUALIZATION_STORE_DIR` 사이드카
+저장 + 원본 TTL 상속(자체 TTL 없음) + 기존 Result Store 정리 주기에 편승,
+200/404/410 + access scope 불일치는 404와 동일 본문(존재 비노출),
+`pp_session_scope` HttpOnly 쿠키(uuid4, `POST /api/chat`이 발급) 기반
+access scope + CORS `allow_credentials=True`. 이 값과 예시 payload는
+[프론트 계획](../../frontend/plan/260915-chart-v2-plan.md)과 일치시켰다.
 
 ---
 
@@ -467,4 +476,14 @@ python -m pytest -q
 
 ## 결정 기록
 
-*(실행 세션이 설계에 없던 판단을 내릴 때마다 여기에 남긴다.)*
+- **코드·명 label 연결:** `group_by`가 `_cd`/`_code`로 끝나고 대응하는
+  `_nm`/`_name` 컬럼이 실제 결과에 있으며 코드별 이름이 하나로 유일할 때만
+  이름을 표시 label로 쓴다. 그 외에는 group 원값을 쓴다. 동명 이름은 허용하되
+  내부 `series_N` key로 identity를 분리한다.
+- **전체 NULL과 dtype 검증 순서:** parquet에서 전체 NULL 컬럼은 object dtype이
+  될 수 있으므로 dtype 오류보다 `UNRENDERABLE_VALUES`를 먼저 반환한다.
+- **조회 캐시:** API는 `Cache-Control: private`와 `Vary: Cookie`를 함께 반환해
+  HttpOnly access scope별 응답이 공유 캐시에 섞이지 않게 했다.
+- **검증:** Task 1~6 관련 pytest와 기본 백엔드 전체 suite(`189 passed`,
+  실제 provider 자격 증명이 필요한 e2e 5건은 deselected)를 통과했고,
+  프론트 Task 1~5 전환 뒤 v1 `infer_chart` 호출/모듈/전용 테스트를 제거했다.

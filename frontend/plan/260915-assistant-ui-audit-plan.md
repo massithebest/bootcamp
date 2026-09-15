@@ -1,7 +1,8 @@
 # assistant-ui 전면 감사 및 리팩터링 계획
 
-- 상태: 감사 완료 / 구현 대기
+- 상태: 완료 (Task 1~6 구현·검증 완료, 2026-09-15)
 - 작성일: 2026-09-15
+- 상위 기준: [프로젝트 요구사항 및 Todo](../../plan/Todo.md)
 - 대상 버전: `@assistant-ui/react@0.15.19`, `@assistant-ui/react-markdown@0.14.15`
 - 범위: `frontend`의 assistant-ui Runtime, Thread/Message, Composer, Markdown, Tool UI, 진행 상태, 세션 목록 및 이관 잔재
 - 비범위: 이번 계획 작성 단계의 소스 수정, 백엔드 `AgentEvent` 계약 변경, Runtime/전송 프로토콜 교체, Next.js 재도입
@@ -363,5 +364,9 @@ Tool toolkit/GroupedParts와 thread-list는 위 순서에 넣지 않는다. 각�
 | 2026-09-15 | 감사 baseline | lint 0 errors/6 warnings, build 성공, bundle size warning | bundle 최적화는 assistant-ui 감사 범위에서 분리 | `npm run lint`, `npm run build` | 리팩터링 후 동일 명령으로 비교 |
 | 2026-09-15 | 감사 baseline | `MessagePrimitive.Parts components`는 설치 타입에서 허용되나 최신 문서는 children을 권장 | 즉시 장애가 아닌 forward-compatibility 교체로 P1 분류 | Message docs, v0.14 migration, 설치 `MessageParts.d.ts` | Task 1에서 동작 보존형 이전 |
 | 2026-09-15 | 감사 baseline | External Store thread-list adapter가 공식 문서에는 있으나 설치 타입은 active development/deprecated | 현 세션 UI 교체를 보류 | Threads docs, 설치 `external-store-adapter.d.ts` | persistence 계약 수립 후 재검토 |
-| YYYY-MM-DD | Task N |  |  |  |  |
-
+| 2026-09-15 | Task 1 | `ThreadPrimitive.Messages`/`MessagePrimitive.Parts`를 children renderer로 전환, `UserMessage`의 첫 text part 직접 추출 제거 | 계획대로 진행, 별도 이탈 없음 | 커밋 `57fdfc9` diff (`chat-window.tsx`, `thread-messages.tsx`) | Task 2 진행 가능 |
+| 2026-09-15 | Task 2 | `use-agent-chat.ts`에서 `setMessages` 제거, `chat-runtime.ts` 상태 소유권 주석 갱신 | 계획대로 진행 | 커밋 `7ba5cf0` diff | Task 3 진행 가능 |
+| 2026-09-15 | Task 3 | `types/chat.ts`에 메시지 terminal-state 도입, `convertMessage`가 `complete/incomplete(cancelled,error)`로 매핑, `dummy.ts` fixture 갱신 | 계획대로 진행 | 커밋 `0ad8961` diff (`chat.ts`, `chat-runtime.ts`, `use-agent-chat.ts`, `agent-progress.tsx`, `thread-messages.tsx`, `dummy.ts`) | Task 4 진행 가능 |
+| 2026-09-15 | Task 4 | Send/Cancel 및 empty 조건을 `AuiIf` 기반으로 정리 | 계획대로 진행 | 커밋 `d47dace` diff (`chat-window.tsx`, `message-input.tsx`) | Task 5 진행 가능 |
+| 2026-09-15 | Task 5 | `ai-elements/task.tsx` 제거, `chain-of-thought.tsx`의 미사용 export 제거, `tool.tsx`의 `getStatusBadge` 비공개화, 미참조된 `components/ui/badge.tsx` 제거 | 계획대로 진행 | 커밋 `945a7e2` diff | lint warning 6→4건 감소, 새 error 없음 |
+| 2026-09-15 | Task 6 | Task 1~5가 계획된 커밋 단위(`57fdfc9`,`7ba5cf0`,`0ad8961`,`d47dace`,`945a7e2`)대로 완료돼 있음을 diff 재대조로 확인 | `frontend/docs/decisions.md`의 assistant-ui 절에 External Store capability 축소, 메시지 종료 상태 정규화, tool/thread-list 보류 사유 요약 반영. 자동 테스트 러너는 여전히 미도입 상태로 유지(§9 결정 유효) | `npm run lint` → 0 errors / 4 warnings(§10 baseline 6에서 예상대로 2건 감소), `npm run build` → 성공(500kB chunk 경고는 기존과 동일, 성능 과제로 분리) | 상위 [Todo.md](../../plan/Todo.md)의 해당 행 상태를 완료로 갱신 |

@@ -1,12 +1,12 @@
 # Result Store 연동 계획 (프론트엔드)
 
-**상태: 완료 (2026-09-15).** 설계는 [docs/result-store.md](../../docs/result-store.md) §5, §7. 백엔드 실행 계획은 [backend/plan/260915-result-store-plan.md](../../backend/plan/260915-result-store-plan.md)(완료). 실행 세부는 문서 끝 "실행 기록" 참고.
+**상태: 완료 (2026-09-15).** 상위 요구사항은 [Result Store 통합 계획](../../plan/260915-result-store-plan.md), 백엔드 실행 이력은 [백엔드 계획](../../backend/plan/260915-result-store-plan.md)을 따른다. 실행 세부는 문서 끝 "실행 기록" 참고.
 
-**assistant-ui 검토 완료 (2026-09-15):** `frontend/CLAUDE.md`의 "assistant-ui 작업 원칙"에 따라 `assistant-ui:tools`, `assistant-ui:generative-ui` Skill로 사전 확인함 — 둘 다 이 작업과 무관하다는 결론. `tools`(`defineToolkit`/`render`)와 `generative-ui`(`present` tool)는 모두 `"use generative"` 컴파일러 + `AISDKToolkit` + AI SDK v7 라우트를 전제로 하는데, 이 프로젝트는 AI SDK를 도입하지 않고 `useExternalStoreRuntime` + 자체 SSE(`AgentEvent`)를 쓴다. `large_result` 요약 카드는 백엔드가 고정 스키마로 보낸 데이터를 프론트가 고정된 방식으로 렌더하는 케이스라, 기존 `database-result.tsx`의 `data.table`/`data.chart` 분기 패턴을 그대로 확장하면 된다 — 아래 작업 목록은 이 결론을 반영해 변경 없이 유지한다.
+**assistant-ui 검토 완료 (2026-09-15):** `frontend/AGENTS.md`의 assistant-ui 경계에 따라 `assistant-ui:tools`, `assistant-ui:generative-ui` Skill로 사전 확인함 — 둘 다 이 작업과 무관하다는 결론. `tools`(`defineToolkit`/`render`)와 `generative-ui`(`present` tool)는 모두 `"use generative"` 컴파일러 + `AISDKToolkit` + AI SDK v7 라우트를 전제로 하는데, 이 프로젝트는 AI SDK를 도입하지 않고 `useExternalStoreRuntime` + 자체 SSE(`AgentEvent`)를 쓴다. `large_result` 요약 카드는 백엔드가 고정 스키마로 보낸 데이터를 프론트가 고정된 방식으로 렌더하는 케이스라, 기존 `database-result.tsx`의 결과 분기 패턴을 확장한다.
 
 ## 왜 기다리나
 
-프론트 몫은 전부 백엔드가 `execute_sql`(그리고 `run_simulation`) 결과에 새로 싣는 `type`/`result_id`/`sample_rows`/`summary` 필드에 의존한다. 이 계약은 백엔드 Task 2~3에서 코드로 굳는다. 그 전에 만들면 형태를 추측한 더미를 만들고 나중에 다시 맞추게 된다 — 도메인 지식 연동 때 `database-result.tsx`의 `table.{columns,rows}` 형태가 계획과 실제가 달랐던 사례([frontend/plan/domain-knowledge-plan.md](domain-knowledge-plan.md) 실행 기록 참고)가 반복될 수 있다.
+프론트 몫은 전부 백엔드가 `execute_sql`(그리고 `run_simulation`) 결과에 새로 싣는 `type`/`result_id`/`sample_rows`/`summary` 필드에 의존한다. 이 계약은 백엔드 Task 2~3에서 코드로 굳는다. 그 전에 만들면 형태를 추측한 더미를 만들고 나중에 다시 맞추게 된다 — 도메인 지식 연동 때 `database-result.tsx`의 `table.{columns,rows}` 형태가 계획과 실제가 달랐던 사례([도메인 지식 실행 기록](260914-domain-knowledge-plan.md) 참고)가 반복될 수 있다.
 
 ## 착수 조건
 
@@ -24,9 +24,9 @@ PLANNING_AGENT_FAKE=1 uvicorn main:app --port 8000
 
 ## 작업 목록
 
-실행 세션은 `frontend/`에서 `claude --model sonnet`으로 열고 [frontend/CLAUDE.md](../CLAUDE.md) 규칙을 따른다(특히 폐쇄망 원칙, 디자인 토큰 규칙). 새 패키지는 없다.
+실행 세션은 `frontend/`에서 `claude --model sonnet`으로 열고 [frontend/AGENTS.md](../AGENTS.md) 규칙을 따른다(특히 폐쇄망 원칙, 디자인 토큰 규칙). 새 패키지는 없다.
 
-설계 문서에 없던 판단을 내릴 때마다 이 문서 끝 "실행 기록" 절에 무엇을 왜 그렇게 정했는지 바로 남긴다 — 다른 세션이 이력을 추적할 수 있어야 한다(`plan/CLAUDE.md` 관례). 실행 에이전트가 Claude Code가 아니어도(Codex 등) 동일하게 적용한다.
+설계 문서에 없던 판단을 내릴 때마다 이 문서 끝 "실행 기록" 절에 무엇을 왜 그렇게 정했는지 바로 남긴다 — 다른 세션이 이력을 추적할 수 있어야 한다(`plan/AGENTS.md` 관례). 실행 에이전트가 Claude Code가 아니어도(Codex 등) 동일하게 적용한다.
 
 ### 1. `database-result.tsx` — `large_result` 요약 카드 분기
 
@@ -71,7 +71,7 @@ cd frontend && npm run lint && npm run build
 
 ## 이후
 
-3차(재사용 연산: `filter_result`/`aggregate_result`)와 2차(차트, [docs/chart-visualization.md](../../docs/chart-visualization.md))는 이 계획 범위 밖이다. 차트는 `GET /api/results/{id}/chart`를 쓰는 별도 API라 이 문서가 다루는 raw 조회 요약 카드와 무관하다(설계 §7 "차트와의 관계").
+3차 재사용 연산(`filter_result`/`aggregate_result`)과 [차트 v2](../../plan/260915-chart-visualization-plan.md)는 이 실행 계획 범위 밖이다. 차트는 `prepare_visualization`과 `GET /api/visualizations/{id}`를 사용하며 raw 조회 요약 카드와 분리된다.
 
 ## 실행 기록
 
@@ -86,4 +86,4 @@ cd frontend && npm run lint && npm run build
 - **`agent-progress.tsx`(Task 3 선택 항목)**: 실제로 확인해보니 진행 단계 `status` 이벤트의 `label`은 `agent-progress.tsx`가 아니라 백엔드 `event_adapter.py`가 `f"{tool_name} 실행"`/`f"{tool_name} 완료"` 형태로 항상 자동 생성한다(도구별 한글 라벨을 프론트가 개입할 지점이 없음). 계획 표는 사실 `tool-result-card.tsx`의 `TOOL_META`(결과 카드 헤더 라벨)를 가리키는 것이었고, 그쪽에 `get_result_summary`/`get_result_page` 두 항목을 계획대로 추가했다. `agent-progress.tsx` 자체는 수정하지 않았다(별도 라벨 매핑 지점이 아니므로).
 - **검증**: `npm run lint && npm run build` 통과. 시각 검증은 Fake Runner가 고정 88행 쿼리만 실행해 대량 케이스를 못 만들기 때문에, mock `execute_sql`을 직접 호출해 얻은 실제 대량 응답을 dummy 대화에 임시로 대입 → Playwright로 데스크톱/400px 폭 양쪽에서 요약 카드(전체 500행 배지, 샘플 5행 표, 컬럼별 역할 배지, min/max/평균 통계) 렌더링과 가로 스크롤 없음을 스크린샷으로 확인 → 검증 후 `git checkout`으로 `dummy.ts` 원상복구(이 변경은 계획 범위 밖이라 커밋에 남기지 않음).
 - 3번(선택, `agent-progress.tsx` 라벨 확인)을 제외한 계획 전 항목을 반영했다.
-- **임계값·샘플 행 수 조정 (사용자 요청, 커밋 직전)**: `INLINE_ROW_THRESHOLD`를 200→100행, `sample_rows` 슬라이스를 5→10행으로 낮췄다(`backend/services/mock/mock_sql_service.py`, `backend/services/mock/mock_simulation_service.py` 양쪽에 중복 정의된 상수 모두 수정, `SAMPLE_ROW_COUNT` 상수로 명명). `docs/result-store.md` §1과 "열린 질문"의 "200행" 서술도 100행으로 갱신했다. 완료된 백엔드 실행 계획(`backend/plan/260915-result-store-plan.md`)은 저장소 관례상 소급 수정하지 않았다 — 그 문서는 Task 실행 당시(200/5) 이력으로 남긴다. 프론트 쪽은 `ResultSummaryCard`가 이미 `sampleRows.length`를 동적으로 배지에 쓰고 있어 코드 변경이 필요 없었다. `backend/pytest -q` 156개 재확인, mock `execute_sql` 직접 호출로 `sample_rows` 길이 10 확인.
+- **임계값·샘플 행 수 조정 (사용자 요청, 커밋 직전)**: `INLINE_ROW_THRESHOLD`를 200→100행, `sample_rows` 슬라이스를 5→10행으로 낮췄다(`backend/services/mock/mock_sql_service.py`, `backend/services/mock/mock_simulation_service.py` 양쪽에 중복 정의된 상수 모두 수정, `SAMPLE_ROW_COUNT` 상수로 명명). [상위 Result Store 계획](../../plan/260915-result-store-plan.md)도 현재 값으로 갱신했다. 완료된 백엔드 실행 계획은 Task 실행 당시(200/5) 이력으로 남긴다. 프론트 쪽은 `ResultSummaryCard`가 이미 `sampleRows.length`를 동적으로 배지에 쓰고 있어 코드 변경이 필요 없었다. `backend/pytest -q` 156개 재확인, mock `execute_sql` 직접 호출로 `sample_rows` 길이 10 확인.

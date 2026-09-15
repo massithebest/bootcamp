@@ -1,8 +1,8 @@
 # Result Store 1차 실행 계획 (백엔드)
 
-**상태: 완료.** 설계는 [docs/result-store.md](../../docs/result-store.md)(§1~§6, §8, §10). 이 문서는 그 설계의 "1차" 범위(§10 목록)를 **저비용 모델 세션이 순서대로 실행**할 수 있게 쓴 작업 목록이다. 설계 판단은 여기서 다시 하지 않는다 — 여기 없는 결정이 필요하면 멈추고 설계 문서를 먼저 갱신한다.
+**상태: 완료.** 상위 요구사항은 [Result Store 통합 계획](../../plan/260915-result-store-plan.md)을 따른다. 이 문서는 1차 백엔드 구현의 상세 실행·결정 기록이다.
 
-[docs/chart-visualization.md](../../docs/chart-visualization.md)의 v2 차트 설계가 이 계획의 완료를 전제로 한다 — 이 계획을 먼저 끝낸다.
+[차트 시각화 통합 계획](../../plan/260915-chart-visualization-plan.md)은 이 계획의 완료를 전제로 한다.
 
 ## 실행 세션 시작 방법
 
@@ -13,12 +13,12 @@ claude --model sonnet
 
 첫 프롬프트: "`plan/260915-result-store-plan.md`를 Task 0부터 순서대로 진행해줘. 설계 문서에 없던 판단을 내릴 때마다 문서 끝 '결정 기록' 절에 무엇을 왜 그렇게 정했는지 바로 남겨줘 — 다른 세션이 이력을 추적할 수 있어야 해."
 
-이 지시는 실행 에이전트가 Claude Code가 아니어도(Codex 등) 동일하게 적용한다 — `plan/CLAUDE.md`의 저장소 관례다.
+이 지시는 실행 에이전트가 Claude Code가 아니어도(Codex 등) 동일하게 적용한다 — `plan/AGENTS.md`의 저장소 관례다.
 
 ## 실행 규칙
 
 - 각 Task 끝의 "검증"을 통과해야 다음 Task로 넘어간다.
-- mock/real 계약(함수 시그니처, 반환 dict 키)은 항상 동일하게 유지한다 — `backend/CLAUDE.md` "Mock ↔ Real 서비스 전환" 참고. `services/real/*`는 현재 `NotImplementedError` 상태이므로 이번 작업은 mock 경로만 구현한다.
+- mock/real 계약(함수 시그니처, 반환 dict 키)은 항상 동일하게 유지한다 — `backend/AGENTS.md` 참고. `services/real/*`는 현재 `NotImplementedError` 상태이므로 이번 작업은 mock 경로만 구현한다.
 - 새 환경변수는 `core/config.py`에서만 읽는다. `.env.example`도 같은 커밋에서 갱신한다.
 - `backend/agent/sdk_tools.py`의 `TOOL_NAMES`에 tool을 추가하면 `backend/tests/test_prompt_consistency.py`가 `agent/agent_sdk/CLAUDE.md`의 "Tool 사용 규칙" 표와의 일치를 강제한다 — Task 5에서 둘을 같은 커밋으로 갱신한다.
 - 각 Task는 관련 있는 기존 테스트 파일(`test_services.py`/`test_tools.py`/`test_prompt_consistency.py`)에 이어 붙인다. 새 파일이 필요하면 해당 Task에 명시했다.
@@ -327,7 +327,7 @@ PLANNING_AGENT_FAKE=1 uvicorn main:app --port 8000
 
 ## 이후
 
-- **2차 (차트)**: [docs/chart-visualization.md](../../docs/chart-visualization.md) — 이 계획 완료 후 별도 계획 문서.
+- **2차 (차트)**: [상위 차트 계획](../../plan/260915-chart-visualization-plan.md) — 백엔드 실행 이력은 [plan/260915-chart-v2-plan.md](260915-chart-v2-plan.md).
 - **3차 (재사용 연산)**: `filter_result`/`aggregate_result` — 설계 §9. 이번 범위 아님, `ResultStore` 인터페이스에 자리만 비워둔다(이미 Task 1에서 추상 메서드로 구현하지 않음).
 
 ## 결정 기록

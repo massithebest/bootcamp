@@ -1,66 +1,62 @@
-# Frontend Guidelines
+# Frontend 작업 지침
 
-## Closed-Network Requirement
+Vite 7, React 18, strict TypeScript 기반의 라우터 없는 SPA다. 코드 변경 전
+상위 `../AGENTS.md`, [프론트 결정 기록](docs/decisions.md)과 관련 상위 계획을
+확인한다.
 
-The frontend is ultimately deployed in a closed network without public internet access. Before adding dependencies, fonts, CDN assets, remote resources, or build-time/runtime network calls, read and follow the [closed-network operating principles](docs/closed-network.md). Any change must remain buildable and operable under those constraints.
+## 구조와 상태 소유권
 
-Before accepting a package, verify its exact version and complete transitive dependency tree in the closed-network Nexus registry, then perform a clean-cache `npm ci` and build using only that registry. Do not commit Nexus URLs or credentials. shadcn and similar registry-backed CLIs must be run before transfer; commit the generated source so no CLI fetch is required inside the closed network.
+- `src/App.tsx`가 앱을 조립한다. shadcn primitive는 `components/ui`, 복사한
+  AI Elements는 `components/ai-elements`, 기능 UI는 `components/chat`, 동작과
+  상태는 `hooks`, 통신·adapter는 `lib`, 계약은 `types`에 둔다.
+- assistant-ui는 thread, composer, viewport, action bar와 Markdown UI를 맡는다.
+  메시지·SSE·retry·cancel·edit·regenerate 상태는
+  `hooks/use-agent-chat.ts`와 `useExternalStoreRuntime`이 소유한다.
+- `@ai-sdk/react`, `useChat`, `streamdown`, AI SDK streaming protocol을 도입하지
+  않는다. 브라우저 통신은 `lib/chat-api.ts`의 `fetch`/`ReadableStream` SSE를
+  유지하고 외부 LLM provider를 직접 호출하지 않는다.
+- assistant-ui 구조를 바꿀 때는 해당 공식 Skill과 문서를 확인하고 설치된
+  패키지의 타입 선언으로 호환성을 검증한다.
 
-## Project Decisions
+## UI와 공유 계약
 
-Read the [frontend decision log](docs/decisions.md) before making architectural, dependency, UI-library, styling, or integration changes. Preserve active decisions, account for superseded decisions, and record new material decisions in that document. The implemented chart v1 and planned v2 are separated in [the chart visualization guide](../docs/chart-visualization.md); [the result-store guide](../docs/result-store.md) is design-only and must not be treated as current behavior.
+- Tailwind v4와 `globals.css`의 semantic CSS 변수를 사용한다. 컴포넌트 색상
+  하드코딩과 dark theme를 추가하지 않는다. shadcn 변수는 기존 프로젝트
+  토큰에 매핑한다.
+- `--chart-1`부터 `--chart-5`는 차트 시리즈에만 사용한다.
+- 현재 sidebar는 `app-sidebar.tsx`의 커스텀 구현이다. shadcn Sidebar provider와
+  섞으려면 먼저 결정 기록을 추가한다.
+- 어시스턴트 메시지는 도착 순서가 보존되는 `MessagePart[]`를 사용한다.
+  `AgentEvent`, `done.data.turn_id`, `fork_from_turn_id`와 tool result kind는
+  백엔드 계약과 동기화한다.
+- 최종 답변의 `chart` fence는 `visualization_id`만 허용하고
+  `/api/visualizations/{id}` 응답을 검증한 뒤 bar/line으로 렌더링한다.
+  tool 카드에는 자동 차트를 넣지 않는다.
+- 세 pane의 스크롤 체인에 필요한 `min-h-0`, `overflow-hidden`, `shrink-0`을
+  유지한다.
 
-## Architecture & Component Organization
+## 폐쇄망과 통신
 
-This Vite 7, React 18, strict-TypeScript SPA has no router or `pages/` layer. `src/App.tsx` composes the app. Put shadcn primitives in `src/components/ui/`, copied AI Elements source in `src/components/ai-elements/`, and feature components in `src/components/chat/`; keep domain tool renderers under `chat/tool-results/`. `hooks/` owns behavior and chat state, `lib/` owns API transports and adapters, `types/` owns contracts, and `src/app/globals.css` owns global tokens.
+- 패키지, 폰트, CDN, remote asset을 추가하기 전에
+  [폐쇄망 운영 원칙](docs/closed-network.md)을 따른다.
+- 패키지는 정확한 버전과 전이 의존성이 사내 Nexus에 있는지 확인하고
+  registry CLI가 필요한 소스는 외부에서 생성해 저장소에 포함한다.
+- backend 접근은 `lib`의 API 모듈에만 두고 transport 오류를 사용자에게 안전한
+  상태로 변환한다. live SSE 응답은 캐시하지 않는다.
 
-Keep primitives small and presentational. Containers and hooks coordinate state, streaming, and side effects. Do not add business or fetch logic to UI primitives. `use-agent-chat.ts` is the owner of messages, SSE state, retries, cancellation, editing, and regeneration. It exposes those messages to assistant-ui through `useExternalStoreRuntime`; assistant-ui supplies generic thread, composer, viewport, message, action-bar, and Markdown plumbing, but it is not the message-state owner.
+## 명령과 검증
 
-Retain the current split between the two UI libraries: assistant-ui handles generic chat interaction, while the copied AI Elements `chain-of-thought`, `tool`, and `task` components support progress and tool presentation. Do not introduce Vercel AI SDK `ai`, `@ai-sdk/react`, `useChat`, `streamdown`, or the AI SDK streaming protocol. Browser-to-backend transport remains the custom `fetch`/`ReadableStream` SSE implementation in `src/lib/chat-api.ts`.
-
-Recharts is used through the local shadcn chart wrapper for the implemented `bar` and `line` result charts. `ChartBlock` dispatches optional backend `ChartSpec` payloads; unsupported or absent chart shapes must retain the table/result fallback. Pie, Gantt, final-answer chart markers, and result-store pagination are not implemented yet.
-
-## assistant-ui Workflow
-
-- For assistant-ui feature implementation or structural changes, use the focused assistant-ui Skill that matches the work before proceeding.
-- When an assistant-ui API, component, or Runtime behavior is unclear or may have changed, consult the official documentation through the assistant-ui MCP. Then verify compatibility against the type declarations of the version installed in this repository.
-- Preserve the existing `useExternalStoreRuntime`, custom `fetch`/`ReadableStream` SSE transport, and application-owned message state. Switching runtimes or transport protocols requires an explicit architecture decision.
-- Prefer official assistant-ui primitives, Runtime APIs, and adapters over custom implementations when they satisfy the requirement without breaking the current architecture or backend contract.
-- Do not invoke assistant-ui Skills or MCP documentation for changes that are unrelated to assistant-ui structure, such as copy-only or simple styling edits.
-
-## Development & Build Commands
-
-Run from `frontend/`:
+`frontend/`에서 실행한다.
 
 ```bash
 npm install
 cp .env.example .env.local
-npm run dev       # http://localhost:3000
-npm run build     # tsc -b && vite build
-npm run lint      # eslint .
-npm run preview   # serve dist/ on :3000
+npm run dev
+npm run build
+npm run lint
+npm run preview
 ```
 
-`npm run build` is the current type-check command. No formatter or automated test script is configured; add configuration and package scripts before requiring either.
-
-## Coding & Styling Conventions
-
-Use PascalCase for component symbols and types, camelCase for functions and values, `useX` for hooks, and kebab-case filenames. Prefer named exports, explicit prop types, `@/` imports, and immutable state updates. Preserve streamed assistant content as ordered message parts.
-
-Style with Tailwind v4 and the semantic CSS variables in `globals.css`; never hardcode component colors or add dark-theme rules. Map new shadcn variables to existing project tokens. Use `cn()` for conditional classes. Preserve the three-pane flex/scroll chain with `min-h-0`, `overflow-hidden`, and `shrink-0` where applicable.
-
-Use `--chart-1` through `--chart-5` only for chart series. Keep shadcn variables mapped to existing namespaced project tokens. The current left sidebar is the custom `app-sidebar.tsx`, not the installed shadcn sidebar; do not mix their provider/layout models without an explicit migration decision.
-
-## Testing & UI Quality
-
-No automated frontend test command is currently configured. When adding tests, prefer Vitest plus React Testing Library for components/hooks and Playwright for critical streaming, editing, and regeneration flows. Until then, require `npm run build`, `npm run lint`, and manual verification at narrow, tablet, and desktop widths. Verify composer submit/cancel, auto-scroll, copy/edit/regenerate actions, retry after connection loss, tool-card expansion, and chart/table fallbacks. Check keyboard operation, focus, labels, contrast, reduced motion, loading/empty/error states, and screen-reader announcements. Avoid unnecessary effects and rerenders; memoize only after measurement and lazy-load genuinely heavy UI.
-
-## API Integration & Error Handling
-
-Keep backend access in `src/lib/chat-api.ts` and `src/lib/knowledge-api.ts`; components must not call providers directly. Keep `src/types/chat.ts` synchronized with `backend/api/schemas.py`, backend service result payloads, and chart specs. The stable event types are `text`, `status`, `tool_call`, `tool_result`, `error`, and `done`.
-
-Assistant messages store ordered `MessagePart[]` rather than one text blob. `src/lib/chat-runtime.ts` must preserve that order when converting to assistant-ui parts; status/progress stays in `metadata.custom`. A `done.data.turn_id` is the backend fork anchor used by edit and regenerate requests through `fork_from_turn_id`. Preserve the anchor and truncated message prefix across retries.
-
-Tool results use domain kinds `database`, `knowledge`, `catalog`, and `simulation`; optional charts are nested in database/simulation payloads. The backend currently registers ten tools. `tool-result-card.tsx` has explicit metadata for eight, while recipe tools reach the catalog renderer through `data.kind`; preserve that safe fallback and add explicit metadata when a tool needs a dedicated label or presentation. Treat backend `agent/sdk_tools.py::TOOL_NAMES` as the canonical tool inventory.
-
-The context inspector currently loads only Skills from `/api/knowledge/skills`; Metadata and Prompt remain local dummy data, and the prompt save control is not persistent. Do not describe those panels as backend-connected until APIs exist. Use `AbortController`, represent loading explicitly, normalize transport/stream failures into user-safe states, preserve retry context, and render `connection-banner.tsx` or a local fallback. Add caching only for stable read data, with explicit invalidation; never cache live SSE responses.
+- `npm run build`가 현재 type check를 포함한다. 자동 테스트와 formatter는 아직 없다.
+- UI 변경은 loading·empty·error, 키보드·focus·label, tool card와 chart/table
+  fallback, 좁은 화면부터 desktop까지 수동 확인한다.
