@@ -11,7 +11,15 @@ Production Planning Agent의 Vite + React SPA 프론트엔드 (2026-09-14 Next.j
 - 상태관리: React 기본(`useState`/`useRef`)만 사용, 외부 상태관리 라이브러리 없음
 - **AI Elements** (2026-09-14 채택) — `src/components/ai-elements/`에 shadcn CLI로 복사된 소스(`chain-of-thought`, `tool`, `task`). **컴포넌트만 쓰고 `useChat`/`@ai-sdk/react`/`streamdown`은 도입하지 않는다.** 복사된 소스는 우리 코드로 취급해 토큰·한국어 라벨로 다듬었고, `code-block`(shiki)·radix 훅 의존은 제거했다(로컬 `hooks/use-controllable-state.ts`). 배경과 assistant-ui 비교는 [docs/decisions.md#ai-sdk-및-채팅-ui-라이브러리-도입-검토](docs/decisions.md#ai-sdk-및-채팅-ui-라이브러리-도입-검토).
 - **Vercel AI SDK(`ai`)는 도입하지 않는다.** AI Elements `tool.tsx`가 예전엔 `ToolUIPart`/`DynamicToolUIPart` 타입만 import했지만, Vite 이관(2026-09-14) 때 실제로 쓰는 표면(`type`/`state`)만 로컬 타입으로 옮기고 `ai` 의존성 자체를 제거했다 (`ai` + `@ai-sdk/*` 트리 ~12.6MB, `@ai-sdk/gateway`에 외부 URL 하드코딩 — 폐쇄망 반입 대상에서 뺐다). **외부 LLM provider(OpenAI/Anthropic 등)를 프론트에서 직접 호출하지 않는다** — 반드시 사내 백엔드(`lib/chat-api.ts`)를 경유한다.
-- **assistant-ui**(`@assistant-ui/react` + `@assistant-ui/react-markdown`, 2026-09-14 도입)는 **상태·UI 플럼빙 계층으로만** 쓴다. `useExternalStoreRuntime`으로 메시지 상태 소유권은 계속 우리(`hooks/use-agent-chat.ts`)가 갖는다. **`@ai-sdk/react`/`useChat`/AI SDK 데이터 스트림 프로토콜은 도입하지 않는다** — 백엔드가 그 포맷을 쓰지 않는다. 범용 채팅 UI 기능(스크롤 앵커링·컴포저·액션바·마크다운)은 assistant-ui 프리미티브에 위임하고, 도메인 렌더링(`tool-results/*`, `AgentEvent` 처리)은 계속 자체 구현한다. 새 assistant-ui API를 쓰기 전에 `node_modules/@assistant-ui/*/dist/**/*.d.ts`를 직접 읽을 것 — 문서·기억에 의존하지 말 것(실제로 독스트링과 다르게 동작하는 API가 있었다, `resume_session_at` 사례는 [docs/decisions.md#assistant-ui-도입](docs/decisions.md#assistant-ui-도입) Q5 참고). 배경·설계 결정 전체는 [docs/decisions.md#assistant-ui-도입](docs/decisions.md#assistant-ui-도입).
+- **assistant-ui**(`@assistant-ui/react` + `@assistant-ui/react-markdown`, 2026-09-14 도입)는 **상태·UI 플럼빙 계층으로만** 쓴다. `useExternalStoreRuntime`으로 메시지 상태 소유권은 계속 우리(`hooks/use-agent-chat.ts`)가 갖는다. **`@ai-sdk/react`/`useChat`/AI SDK 데이터 스트림 프로토콜은 도입하지 않는다** — 백엔드가 그 포맷을 쓰지 않는다. 범용 채팅 UI 기능(스크롤 앵커링·컴포저·액션바·마크다운)은 assistant-ui 프리미티브에 위임하고, 도메인 렌더링(`tool-results/*`, `AgentEvent` 처리)은 계속 자체 구현한다. 새 assistant-ui API는 아래 작업 원칙에 따라 확인하고, 현재 설치 버전의 `node_modules/@assistant-ui/*/dist/**/*.d.ts`를 최종 호환성 기준으로 검증한다(실제로 독스트링과 다르게 동작하는 API가 있었다, `resume_session_at` 사례는 [docs/decisions.md#assistant-ui-도입](docs/decisions.md#assistant-ui-도입) Q5 참고). 배경·설계 결정 전체는 [docs/decisions.md#assistant-ui-도입](docs/decisions.md#assistant-ui-도입).
+
+## assistant-ui 작업 원칙
+
+- assistant-ui 기능을 구현하거나 관련 구조를 변경할 때는 작업 영역에 맞는 assistant-ui Skill을 먼저 활용한다.
+- assistant-ui API·컴포넌트·Runtime 사용법이 불확실하거나 최신 동작을 확인해야 하면 assistant-ui MCP에서 공식 문서를 조회한다. 이어서 현재 설치 버전의 타입 정의를 확인해 실제 호환성을 검증한다.
+- 기존 `useExternalStoreRuntime`, 커스텀 `fetch`/`ReadableStream` SSE, 메시지 상태 소유 구조를 우선 유지한다. 다른 Runtime이나 전송 프로토콜로 바꾸려면 별도 아키텍처 결정이 필요하다.
+- 요구사항을 assistant-ui가 공식 제공하는 primitive, Runtime API 또는 adapter로 해결할 수 있으면 별도 구현보다 공식 기능을 우선한다. 단, 기존 프로젝트 구조와 백엔드 계약을 깨뜨리지 않아야 한다.
+- 단순 스타일·문구 변경처럼 assistant-ui 구조와 무관한 작업에는 Skill이나 MCP를 불필요하게 사용하지 않는다.
 
 ## 최우선 원칙: 폐쇄망(closed-network)
 

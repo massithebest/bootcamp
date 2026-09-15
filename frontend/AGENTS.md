@@ -20,6 +20,14 @@ Retain the current split between the two UI libraries: assistant-ui handles gene
 
 Recharts is used through the local shadcn chart wrapper for the implemented `bar` and `line` result charts. `ChartBlock` dispatches optional backend `ChartSpec` payloads; unsupported or absent chart shapes must retain the table/result fallback. Pie, Gantt, final-answer chart markers, and result-store pagination are not implemented yet.
 
+## assistant-ui Workflow
+
+- For assistant-ui feature implementation or structural changes, use the focused assistant-ui Skill that matches the work before proceeding.
+- When an assistant-ui API, component, or Runtime behavior is unclear or may have changed, consult the official documentation through the assistant-ui MCP. Then verify compatibility against the type declarations of the version installed in this repository.
+- Preserve the existing `useExternalStoreRuntime`, custom `fetch`/`ReadableStream` SSE transport, and application-owned message state. Switching runtimes or transport protocols requires an explicit architecture decision.
+- Prefer official assistant-ui primitives, Runtime APIs, and adapters over custom implementations when they satisfy the requirement without breaking the current architecture or backend contract.
+- Do not invoke assistant-ui Skills or MCP documentation for changes that are unrelated to assistant-ui structure, such as copy-only or simple styling edits.
+
 ## Development & Build Commands
 
 Run from `frontend/`:
