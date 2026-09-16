@@ -5,8 +5,11 @@
   <body>
     <pre id="results">검증 중…</pre>
     <script type="module">
-      import { runChatRegressions } from "./chat-browser.tsx";
-      const results = await runChatRegressions();
+      import { runChatRegressions, runExecutionUiRegressions } from "./chat-browser.tsx";
+      const results = [
+        ...await runChatRegressions(),
+        ...await runExecutionUiRegressions(),
+      ];
       document.querySelector("#results").textContent = JSON.stringify(results, null, 2);
       document.title = results.some(result => result.error) ? "FAIL" : "PASS";
     </script>

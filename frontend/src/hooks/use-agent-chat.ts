@@ -1,11 +1,11 @@
 /**
  * 대화 상태 · SSE Streaming · AgentEvent 처리 · assistant-ui 런타임 배선.
  *
- * `chat-window.tsx`(3-pane 셸)에서 분리했다 — 셸은 레이아웃/패널 토글/세션
+ * `App` 루트에서 생성해 `chat-window.tsx`(3-pane 셸)에 전달한다 — 셸은 레이아웃/패널 토글/세션
  * 목록 표시만 맡고, 이 훅이 상태 소유권(React 기본 useState/useRef)과
  * assistant-ui 런타임 생성을 모두 갖는다. `useExternalStoreRuntime`을 쓰지만
  * 메시지 상태는 계속 우리가 소유한다 — assistant-ui는 상태/UI 플럼빙
- * 계층일 뿐이다.
+ * 및 공통 Elements 계층을 담당한다.
  *
  * 편집/재생성(onEdit/onReload)은 백엔드 세션 포크가 필요해서
  * `turnId`(백엔드 `done` Event 의 `data.turn_id`)를 assistant 메시지에

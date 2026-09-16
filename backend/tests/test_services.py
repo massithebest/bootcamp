@@ -41,7 +41,7 @@ def test_mock_execute_sql_respects_max_rows_guardrail(smt_db) -> None:
             "SELECT * FROM route_step WHERE dataset = 'LVHM'", purpose="전체 Route Step"
         )
     )
-    assert result["row_count"] == 500
+    assert result["row_count"] == 1000
     meta = result_store.get_result_store().get_meta(result["result_id"])
     assert meta is not None and meta.source_truncated is True
 

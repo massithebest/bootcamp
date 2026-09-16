@@ -50,3 +50,10 @@ Knowledge 확인 → 집계 SQL/시뮬레이션 → Result Store(result_id)
 - streaming 중 미완성 marker와 완료 후 잘못된 marker가 무한 로딩으로 남지 않는다.
 - tool 미호출이나 검증 실패 시 표·텍스트 응답이 유지된다.
 - pie·간트와 자동 다운샘플링은 후속 별도 계획 전까지 지원하지 않는다.
+
+## 후속: assistant-ui Tool UI 전환 (2026-09-16, 완료)
+
+신규 응답의 표시 진입점을 최종 답변 `chart` marker에서
+`prepare_visualization` standalone Tool UI로 전환했다. 검증·저장·조회 API와
+ChartSpec은 유지하며 marker renderer는 과거 메시지 호환용으로 남긴다. 상세 범위와
+검증은 [Tool UI 차트 계획](260916-assistant-ui-tool-ui-plan.md)을 따른다.

@@ -1,8 +1,10 @@
+import { forwardRef } from "react"
 import { Collapsible as CollapsiblePrimitive } from "@base-ui/react/collapsible"
 
-function Collapsible({ ...props }: CollapsiblePrimitive.Root.Props) {
-  return <CollapsiblePrimitive.Root data-slot="collapsible" {...props} />
-}
+const Collapsible = forwardRef<HTMLDivElement, CollapsiblePrimitive.Root.Props>(({ ...props }, ref) => {
+  return <CollapsiblePrimitive.Root ref={ref} data-slot="collapsible" {...props} />
+})
+Collapsible.displayName = "Collapsible"
 
 function CollapsibleTrigger({ ...props }: CollapsiblePrimitive.Trigger.Props) {
   return (

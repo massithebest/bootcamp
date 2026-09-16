@@ -2,12 +2,24 @@ import { useState } from "react";
 import { useAuiState } from "@assistant-ui/react";
 
 import { useVisualization } from "@/hooks/use-visualization";
-import { parseChartMarker } from "@/lib/chart-marker";
+import {
+  parseChartMarker,
+  visualizationIdFromToolResult,
+} from "@/lib/chart-marker";
 import { ChartBlock } from "./chart-block";
 
 export function ChartMarker({ source }: { source: string }) {
-  const messageStatus = useAuiState((state) => state.message.status?.type);
   const parsed = parseChartMarker(source);
+  const messageStatus = useAuiState((state) => state.message.status?.type);
+  const alreadyRenderedByToolUi = useAuiState((state) => {
+    if (parsed.type !== "valid") return false;
+    return state.message.parts.some(
+      (part) =>
+        part.type === "tool-call" &&
+        part.toolName === "prepare_visualization" &&
+        visualizationIdFromToolResult(part.result) === parsed.visualizationId,
+    );
+  });
 
   if (parsed.type === "incomplete") {
     return messageStatus === "running" ? (
@@ -19,9 +31,12 @@ export function ChartMarker({ source }: { source: string }) {
   if (parsed.type === "invalid") {
     return <ChartMarkerMessage message="올바르지 않은 차트 마커입니다." alert />;
   }
-  return <ResolvedChartMarker visualizationId={parsed.visualizationId} />;
+  if (alreadyRenderedByToolUi) return null;
+  return <VisualizationById visualizationId={parsed.visualizationId} />;
 }
-function ResolvedChartMarker({ visualizationId }: { visualizationId: string }) {
+
+/** Tool UI와 과거 chart marker가 공유하는 검증된 ID 기반 조회 renderer. */
+export function VisualizationById({ visualizationId }: { visualizationId: string }) {
   const [retryKey, setRetryKey] = useState(0);
   const state = useVisualization(visualizationId, retryKey);
 

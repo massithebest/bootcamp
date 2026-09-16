@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "tw-shimmer";
 @config "../../tailwind.config.ts";
 
 /*
@@ -77,6 +78,12 @@ body {
   border-radius: 2px;
 }
 
+/* Composer는 form 외곽선 하나로 focus를 표현한다. textarea의 전역 outline을
+   겹치지 않아 내부·외부 테두리가 동시에 파랗게 보이지 않게 한다. */
+[data-slot="aui_composer-input"]:focus-visible {
+  outline: none;
+}
+
 /* 모션 감소 설정 존중 */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -142,8 +149,10 @@ body {
   --color-secondary-foreground: var(--shadcn-secondary-foreground);
   --color-muted: var(--shadcn-muted);
   --color-muted-foreground: var(--shadcn-muted-foreground);
-  --color-accent: var(--shadcn-accent);
-  --color-accent-foreground: var(--shadcn-accent-foreground);
+  /* bg-accent/text-accent are product tokens; shadcn's pale surface must not
+     override the primary action and selected-tab color. */
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-ink);
   --color-destructive: var(--shadcn-destructive);
   --color-border: var(--shadcn-border);
   --color-input: var(--shadcn-input);
@@ -152,4 +161,32 @@ body {
   --radius-md: calc(var(--shadcn-radius) - 2px);
   --radius-lg: var(--shadcn-radius);
   --radius-xl: calc(var(--shadcn-radius) + 4px);
+  @keyframes collapsible-down {
+  from {
+    height: 0;
+    }
+  to {
+    height: var(--radix-collapsible-content-height, var(--collapsible-panel-height, auto));
+    }
+  }
+  @keyframes collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height, var(--collapsible-panel-height, auto));
+    }
+  to {
+    height: 0;
+    }
+  }
 }
+
+/*
+ ---break---
+ */
+
+@custom-variant data-open (&:where([data-state="open"], [data-open]:not([data-open="false"])));
+
+/*
+ ---break---
+ */
+
+@custom-variant data-closed (&:where([data-state="closed"], [data-closed]:not([data-closed="false"])));

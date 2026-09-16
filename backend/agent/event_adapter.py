@@ -6,6 +6,7 @@ from typing import Any
 from claude_agent_sdk import (
     AssistantMessage,
     ResultMessage,
+    StreamEvent,
     SystemMessage,
     TextBlock,
     ThinkingBlock,
@@ -83,6 +84,12 @@ class AgentEventAdapter:
         self._tool_name_by_id: dict[str, str] = {}
         self._last_session_id: str | None = None
         self._last_entry_uuid: str | None = None
+        # StreamEvent.uuid는 이벤트마다 달라진다. message_start의 provider
+        # message id를 보관해 뒤이어 오는 누적 AssistantMessage TextBlock을
+        # 다시 보내지 않는다.
+        self._active_stream_message_id: str | None = None
+        self._streamed_text_message_ids: set[str] = set()
+        self._has_pending_streamed_text = False
         self.result_succeeded: bool | None = None
 
     @property
@@ -108,6 +115,9 @@ class AgentEventAdapter:
 
     def convert(self, raw_event: object) -> list[AgentEvent]:
         """SDK 이벤트 1개를 0개 이상의 `AgentEvent` 로 변환한다."""
+
+        if isinstance(raw_event, StreamEvent):
+            return self._convert_stream(raw_event)
 
         if isinstance(raw_event, (AssistantMessage, UserMessage)):
             uuid = getattr(raw_event, "uuid", None)
@@ -139,12 +149,55 @@ class AgentEventAdapter:
 
     # -- block level ------------------------------------------------------
 
+    def _convert_stream(self, message: StreamEvent) -> list[AgentEvent]:
+        """공개 가능한 partial text delta만 기존 text 이벤트로 변환한다.
+
+        thinking/signature/tool input delta는 모델 내부 정보 또는 불완전한 JSON이므로
+        이 계층에서 계속 폐기한다. 알 수 없는 신규 event도 안전하게 무시한다.
+        """
+
+        event = message.event
+        event_type = event.get("type")
+
+        if event_type == "message_start":
+            provider_message = event.get("message")
+            provider_message_id = (
+                provider_message.get("id")
+                if isinstance(provider_message, dict)
+                else None
+            )
+            self._active_stream_message_id = (
+                provider_message_id
+                if isinstance(provider_message_id, str)
+                else None
+            )
+            return []
+
+        if event_type != "content_block_delta":
+            return []
+        delta = event.get("delta")
+        if not isinstance(delta, dict) or delta.get("type") != "text_delta":
+            return []
+        text = delta.get("text")
+        if not isinstance(text, str) or not text:
+            return []
+        self._has_pending_streamed_text = True
+        if self._active_stream_message_id is not None:
+            self._streamed_text_message_ids.add(self._active_stream_message_id)
+        return [AgentEvent(type="text", content=text)]
+
     def _convert_assistant(self, message: AssistantMessage) -> list[AgentEvent]:
         events: list[AgentEvent] = []
+        text_already_streamed = (
+            isinstance(message.message_id, str)
+            and message.message_id in self._streamed_text_message_ids
+        ) or (
+            message.message_id is None and self._has_pending_streamed_text
+        )
 
         for block in message.content:
             if isinstance(block, TextBlock):
-                if block.text:
+                if block.text and not text_already_streamed:
                     events.append(
                         AgentEvent(type="text", content=block.text)
                     )
@@ -156,13 +209,20 @@ class AgentEventAdapter:
                     continue
                 short = _short_tool_name(block.name)
                 events.append(
-                    AgentEvent(type="tool_call", tool_name=short)
+                    AgentEvent(
+                        type="tool_call",
+                        tool_name=short,
+                        tool_call_id=block.id,
+                        data={"args": block.input},
+                    )
                 )
                 events.append(
                     AgentEvent(
                         type="status",
+                        tool_name=short,
+                        tool_call_id=block.id,
                         data={
-                            "step": short,
+                            "step": block.id,
                             "status": "running",
                             "label": f"{short} 실행",
                         },
@@ -172,6 +232,11 @@ class AgentEventAdapter:
             elif isinstance(block, ThinkingBlock):
                 # 내부 reasoning 은 Frontend 에 전달하지 않는다.
                 continue
+
+        if text_already_streamed:
+            if isinstance(message.message_id, str):
+                self._streamed_text_message_ids.discard(message.message_id)
+            self._has_pending_streamed_text = False
 
         return events
 
@@ -206,14 +271,17 @@ class AgentEventAdapter:
                 AgentEvent(
                     type="tool_result",
                     tool_name=tool_name,
+                    tool_call_id=block.tool_use_id,
                     data=data,
                 )
             )
             events.append(
                 AgentEvent(
                     type="status",
+                    tool_name=tool_name,
+                    tool_call_id=block.tool_use_id,
                     data={
-                        "step": tool_name,
+                        "step": block.tool_use_id,
                         "status": status,
                         "label": f"{tool_name} {'실패' if failed else '완료'}",
                     },

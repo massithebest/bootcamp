@@ -24,6 +24,7 @@ from tools.rag_tool import search_knowledge
 from tools.result_tool import get_result_page, get_result_summary
 from tools.simulation_tool import list_simulation, run_simulation
 from tools.sql_tool import execute_sql
+from tools.table_tool import prepare_table
 from tools.visualization_tool import prepare_visualization
 
 
@@ -43,6 +44,7 @@ TOOL_NAMES = [
     f"mcp__{MCP_SERVER_NAME}__get_recipe",
     f"mcp__{MCP_SERVER_NAME}__get_result_summary",
     f"mcp__{MCP_SERVER_NAME}__get_result_page",
+    f"mcp__{MCP_SERVER_NAME}__prepare_table",
     f"mcp__{MCP_SERVER_NAME}__prepare_visualization",
 ]
 
@@ -121,13 +123,19 @@ def _run_simulation_tool(access_scope: str | None):
     return _run_simulation
 
 
+class _ListTablesInput(TypedDict):
+    keyword: NotRequired[str]
+    tag: NotRequired[str]
+
+
 @tool(
     "list_tables",
     "조회 가능한 테이블 목록을 요약으로 돌려준다. "
-    "keyword(테이블명·설명·태그·컬럼명 부분일치) 나 tag 로 좁힐 수 있다.",
-    {"keyword": str, "tag": str},
+    "keyword(테이블명·설명·태그·컬럼명 부분일치) 나 tag 로 좁힐 수 있으며 "
+    "두 필터는 모두 생략할 수 있다.",
+    _ListTablesInput,
 )
-async def _list_tables(args: dict[str, Any]) -> dict[str, Any]:
+async def _list_tables(args: _ListTablesInput) -> dict[str, Any]:
     return _ok(await list_tables(keyword=args.get("keyword"), tag=args.get("tag")))
 
 
@@ -141,12 +149,16 @@ async def _describe_table(args: dict[str, Any]) -> dict[str, Any]:
     return _ok(await describe_table(table=args["table"]))
 
 
+class _OptionalKeywordInput(TypedDict):
+    keyword: NotRequired[str]
+
+
 @tool(
     "list_kpis",
-    "정의된 KPI 목록을 조회한다. keyword 로 이름·별칭·정의를 부분일치 검색한다.",
-    {"keyword": str},
+    "정의된 KPI 목록을 조회한다. 생략 가능한 keyword 로 이름·별칭·정의를 부분일치 검색한다.",
+    _OptionalKeywordInput,
 )
-async def _list_kpis(args: dict[str, Any]) -> dict[str, Any]:
+async def _list_kpis(args: _OptionalKeywordInput) -> dict[str, Any]:
     return _ok(await list_kpis(keyword=args.get("keyword")))
 
 
@@ -163,10 +175,10 @@ async def _get_kpi(args: dict[str, Any]) -> dict[str, Any]:
 @tool(
     "list_recipes",
     "자주 쓰는 집계·조인 패턴을 담은 재사용 CTE 목록을 조회한다. "
-    "keyword 로 이름·설명·적용 목적을 부분일치 검색한다.",
-    {"keyword": str},
+    "생략 가능한 keyword 로 이름·설명·적용 목적을 부분일치 검색한다.",
+    _OptionalKeywordInput,
 )
-async def _list_recipes(args: dict[str, Any]) -> dict[str, Any]:
+async def _list_recipes(args: _OptionalKeywordInput) -> dict[str, Any]:
     return _ok(await list_recipes(keyword=args.get("keyword")))
 
 
@@ -213,6 +225,33 @@ def _get_result_page_tool(access_scope: str | None):
         )
 
     return _get_result_page
+
+
+class _PrepareTableInput(TypedDict):
+    result_id: str
+    columns: NotRequired[list[str]]
+    title: NotRequired[str]
+
+
+def _prepare_table_tool(access_scope: str | None):
+    @tool(
+        "prepare_table",
+        "사용자가 표를 요청했거나 조회 결과의 행을 표로 제시할 때 반드시 호출한다. "
+        "저장된 조회 결과를 답변 아래의 대화형 표로 준비하며 원본 행 배열은 받지 않는다. "
+        "화면에는 최대 100행을 제공하고 같은 데이터를 Markdown 표로 반복하지 않는다.",
+        _PrepareTableInput,
+    )
+    async def _prepare_table(args: _PrepareTableInput) -> dict[str, Any]:
+        return _ok(
+            await prepare_table(
+                result_id=args["result_id"],
+                columns=args.get("columns"),
+                title=args.get("title"),
+                access_scope=access_scope,
+            )
+        )
+
+    return _prepare_table
 
 
 class _PrepareVisualizationInput(TypedDict):
@@ -269,6 +308,7 @@ def build_planning_mcp_server(access_scope: str | None = None):
             _get_recipe,
             _get_result_summary_tool(access_scope),
             _get_result_page_tool(access_scope),
+            _prepare_table_tool(access_scope),
             _prepare_visualization_tool(access_scope),
         ],
     )

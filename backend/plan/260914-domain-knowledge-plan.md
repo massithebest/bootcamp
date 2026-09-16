@@ -265,7 +265,10 @@ async def get_kpi(kpi_id: str) -> dict                     # catalog_type "kpi"
 
 `agent/sdk_tools.py`:
 
-- `@tool` 4개 추가. 입력 스키마: `list_tables {"keyword": str, "tag": str}`, `describe_table {"table": str}`, `list_kpis {"keyword": str}`, `get_kpi {"kpi_id": str}`. 선택 인자는 `args.get(...)`.
+- `@tool` 4개 추가. 입력 스키마: `list_tables`의 `keyword`·`tag`와 `list_kpis`의
+  `keyword`는 `NotRequired` TypedDict, `describe_table {"table": str}`,
+  `get_kpi {"kpi_id": str}`. 선택 인자는 `args.get(...)`으로 읽는다. dict 스키마는
+  SDK가 모든 키를 필수로 변환하므로 선택 인자에 사용하지 않는다(2026-09-16 수정).
 - `query_database` @tool 삭제, `execute_sql` @tool 추가: 스키마 `{"sql": str, "purpose": str}`, 설명 "카탈로그에 등록된 테이블을 SELECT 로 조회한다. 테이블·컬럼은 describe_table 로 먼저 확인한다. purpose 에는 이 쿼리로 확인하려는 것을 한 줄로 쓴다."
 - `TOOL_NAMES` 순서: `execute_sql, search_knowledge, list_simulation, run_simulation, list_tables, describe_table, list_kpis, get_kpi`.
 - `build_planning_mcp_server`의 `tools=` 목록 갱신.

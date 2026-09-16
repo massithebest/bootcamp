@@ -1,40 +1,39 @@
 /**
  * 대화 시작 전 빈 상태.  이 도구로 무엇을 물어볼 수 있는지 실제 생산계획 용어로.
  *
- * 예시 질문 버튼은 `ThreadPrimitive.Suggestion` 으로 런타임에 직접 전송한다
- * (send) — `onPick`/`handleSend` prop 드릴링이 필요 없다.
+ * 예시 질문은 App의 정적 Suggestions scope에서 읽고 런타임에 직접 전송한다.
  */
 
-import { ThreadPrimitive } from "@assistant-ui/react";
-
-import { EXAMPLE_QUESTIONS } from "@/lib/dummy";
+import { SuggestionPrimitive, ThreadPrimitive } from "@assistant-ui/react";
 
 export function EmptyState() {
   return (
-    <div className="mx-auto flex max-w-reading flex-col gap-5 py-14">
-      <div>
-        <h2 className="text-ui-lg font-semibold text-ink">
-          무엇을 검토할까요?
-        </h2>
-        <p className="mt-1 text-ui leading-relaxed text-ink-2">
-          SMT2020의 Part, Route, Tool, WIP를 조회하고 입력 관계를 검증합니다.
-          근거가 되는 데이터와 수치를 함께 제시합니다.
-        </p>
-      </div>
-
-      <ul className="flex flex-col divide-y divide-line border-y border-line">
-        {EXAMPLE_QUESTIONS.map((q) => (
-          <li key={q}>
-            <ThreadPrimitive.Suggestion
-              prompt={q}
-              send
-              className="w-full py-2.5 text-left text-ui text-ink-2 transition-colors hover:text-ink"
-            >
-              {q}
-            </ThreadPrimitive.Suggestion>
-          </li>
-        ))}
-      </ul>
+    <div className="text-center">
+      <h2 className="text-2xl font-semibold tracking-tight text-ink">
+        무엇을 도와드릴까요?
+      </h2>
+      <p className="mt-2 text-ui leading-relaxed text-ink-2">
+        SMT2020의 Part, Route, Tool, WIP를 조회하고 입력 관계를 검증합니다.
+      </p>
     </div>
+  );
+}
+
+export function ExampleSuggestions() {
+  return (
+    <ul className="flex max-w-[42rem] flex-wrap justify-center gap-2">
+      <ThreadPrimitive.Suggestions>
+        {() => (
+          <li>
+            <SuggestionPrimitive.Trigger
+              send
+              className="rounded-lg border border-line-strong bg-canvas px-3 py-1.5 text-ui text-ink-2 transition-colors hover:bg-surface hover:text-ink"
+            >
+              <SuggestionPrimitive.Title />
+            </SuggestionPrimitive.Trigger>
+          </li>
+        )}
+      </ThreadPrimitive.Suggestions>
+    </ul>
   );
 }

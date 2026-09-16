@@ -23,6 +23,7 @@ from tools.rag_tool import search_knowledge
 from tools.result_tool import get_result_page, get_result_summary
 from tools.simulation_tool import list_simulation, run_simulation
 from tools.sql_tool import execute_sql
+from tools.table_tool import prepare_table
 from tools.visualization_tool import prepare_visualization
 
 
@@ -39,6 +40,7 @@ ALL_TOOLS = (
     get_recipe,
     get_result_summary,
     get_result_page,
+    prepare_table,
     prepare_visualization,
 )
 
@@ -191,6 +193,96 @@ def test_prepare_visualization_returns_only_id_and_warnings(seeded_db) -> None:
 
     assert set(result) == {"status", "visualization_id", "warnings"}
     assert result["status"] == "ok"
+
+
+def test_prepare_table_returns_selected_columns_and_at_most_100_rows(tmp_path, monkeypatch) -> None:
+    store = LocalParquetResultStore(tmp_path / "results")
+    monkeypatch.setattr(result_store, "_store", store)
+    meta = store.save(
+        ["id", "name", "ignored"],
+        [[index, f"row-{index}", "x"] for index in range(120)],
+        source="test",
+        conversation_id=None,
+        source_truncated=True,
+        access_scope="scope-a",
+    )
+
+    result = asyncio.run(
+        prepare_table(
+            meta.result_id,
+            columns=["name", "id"],
+            title="검증 표",
+            access_scope="scope-a",
+        )
+    )
+
+    assert result["status"] == "ok"
+    assert result["columns"] == ["name", "id"]
+    assert result["rows"][0] == ["row-0", 0]
+    assert result["rows"][-1] == ["row-99", 99]
+    assert result["row_count"] == 120
+    assert result["displayed_count"] == 100
+    assert result["source_truncated"] is True
+
+
+@pytest.mark.parametrize(
+    ("scope", "columns", "code"),
+    [
+        ("scope-b", None, "RESULT_FORBIDDEN"),
+        ("scope-a", ["missing"], "COLUMN_NOT_FOUND"),
+        ("scope-a", ["id", "id"], "INVALID_COLUMNS"),
+        ("scope-a", "id", "INVALID_COLUMNS"),
+    ],
+)
+def test_prepare_table_rejects_unavailable_or_invalid_projection(
+    tmp_path, monkeypatch, scope, columns, code
+) -> None:
+    store = LocalParquetResultStore(tmp_path / "results")
+    monkeypatch.setattr(result_store, "_store", store)
+    meta = store.save(
+        ["id"],
+        [[1]],
+        source="test",
+        conversation_id=None,
+        access_scope="scope-a",
+    )
+
+    result = asyncio.run(
+        prepare_table(meta.result_id, columns=columns, access_scope=scope)
+    )
+
+    assert result["status"] == "error"
+    assert result["code"] == code
+    assert str(tmp_path) not in str(result)
+
+
+@pytest.mark.parametrize("state", ["expired", "missing-file", "corrupt-meta", "corrupt-data"])
+def test_prepare_table_safely_rejects_unavailable_results(tmp_path, monkeypatch, state) -> None:
+    import json
+    from datetime import datetime, timedelta, timezone
+
+    store = LocalParquetResultStore(tmp_path / "results")
+    monkeypatch.setattr(result_store, "_store", store)
+    meta = store.save(
+        ["id"], [[1]], source="test", conversation_id=None, access_scope="scope-a"
+    )
+    meta_path = store.directory / f"{meta.result_id}.meta.json"
+    if state == "expired":
+        payload = json.loads(meta_path.read_text(encoding="utf-8"))
+        payload["expires_at"] = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+        meta_path.write_text(json.dumps(payload), encoding="utf-8")
+    elif state == "missing-file":
+        meta.path.unlink()
+    elif state == "corrupt-meta":
+        meta_path.write_text("{", encoding="utf-8")
+    elif state == "corrupt-data":
+        meta.path.write_text("broken parquet", encoding="utf-8")
+
+    result = asyncio.run(prepare_table(meta.result_id, access_scope="scope-a"))
+
+    assert result["status"] == "error"
+    assert result["code"] in {"RESULT_EXPIRED", "RESULT_UNAVAILABLE"}
+    assert str(tmp_path) not in str(result)
 
 
 def test_prepare_visualization_preserves_service_error(seeded_db) -> None:

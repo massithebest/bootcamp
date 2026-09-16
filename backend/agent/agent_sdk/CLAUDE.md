@@ -39,6 +39,7 @@
 | `get_recipe` | 레시피 상세. 적용 목적·출력 단위·집계 가이드·CTE SQL·표현 힌트 |
 | `get_result_summary` | 대용량 조회 결과(`large_result`)의 메타데이터·요약 통계 확인 |
 | `get_result_page` | 대용량 조회 결과의 특정 구간(offset/limit) 조회 |
+| `prepare_table` | 저장된 result_id를 검색·정렬·페이지 이동 가능한 standalone 표로 준비 |
 | `prepare_visualization` | 집계된 result_id의 실제 컬럼·grain을 검증해 bar/line 시각화 등록 |
 
 - SQL 을 작성하기 전에 `describe_table` 로 컬럼과 주의사항(caveats)을 확인한다.
@@ -47,20 +48,16 @@
 - `SMT2020_입력검증`은 테이블 건수와 관계를 확인하는 mock이다. 실제 완료량,
   throughput, 병목, 납기 달성률을 계산한 simulation으로 해석하지 않는다.
 - `execute_sql` 결과가 `type: "large_result"`면 `get_result_summary`로 성격을 파악하고, 필요한 구간만 `get_result_page`로 조회한다.
-- 비교·추이가 유용하거나 사용자가 차트를 요청하면 실제 `columns`와 결과 grain을 확인한 뒤 `prepare_visualization`을 호출한다. 오류는 명세 수정 또는 새 집계 결과로 최대 2회 보정하고, 성공한 `visualization_id`만 `chart` 코드 펜스 마커에 넣는다. 실패하거나 지원하지 않는 표현이면 표·텍스트로 답한다.
-
-성공 마커에는 다음처럼 ID 하나만 넣는다. `result_id`, 축 명세, data는 넣지 않는다.
-
-~~~~text
-```chart
-{"visualization_id":"b8c19235da17461ab3e8ec82a942f017"}
-```
-~~~~
+- 비교·추이가 유용하거나 사용자가 차트를 요청하면 실제 `columns`와 결과 grain을 확인한 뒤 `prepare_visualization`을 호출한다. 오류는 명세 수정 또는 새 집계 결과로 최대 2회 보정한다. 성공 결과는 Tool UI가 자동으로 표시하므로 최종 답변에 `visualization_id`나 `chart` 코드 펜스를 반복하지 않는다. 실패하거나 지원하지 않는 표현이면 표·텍스트로 답한다.
+- 사용자가 표를 요청했거나 조회·시뮬레이션 결과에서 2행 이상을 나열하려면 반드시 `prepare_table(result_id, columns?, title?)`을 호출한다. `get_result_page`로 일부 행을 확인했더라도 원래 `result_id`로 호출한다. 성공 결과는 Tool UI가 최대 100행을 표시한다. Result Store 데이터를 Markdown 표로 작성하지 않는다.
+- 표와 차트는 각각 사용자에게 공개할 짧은 `도입 설명 → Tool UI → 결과 해석` 순서로 배치한다. 둘을 함께 제공하면 표의 도입·호출·해석을 마친 뒤 차트의 도입·호출·해석을 이어 쓴다. 도입과 해석에는 내부 추론을 쓰지 않고, 해당 결과의 범위·핵심 수치·주의점만 설명한다.
 
 ## 결과 검증 원칙
 
 - Tool 결과의 `status` 를 확인하고, 오류면 사용자에게 알린다.
 - 수치를 인용할 때는 어떤 Tool 결과에서 나온 값인지 밝힌다.
+- Markdown 표는 Result Store와 무관한 개념 비교에만 사용한다. SQL·시뮬레이션
+  결과 행은 `prepare_table` Tool UI로 표시한다.
 - `verified: false` 인 지식으로 계산했으면 "미검증 정의 기준"임을 밝힌다.
 
 ## Skills

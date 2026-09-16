@@ -43,6 +43,14 @@
 | - | Mock에서 실제 사내 서비스로 전환 | P3 | 진행 중 | 해당 없음 | [백엔드 폐쇄망 가이드](../backend/docs/CLOSED_NETWORK_SETUP.md) | - |
 | 6 | 문서 역할 분리와 Agent 공통 지침 | - | 완료 | 완료 | 완료 | 2026-09-15 |
 | 9 | frontend-design Skill 기반 3-pane 워크벤치 UI/UX 개선 | - | 해당 없음 | 완료 | [Frontend UI/UX 계획](260916-frontend-ui-ux-plan.md) | 2026-09-16 |
+| 10 | assistant-ui Elements 기반 공통 프론트엔드 전환 | - | 해당 없음 | 완료 | [Elements 전환 계획](260916-assistant-ui-elements-plan.md) | 2026-09-16 |
+| 11 | assistant-ui 홈페이지형 Composer와 공개 실행·답변 스트리밍 | - | 완료 | 완료 | [스트리밍 UI 계획](260916-assistant-ui-streaming-plan.md) | 2026-09-16 |
+| 12 | 조회 1,000행·Composer 준비 중 제어(당시 표시 10행 정책은 #15에서 대체) | - | 완료 | 완료 | [조회·Composer 계획](260916-result-limit-composer-controls-plan.md) | 2026-09-16 |
+| 13 | 중첩 Tool Reasoning과 호출 상세 | - | 완료 | 완료 | [중첩 Tool Reasoning 계획](260916-nested-tool-reasoning-plan.md) | 2026-09-16 |
+| 14 | assistant-ui Tool UI 기반 차트 표시 | - | 완료 | 완료 | [Tool UI 차트 계획](260916-assistant-ui-tool-ui-plan.md) | 2026-09-16 |
+| 15 | assistant-ui Tool UI 기반 대화형 표·표시 100행 | - | 완료 | 완료 | [대화형 표 계획](260916-interactive-table-tool-ui-plan.md) | 2026-09-16 |
+| 16 | TanStack Table 전환과 표·차트 문맥 순서 | - | 완료 | 완료 | [TanStack Table·메시지 순서 계획](260916-tanstack-table-message-order-plan.md) | 2026-09-16 |
+| 17 | 카탈로그 Tool 선택 인자 스키마 수정 | - | 완료 | 해당 없음 | [카탈로그 Tool 스키마 계획](260916-optional-catalog-tool-schema-plan.md) | 2026-09-16 |
 
 P1~P3는 미수행 항목 간 상대적 우선순위이며 숫자가 낮을수록 먼저 착수한다.
 근거는 아래 "다음 우선순위"에 정리한다. 순번·수행일자는 git 커밋 이력 기준 실제
@@ -56,7 +64,7 @@ P1~P3는 미수행 항목 간 상대적 우선순위이며 숫자가 낮을수�
 - 비밀값과 사내 주소는 환경 설정으로만 주입하고 버전관리에 포함하지 않는다.
 - `AgentEvent`와 tool 결과 계약을 변경할 때 백엔드 스키마와 프론트엔드
   타입·파서를 같은 작업에서 갱신한다.
-- Result Store, `prepare_visualization`, `/api/visualizations/{id}`와
+- Result Store, `prepare_table`, `prepare_visualization`, `/api/visualizations/{id}`와
   `pp_session_scope`의 계약 및 접근 범위·TTL을 유지한다.
 - 도메인 지식 YAML과 Agent tool의 경계를 유지하고 내부 파일 경로를 API
   payload에 포함하지 않는다.
@@ -64,6 +72,16 @@ P1~P3는 미수행 항목 간 상대적 우선순위이며 숫자가 낮을수�
 
 ## 수행해야 할 일
 
+- [x] [누적 미커밋 변경 통합 검토](260916-uncommitted-review-plan.md) — 결과 문맥 보존·오탐·종료 상태·접근성 수정 및 필수/브라우저 검증
+
+- [x] [assistant-ui Elements 기반 프론트엔드 전환](260916-assistant-ui-elements-plan.md) — 공식 shadcn 설치 및 Elements 카탈로그 5종 추가 적용 완료
+- [x] [assistant-ui 홈페이지형 Composer와 공개 실행·답변 스트리밍](260916-assistant-ui-streaming-plan.md)
+- [x] [조회 1,000행·Composer 준비 중 제어](260916-result-limit-composer-controls-plan.md) — 당시 표시 10행 정책은 대화형 표 계획에서 100행으로 대체
+- [x] [중첩 Tool Reasoning과 호출 상세](260916-nested-tool-reasoning-plan.md)
+- [x] [assistant-ui Tool UI 기반 차트 표시](260916-assistant-ui-tool-ui-plan.md)
+- [x] [assistant-ui Tool UI 기반 대화형 표·표시 100행](260916-interactive-table-tool-ui-plan.md)
+- [x] [TanStack Table 전환과 표·차트 문맥 순서](260916-tanstack-table-message-order-plan.md)
+- [x] [카탈로그 Tool 선택 인자 스키마 수정](260916-optional-catalog-tool-schema-plan.md)
 - [x] [전체 시스템 근거 기반 감사 및 리팩토링](260915-full-stack-refactoring-plan.md) — 선정 P0/P1 및 소규모 P2 구현·검증 완료
 - [x] SMT2020 HVLM/LVHM 원본을 단일 SQLite DB로 변환
 - [x] 기존 합성 FGS/MP 시드와 mock을 SMT2020 SQL·입력 검증 mock으로 교체
@@ -115,3 +133,5 @@ DB와 입력 정합성 mock으로 대체했다.
 - [SMT2020 SQLite 및 Mock 전환](260915-smt2020-mock-data-plan.md)
 - [전체 시스템 리팩토링](260915-full-stack-refactoring-plan.md)
 - [Frontend UI/UX 개선(frontend-design)](260916-frontend-ui-ux-plan.md)
+
+- [assistant-ui Elements 전환](260916-assistant-ui-elements-plan.md)

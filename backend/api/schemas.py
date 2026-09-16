@@ -39,6 +39,7 @@ class AgentEvent(BaseModel):
     type: AgentEventType
     content: str | None = None
     tool_name: str | None = None
+    tool_call_id: str | None = None
     data: dict[str, Any] | None = None
 
 

@@ -1,6 +1,9 @@
 /** 개발 서버에서만 불러오는 회귀 harness. 앱 bundle에는 포함하지 않는다. */
 import { act, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { AssistantRuntimeProvider, ThreadPrimitive } from "@assistant-ui/react";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { AssistantMessage } from "@/components/chat/thread-messages";
 import { useAgentChat, type UseAgentChatResult } from "@/hooks/use-agent-chat";
 import type { AgentEvent, ChatMessage } from "@/types/chat";
 
@@ -144,4 +147,124 @@ export async function runChatRegressions() {
     }
   } finally { window.fetch = originalFetch; Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: false }); }
   return results;
+}
+
+/** 실제 AssistantMessage DOM으로 실행 과정의 두 단계 disclosure를 검증한다. */
+export async function runExecutionUiRegressions() {
+  const name = "execution indicator distinguishes tool, writing, and completed phases";
+  const originalFetch = window.fetch;
+  const encoder = new TextEncoder();
+  type Pending = {
+    body: Record<string, unknown>;
+    controller: ReadableStreamDefaultController<Uint8Array>;
+  };
+  const requests: Pending[] = [];
+  let current!: UseAgentChatResult;
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+
+  window.fetch = async (_input, init) => new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      requests.push({ body: JSON.parse(String(init?.body)), controller });
+    },
+  }));
+
+  function UIProbe() {
+    current = useAgentChat([] as ChatMessage[]);
+    return (
+      <AssistantRuntimeProvider runtime={current.runtime}>
+        <TooltipProvider>
+          <ThreadPrimitive.Root>
+            <ThreadPrimitive.Viewport>
+              <ThreadPrimitive.Messages>
+                {({ message }) => message.role === "assistant" ? <AssistantMessage /> : null}
+              </ThreadPrimitive.Messages>
+            </ThreadPrimitive.Viewport>
+          </ThreadPrimitive.Root>
+        </TooltipProvider>
+      </AssistantRuntimeProvider>
+    );
+  }
+
+  const emit = async (events: AgentEvent[]) => {
+    check(requests[0], "request missing");
+    await act(async () => {
+      requests[0].controller.enqueue(encoder.encode(
+        events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(""),
+      ));
+    });
+  };
+
+  const groupTrigger = () => host.querySelector<HTMLButtonElement>(
+    '[data-slot="tool-group-trigger"]',
+  );
+
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  try {
+    await act(async () => root.render(<StrictMode><UIProbe /></StrictMode>));
+    await act(async () => {
+      void current.runtime.thread.append({
+        role: "user",
+        content: [{ type: "text", text: "WIP를 조회해줘" }],
+      });
+    });
+    check(host.textContent?.includes("요청 분석 중"), "initial progress is delayed");
+
+    await emit([{ type: "status", data: {
+      step: "plan",
+      label: "질의 분석",
+      detail: "조회 범위 확인",
+      status: "running",
+    } }]);
+    check(groupTrigger()?.textContent?.includes("실행 과정 진행 중"), "public status group missing");
+    check(host.textContent?.includes("질의 분석"), "independent public status missing");
+
+    await emit([{ type: "tool_call", tool_name: "execute_sql", tool_call_id: "sql-1", data: {
+      step: "sql-1",
+      label: "데이터 조회",
+      status: "running",
+      args: { sql: "SELECT 1" },
+    } }]);
+    check(groupTrigger()?.textContent?.includes("툴 1개 실행 중"), "tool group did not use running part status");
+    check(groupTrigger()?.getAttribute("aria-expanded") === "true", "running group is not open");
+    check(host.textContent?.includes("질의 분석"), "public status left the execution group");
+
+    await emit([
+      { type: "tool_result", tool_name: "execute_sql", tool_call_id: "sql-1", data: { status: "ok", rows: [[1]] } },
+      { type: "status", tool_name: "execute_sql", tool_call_id: "sql-1", data: { step: "sql-1", status: "completed" } },
+    ]);
+    check(current.streaming, "fixture unexpectedly stopped before final text");
+    check(groupTrigger()?.textContent?.includes("응답 작성 중 · 툴 1개 사용"), "writing phase is not distinguished after tools complete");
+    check(groupTrigger()?.querySelector('[data-slot="tool-group-trigger-loader"]'), "activity spinner disappeared while writing");
+    check(groupTrigger()?.getAttribute("aria-expanded") === "true", "group closed before the response completed");
+
+    await act(async () => {
+      requests[0].controller.enqueue(encoder.encode(
+        `data: ${JSON.stringify({ type: "text", content: "조회 결과입니다." })}\n\n` +
+        `data: ${JSON.stringify({ type: "done" })}\n\n`,
+      ));
+      requests[0].controller.close();
+    });
+    check(groupTrigger()?.getAttribute("aria-expanded") === "false", "completed group did not collapse");
+    check(groupTrigger()?.textContent?.includes("응답 작성 완료 · 툴 1개 사용"), "completed phase is not labelled");
+    check(groupTrigger()?.querySelector('[data-slot="tool-group-trigger-complete"]'), "completed icon is missing");
+    check(!groupTrigger()?.querySelector('[data-slot="tool-group-trigger-loader"]'), "spinner remained after completion");
+
+    await act(async () => groupTrigger()?.click());
+    const toolTrigger = host.querySelector<HTMLButtonElement>('[data-slot="tool-call"] button');
+    check(toolTrigger, "tool row missing after reopening the group");
+    await act(async () => toolTrigger.click());
+    check(host.textContent?.includes("Parameters"), "tool parameters missing at the second disclosure level");
+    check(host.textContent?.includes("Result"), "tool result missing at the second disclosure level");
+
+    return [{ name }];
+  } catch (error) {
+    return [{ name, error: String(error) }];
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    window.fetch = originalFetch;
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: false });
+  }
 }

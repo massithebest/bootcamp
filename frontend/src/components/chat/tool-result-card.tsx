@@ -9,16 +9,11 @@
  * 도구 목록은 Backend `agent/sdk_tools.py` 의 `TOOL_NAMES`를 기준으로 유지한다.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import type { ToolResult } from "@/types/chat";
 import { toolResultError } from "@/lib/tool-result";
-import {
-  Tool,
-  ToolContent,
-  ToolHeader,
-  ToolOutput,
-} from "@/components/ai-elements/tool";
+import { ToolCall } from "@/components/assistant-ui/elements/tool-call";
 import { CatalogResult } from "./tool-results/catalog-result";
 import { catalogSummary } from "./tool-results/catalog-data";
 import { DatabaseResult } from "./tool-results/database-result";
@@ -41,12 +36,13 @@ const TOOL_META: Record<string, { label: string; kind: Kind }> = {
   get_recipe: { label: "집계 레시피", kind: "catalog" },
   get_result_summary: { label: "결과 요약 조회", kind: "database" },
   get_result_page: { label: "결과 구간 조회", kind: "database" },
+  prepare_table: { label: "표 준비", kind: "generic" },
   prepare_visualization: { label: "차트 준비", kind: "generic" },
 };
 
-function resolveKind(result: ToolResult): { label: string; kind: Kind } {
-  const meta = TOOL_META[result.toolName];
-  const dataKind = result.data ? str(result.data.kind) : null;
+function resolveKind(toolName: string, result?: ToolResult): { label: string; kind: Kind } {
+  const meta = TOOL_META[toolName];
+  const dataKind = result?.data ? str(result.data.kind) : null;
   if (meta) return meta;
   if (
     dataKind === "database" ||
@@ -54,9 +50,9 @@ function resolveKind(result: ToolResult): { label: string; kind: Kind } {
     dataKind === "simulation" ||
     dataKind === "catalog"
   ) {
-    return { label: result.toolName || "도구 결과", kind: dataKind };
+    return { label: toolName || "도구 결과", kind: dataKind };
   }
-  return { label: result.toolName || "도구 결과", kind: "generic" };
+  return { label: toolName || "도구 결과", kind: "generic" };
 }
 
 /**
@@ -84,50 +80,48 @@ function resultHeaderSummary(kind: Kind, data: Record<string, unknown>): string 
 }
 
 export function ToolResultCard({
+  toolName,
+  args,
   result,
-  isRunning,
+  running,
+  messageRunning,
 }: {
-  result: ToolResult;
-  /** 이 결과를 담은 assistant 메시지가 아직 실행 중인지. 실행 중에는 펼쳐서
-   *  진행 상황을 보여주고, 끝나면 접어 최종 답변의 위계를 회복한다
-   *  (AgentProgress와 동일한 open/touched 패턴). */
-  isRunning: boolean;
+  toolName: string;
+  args: Record<string, unknown>;
+  result?: ToolResult;
+  running: boolean;
+  messageRunning: boolean;
 }) {
-  const { label, kind } = resolveKind(result);
-  const data = result.data ?? {};
-  const errorText = toolResultError(result);
+  const { kind } = resolveKind(toolName, result);
+  const data = result?.data ?? {};
+  const errorText = result ? toolResultError(result) : null;
 
   const summary = resultHeaderSummary(kind, data);
   const unverified = kind === "catalog" && data.verified === false;
-  const title = [label, summary].filter(Boolean).join(" · ");
+  const title = [toolName || "tool", summary].filter(Boolean).join(" · ");
 
-  // 분석 한 번에 지식(catalog) 조회가 4~6회 발생하므로 항상 접어 둔다.
-  // 그 외 종류는 메시지가 실행 중일 때만 펼치고, 완료되면 접어 밀도를 되찾는다.
-  const autoOpen = kind === "catalog" ? false : isRunning;
-  const [open, setOpen] = useState(autoOpen);
-  const [touched, setTouched] = useState(false);
+  const [open, setOpen] = useState(false);
   useEffect(() => {
-    if (!touched) setOpen(autoOpen);
-  }, [autoOpen, touched]);
+    if (!messageRunning) setOpen(false);
+  }, [messageRunning]);
 
   return (
-    <Tool
+    <ToolCall
+      label={unverified ? `${title} · 미검증` : title}
+      error={errorText}
+      running={running}
+      incomplete={!result && !messageRunning}
       open={open}
-      onOpenChange={(v) => {
-        setOpen(v);
-        setTouched(true);
-      }}
-      className="border-l border-line-strong pl-3"
+      onOpenChange={setOpen}
     >
-      <ToolHeader
-        type={`tool-${result.toolName}`}
-        state={errorText ? "output-error" : "output-available"}
-        title={unverified ? `${title} · 미검증` : title}
-      />
-      <ToolContent>
-        <ToolOutput
-          errorText={errorText}
-          output={
+      <div className="flex flex-col gap-4">
+        <DetailSection label="Parameters">
+          <JsonDetail value={args} empty="파라미터가 없습니다." />
+        </DetailSection>
+        <DetailSection label="Result">
+          {!result ? (
+            <p className="text-ui text-ink-3">{messageRunning ? "Tool 결과를 기다리고 있습니다." : "결과가 도착하기 전에 실행이 종료되었습니다."}</p>
+          ) : (
             <>
               {kind === "database" && <DatabaseResult data={data} />}
               {kind === "knowledge" && <KnowledgeResult data={data} />}
@@ -135,10 +129,28 @@ export function ToolResultCard({
               {kind === "catalog" && <CatalogResult data={data} />}
               {kind === "generic" && <GenericResult result={result} />}
             </>
-          }
-        />
-      </ToolContent>
-    </Tool>
+          )}
+        </DetailSection>
+      </div>
+    </ToolCall>
+  );
+}
+
+function DetailSection({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section>
+      <p className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-ink-3">{label}</p>
+      {children}
+    </section>
+  );
+}
+
+function JsonDetail({ value, empty }: { value: Record<string, unknown>; empty: string }) {
+  if (Object.keys(value).length === 0) return <p className="text-ui text-ink-3">{empty}</p>;
+  return (
+    <pre className="thin-scroll max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-surface-2 p-3 font-mono text-data leading-relaxed text-ink-2">
+      {JSON.stringify(value, null, 2)}
+    </pre>
   );
 }
 

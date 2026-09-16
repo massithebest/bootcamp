@@ -9,7 +9,7 @@ async def execute_sql(sql: str, purpose: str, *, access_scope: str | None = None
     SELECT 전용이며, 카탈로그(`list_tables` / `describe_table`)에 등록된
     테이블만 조회할 수 있다. 결과는 저장소에 보관되며, 100행 이하는 표 전체를,
     초과 결과는 ``result_id``와 샘플·요약을 돌려준다. SQL 가드레일은 최대
-    500행을 허용한다.
+    1,000행을 허용한다.
 
     Args:
         sql: 실행할 SELECT 문.

@@ -10,7 +10,7 @@ import re
 
 
 #: 한 번에 저장할 최대 행 수. 서비스는 MAX_ROWS + 1행으로 source_truncated를 판정한다.
-MAX_ROWS = 500
+MAX_ROWS = 1000
 
 _FORBIDDEN = re.compile(
     r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|ATTACH|PRAGMA)\b", re.I

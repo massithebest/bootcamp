@@ -9,10 +9,15 @@
 | --- | --- | --- |
 | 2026-09-08 | 3-pane 워크벤치 | 활성 |
 | 2026-09-11 | Tailwind v4와 shadcn/ui | 활성 |
-| 2026-09-14 | AI Elements를 복사 소스로 제한해 사용 | 활성 |
+| 2026-09-14 | AI Elements를 복사 소스로 제한해 사용 | 2026-09-16 대체 |
 | 2026-09-14 | Next.js에서 Vite SPA로 이전 | 활성 |
 | 2026-09-14 | assistant-ui를 UI plumbing 계층으로 도입 | 활성 |
-| 2026-09-15 | 차트를 최종 답변의 `visualization_id` marker로 전환 | 활성 |
+| 2026-09-15 | 차트를 최종 답변의 `visualization_id` marker로 전환 | 2026-09-16 대체 |
+| 2026-09-16 | assistant-ui Elements를 공통 채팅 UI의 기준으로 사용 | 활성 |
+| 2026-09-16 | 홈페이지형 Composer와 공개 상태 Reasoning·답변 delta 스트리밍 | 활성 |
+| 2026-09-16 | 조회 1,000행·표시 10행과 Composer 준비 중 제어 | 같은 날 100행 결정으로 대체 |
+| 2026-09-16 | 검증된 차트를 standalone Tool UI로 표시 | 활성 |
+| 2026-09-16 | 표시 100행과 standalone 대화형 표 Tool UI | 활성 |
 
 ## 3-pane 워크벤치
 
@@ -20,9 +25,8 @@
 세션 목록·사용자·Metadata·Prompt는 아직 로컬 데이터다. 실제 연결되지 않은
 패널을 영속 기능으로 설명하지 않는다.
 
-현재 왼쪽 sidebar는 `components/chat/app-sidebar.tsx`의 커스텀 구현이다.
-설치된 shadcn Sidebar는 사용하지 않는다. 교체할 때는 provider, mobile sheet와
-기존 토큰·layout 충돌을 먼저 검토한다.
+왼쪽 sidebar 셸은 `components/chat/app-sidebar.tsx`, 목록은 assistant-ui의
+standalone `ThreadList`다. 설치된 shadcn Sidebar provider는 사용하지 않는다.
 
 ## Tailwind v4와 shadcn/ui
 
@@ -34,8 +38,9 @@ semantic CSS token을 사용하며 shadcn 기본 팔레트를 독립적으로 �
 
 ## AI Elements
 
-`chain-of-thought`, `tool`, `task` 컴포넌트 소스만 사용한다. 복사된 코드는 프로젝트
-코드와 같은 기준으로 수정한다. `ai`, `@ai-sdk/react`, `useChat`, `streamdown`과
+2026-09-16 assistant-ui Elements 전환으로 대체됐다. 이전에는
+`chain-of-thought`, `tool`, `task` 복사 소스를 제한해 사용했다.
+`ai`, `@ai-sdk/react`, `useChat`, `streamdown`과
 AI SDK streaming protocol은 사용하지 않는다. 이유는 Backend SSE 계약과 맞지 않고
 불필요한 의존성·외부 endpoint 가능성을 늘리기 때문이다.
 
@@ -59,8 +64,38 @@ assistant-ui는 thread, viewport, composer, message, action bar와 Markdown rend
   유지하는 동안 `setMessages`(branch switch/delete)는 제거했다.
 - 메시지 종료 상태는 공식 `MessageStatus`(`complete`/`incomplete(cancelled,error)`)로
   정규화하고 오류 표시는 `MessagePrimitive.Error`를 사용한다.
-- Tool UI toolkit/`GroupedParts`와 thread-list adapter는 Backend에 stable
-  `tool_call_id`와 세션 persistence 계약이 생기기 전까지 보류한다.
+- Tool UI는 stable `tool_call_id` 계약을 도입해 `GroupedParts`에 연결했다.
+  thread-list adapter는 세션 persistence 계약이 생기기 전까지 보류한다.
+
+### Elements 중심 UI (2026-09-16, 활성)
+
+사용자 요청에 따라 UI plumbing만 적용하던 범위를 공통 채팅 화면 전체로
+확대했다. 공식 Base 템플릿을 참고하되 Vite와 기존 SSE를 유지한다.
+
+- 루트 `App`에 `AssistantRuntimeProvider`와 tooltip provider를 둔다.
+- 공식 Thread 구조(메시지, welcome, ViewportFooter, composer, scroll-to-bottom)를
+  복사·조정하고 생산계획 `AssistantMessage`/`Welcome` 및 재시도 슬롯을 연결한다.
+- 세션 목록은 standalone ThreadList, 도구 결과는 ToolCall, 진행 단계는
+  AgentPlan이다. AI Elements 소스와 전용 controllable-state 훅은 제거한다.
+- 목록의 미연결 편집/삭제 장식은 제외한다. AgentPlan은 activeIndex로 완료를
+  추측하지 않고 명시적 단계 상태를 받고 취소는 runtime 종료 상태에서 판정한다.
+  최종 상태가 없는 단계는 `완료 미확인`으로 표시한다.
+  ToolCall은 ReactNode 결과와 오류 슬롯을 추가해 SQL·표·지식 renderer를 쓴다.
+- 코드 소스와 MIT 고지는 저장소에 포함한다. 새 npm 의존성은 없다.
+  `tw-shimmer`, 첨부·음성·Cloud 등 미사용 의존성을 자동 설치하지 않는다.
+- 기존 3-pane 폭·semantic token·폰트·읽기 폭·완료 후 접힘 규칙은 유지한다.
+  empty 화면은 중앙 정렬, composer는 Thread의 sticky ViewportFooter에 둔다.
+
+요청된 `useChatRuntime with AI SDK transport`는 기존 SSE 결정과 충돌하므로
+AGENTS.md에 일반 패턴과 현재 적용 예외를 함께 기록했다. 공식 External Store
+경로로 Elements를 사용하는 데 문제없다. `AssistantModal`은 위젯용 패턴이며
+현재 full-page 채팅에는 적용하지 않는다. 원격 thread adapter·tool toolkit
+보류 결정과 백엔드 계약은 바뀌지 않는다.
+
+근거: [Thread](https://www.assistant-ui.com/elements/thread),
+[ToolCall](https://www.assistant-ui.com/elements/tool-call),
+[AgentPlan](https://www.assistant-ui.com/elements/agent-plan),
+[상위 계획](../../plan/260916-assistant-ui-elements-plan.md).
 
 감사 결과와 후속 작업은
 [assistant-ui 감사 계획](../plan/260915-assistant-ui-audit-plan.md)에 둔다.
@@ -94,3 +129,317 @@ SSE envelope 검증은 `lib/chat-sse.ts`, 순수 메시지 전이는 `lib/chat-s
 외부 font, CDN, script, telemetry와 브라우저의 외부 LLM 호출을 금지한다. 패키지
 버전과 전이 의존성을 사내 registry에서 확인하고 오프라인 build를 검증한다.
 세부 절차는 [폐쇄망 운영 원칙](closed-network.md)을 따른다.
+
+
+### 공식 registry CLI 설치 후속 (2026-09-16, 활성)
+
+사용자 지정 `npx shadcn@latest add @assistant-ui/thread @assistant-ui/thread-list`
+실행으로 관련 소스를 추가했다. 기존 수정 파일은 보존하며 runtime ThreadList는
+세션 adapter가 준비되기 전까지 설치된 소스로만 유지한다. 현재 standalone
+예시 목록·Thread 슬롯과 SSE 연결은 동일하다.
+
+이 요청 범위에서 “새 npm 의존성 없음” 결정은 tw-shimmer 0.4.13 추가와
+zustand 5.0.15 직접 선언으로 보완한다. 정확한 버전을 lockfile과 함께 관리한다.
+설치 당시에는 첨부·reasoning·원격 연결을 활성화하지 않았다. Reasoning은 아래
+후속 결정에서 공개 status 표시로 연결했다.
+
+
+### Elements 카탈로그의 적용 경계 (2026-09-16, 활성)
+
+[공식 목록](https://www.assistant-ui.com/elements#messages)을 검토해 기존
+Thread·MessageActions·ToolCall·AgentPlan에 다음 요소를 추가했다.
+
+| Element | 적용 위치와 동작 |
+| --- | --- |
+| ErrorState | 연결 실패·메시지 오류. 연결 실패는 기존 retry context, 메시지 오류는 runtime Reload를 사용한다. |
+| EditMessage | inline 편집. 이후 답변 수와 대화 교체를 안내하고 runtime 입력·취소·저장을 유지한다. |
+| StoppedRun | 취소된 응답 뒤. 받은 내용은 유지하고 같은 질문을 다시 실행한다. |
+| RetrievalChunks | 지식 검색 도구 결과. 제목·위치·본문·유효 관련도를 실제 payload에서 읽는다. |
+
+기존 External Store 결정과 충돌하지 않는다. 다만 공식 편집 예제의 분기 보존
+설명은 현재 선형 adapter와 다르므로 기존 대화로 돌아갈 수 있다고 표시하지
+않는다. StoppedRun의 Continue 역시 실제 이어쓰기가 아니므로 “다시 실행”으로
+명명한다. 오류의 재실행은 다른 요청 실행 중에 runtime이 비활성화한다.
+
+현재 미적용: Branches(분기 저장소 없음), Queue(큐 동작 없음), Feedback(저장 API
+없음), Timestamps(실제 메시지 시각 계약 없음), Regenerate with(모델 선택 없음),
+Confidence(신뢰도 근거 없음). Speaker identity는 단일 assistant에서 추가 역할
+데이터가 없어 보류한다. 공식 DataTable은 모델·context·가격 전용 예제이므로
+동적 SQL 표와 Result Store·Recharts를 대체하지 않는다. 첨부·음성·Cloud 보류는 유지한다.
+
+관련도는 답변 신뢰도가 아니다. 누락·비정상 값은 숨기고 유효한 0은 표시한다.
+새 npm 의존성과 외부 런타임 요청을 추가하지 않았다. PromptLibrary는 아래
+홈페이지형 Composer 결정에서 제거됐다.
+
+### 홈페이지형 Composer와 공개 실행 스트리밍 (2026-09-16, 활성)
+
+공식 홈페이지의 빈 Thread를 참고해 중앙 영역을 제목, 둥근 Composer, suggestion
+pill 순으로 배치한다. 대화가 시작되면 Composer는 기존처럼 viewport 하단에
+고정된다. 별도 질문 모음 popover와 Enter/Shift+Enter 안내는 제거한다. 예시 질문은
+기존 `ThreadPrimitive.Suggestion`으로 유지하므로 클릭하면 바로 전송된다.
+
+Composer focus는 form 외곽선 하나로 표현한다. 전역 키보드 focus 규칙은 유지하고
+`aui_composer-input` textarea에만 내부 outline을 제거한다.
+
+assistant-ui Reasoning disclosure에는 Backend `status` 이벤트의 공개 업무 단계만
+표시한다. 실행 중 자동으로 열리고 진행 label과 단계가 스트리밍되며 완료 후
+접힌다. Claude Agent SDK의 `thinking_delta`와 ThinkingBlock은 계속 폐기하므로
+모델의 비공개 chain-of-thought를 노출하지 않는다.
+
+실 응답은 `include_partial_messages`로 받은 `text_delta`를 기존 AgentEvent `text`로
+즉시 전달한다. `message_start`의 provider message id가 같은 최종 누적 TextBlock은 adapter가 생략해
+중복을 막는다. 공개 AgentEvent와 FastAPI SSE 형식은 바뀌지 않으며 fake runner와
+frontend external-store 계약도 동일하다.
+
+근거: [공통 계획](../../plan/260916-assistant-ui-streaming-plan.md),
+[assistant-ui Reasoning](https://www.assistant-ui.com/elements/reasoning),
+[Claude streaming messages](https://platform.claude.com/docs/en/build-with-claude/streaming).
+
+### 조회·표시 한도와 Composer 준비 중 제어 (2026-09-16, 표시 한도 대체)
+
+SQL 조회·Result Store 저장 상한은 500행에서 1,000행으로 확장한다. Frontend 표
+표시 한도는 이 데이터 한도와 분리해 10행으로 고정한다. 공용 `DataTable`과 최종
+답변 Markdown `tbody`가 모두 처음 10개 데이터 행만 렌더링하고, 나머지 건수를
+안내한다. Agent에도 최종 Markdown 표를 10행 이내로 작성하도록 지시한다.
+
+Composer 왼쪽 아래에는 첨부, 모델 `GLM-5.3-Flash`, 추론 강도 `Low`를 표시한다.
+현재 attachment adapter와 per-run 모델·추론 설정 계약이 없으므로 세 제어는
+준비 중인 비활성 UI다. 사용자가 실제로 설정이 적용된 것으로 오해하지 않도록
+접근 가능한 이름에 준비 중 상태를 포함한다.
+
+근거: [공통 계획](../../plan/260916-result-limit-composer-controls-plan.md).
+
+위 결정의 조회 1,000행과 Composer 제어는 유지한다. 표 표시 10행 정책만 아래
+대화형 표 결정의 100행 정책으로 대체됐다.
+
+### 중첩 Tool 실행 과정 (2026-09-16, 활성)
+
+한 assistant 턴의 업무 Tool 호출은 assistant-ui `MessagePrimitive.GroupedParts`와
+`ToolGroup` 요소로 최종 답변 위에 모은다. 실행 중에는 전체 그룹이 열리고 응답이
+완료되면 자동으로 닫힌다. 사용자가 그룹을 펼치면 Tool 목록, 개별 Tool을 다시
+펼치면 공개 Parameters와 Result가 보이는 두 단계 disclosure를 사용한다.
+
+Backend `AgentEvent`는 선택 필드 `tool_call_id`를 추가했으며 `tool_call.data.args`에
+업무 Tool의 공개 입력만 싣는다. 동일 호출의 call/status/result는 같은 ID를 써서
+같은 이름의 반복 호출도 정확히 연결한다. 내부 access scope, SDK thinking과
+built-in Tool 입력은 계속 노출하지 않는다.
+
+Tool 사이의 안내 텍스트는 실행 과정과 최종 답변을 두 덩어리로 만들지 않도록
+본문에서 제외한다. 마지막 Tool 뒤에 스트리밍된 텍스트만 최종 응답으로 렌더링하며,
+Tool이 없는 응답은 전체 텍스트를 유지한다.
+
+첫 공개 Tool 호출 전에는 빈 assistant 메시지에 `요청 분석 중` indicator를
+즉시 표시한다. 첫 content part가 도착하면 indicator는 실제 ToolGroup 또는
+스트리밍 답변으로 교체된다. 준비 중인 Composer 제어는 비활성 상태를 유지하되
+금지 커서를 표시하지 않는다.
+
+Tool 실행 단계는 assistant-ui가 계산한 그룹 `part.status`를 따른다. 회전
+아이콘은 메시지 전체 실행 상태를 따라 요청 분석, Tool 실행, 최종 답변 작성
+동안 유지한다. Tool이 끝난 뒤 최종 텍스트가 스트리밍되는 동안 그룹은 열린
+상태에서 `응답 작성 중`으로 바뀌고, 완료되면 완료 아이콘과 `응답 작성 완료`를
+표시한 뒤 접힌다. Tool 호출과 연결되지 않은 공개 `status` 이벤트는 metadata로 전달해
+같은 실행 과정 블록의 `AgentPlan`에 표시한다. Tool-linked status는 개별 Tool
+행이 이미 표현하므로 중복 렌더링하지 않는다. 최종 상태에서는 실행 과정 전체를
+자동으로 접고, 다시 펼치면 공개 단계 → Tool 목록 → Parameters/Result 순으로
+확인할 수 있다.
+
+근거: [공통 계획](../../plan/260916-nested-tool-reasoning-plan.md).
+
+### 검증된 차트 Tool UI (2026-09-16, 활성)
+
+`prepare_visualization`은 Backend에서 계속 실행하고, assistant-ui toolkit에는
+같은 이름의 렌더링 전용 backend Tool UI만 등록한다. 성공 payload의 32자
+`visualization_id`를 기존 조회 API와 런타임 검증을 거쳐 Recharts에 전달한다.
+
+차트 Tool은 `display: "standalone"`으로 실행 과정 disclosure에서 분리해 최종
+설명 다음에 둔다. 같은 `result_id`의 실패 호출을 Agent가 후속 성공으로 보정하면
+앞선 실패 UI는 숨기며, 모두 실패한 경우에는 안전한 오류를 표시한다. 기존
+`chart` marker renderer는 과거 메시지 호환용으로 유지하고 같은 ID의 Tool UI가
+있으면 중복 렌더링하지 않는다. 새 Agent 응답은 marker를 작성하지 않는다.
+
+FastAPI SSE, `useExternalStoreRuntime`, Result Store와 시각화 API 계약은 변경하지
+않았다. Generative UI, AI SDK transport, 프론트 실행 Tool과 새 패키지도 추가하지
+않았다.
+
+근거: [공통 계획](../../plan/260916-assistant-ui-tool-ui-plan.md),
+[assistant-ui Tool UI](https://www.assistant-ui.com/docs/tools/tool-ui).
+
+### 대화형 표 Tool UI와 표시 100행 (2026-09-16, 활성)
+
+공용 `DataTable`과 답변 Markdown 표는 데이터 행을 최대 100개까지 렌더링하고,
+세로 높이를 제한한 내부 스크롤로 다음 메시지가 밀리지 않게 한다.
+
+Backend의 `prepare_table(result_id, columns?, title?)`은 Result Store에서 scope,
+TTL과 선택 컬럼을 검증하고 앞쪽 최대 100행을 반환한다. 모델은 행 배열을 입력으로
+보내지 않는다. Frontend는 같은 이름의 render-only backend Tool UI를
+`display: "standalone"`으로 등록해 최종 설명 다음에 표시한다.
+
+대화형 표는 전달된 최대 100행 범위에서 전체 셀 검색, 열 오름차순·내림차순 정렬,
+페이지 크기 10·25·50·100과 이전·다음 이동을 제공한다. payload의 열·행 길이,
+스칼라 타입, 행 수와 Result Store ID가 계약과 다르면 안전한 오류로 닫는다.
+
+명시적인 표 요청이나 Result Store 조회 뒤 Markdown 표 응답에서 모델이
+`prepare_table`을 빠뜨리면 Backend가 마지막 접근 가능한 `result_id`로 Tool 이벤트를
+보완한다. 이 이벤트가 답변 텍스트 뒤에 도착해도 Frontend는 설명을 보존하고 표를
+답변 아래에 둔다. 성공한 표 Tool UI와 같은 응답의 GFM 표 블록만 제거해 데이터가
+두 번 표시되지 않게 한다.
+
+근거: [공통 계획](../../plan/260916-interactive-table-tool-ui-plan.md),
+[assistant-ui Tool UI](https://www.assistant-ui.com/docs/tools/tool-ui).
+
+### assistant-ui Primitives Overview·Composer 점검 (2026-09-16, 활성)
+
+Primitives는 runtime 상태·접근성·키보드 동작을 제공하고 스타일은 제공하지 않는다.
+따라서 공통 채팅 UI는 공식 Elements를 우선 사용하고, 프로젝트 전용 레이아웃이나
+동작이 필요한 부분만 Primitive를 직접 조합하는 현재 경계를 유지한다. 모든
+Primitive는 루트 `AssistantRuntimeProvider` 아래에서 기존 FastAPI SSE 기반
+`useExternalStoreRuntime`을 사용한다.
+
+현재 새 메시지와 인라인 편집은 각각 Thread와 Message 문맥 안의
+`ComposerPrimitive.Root`를 사용한다. `Input`, `Send`, `Cancel`이 입력 상태,
+전송 가능 여부, 실행 취소와 편집 취소를 runtime에 연결하며, 전송·중단 버튼은
+`asChild`로 프로젝트 버튼 스타일만 합성한다. deprecated `ComposerPrimitive.If`나
+`submitOnEnter`는 사용하지 않는다. 제품의 키보드 정책은 `submitMode="enter"`로
+명시해 Enter 전송과 Shift+Enter 줄바꿈을 유지한다.
+
+현재 Composer는 모델·추론 표시를 포함한 두 줄 레이아웃이므로 `compact` 모드를
+적용하지 않는다. Headless input도 현재 textarea로 충분해 도입하지 않는다.
+첨부와 dropzone은 attachment adapter·Backend payload 계약이 마련된 뒤 활성화하고,
+음성 입력은 폐쇄망에서 사용할 DictationAdapter가 정해진 뒤 검토한다. Quote는
+메시지 인용 계약, Queue는 후속 입력 실행 정책, unstable trigger popover는 멘션·
+명령의 의미와 안정 API가 확정될 때까지 보류한다.
+
+근거: [assistant-ui Primitives](https://www.assistant-ui.com/docs/primitives),
+[assistant-ui Composer](https://www.assistant-ui.com/docs/primitives/composer).
+
+### assistant-ui Thread·Message Primitive 점검 (2026-09-16, 활성)
+
+Thread는 `Root` 아래의 실제 스크롤 컨테이너에 `Viewport`를 두고, 메시지는
+`Messages` children render function으로 편집·사용자·assistant 역할을 나눈다.
+빈 상태와 실행 상태는 deprecated `Empty`·`If` 대신 `AuiIf`를 사용하고,
+Composer는 `ViewportFooter`, 이동 버튼은 `ScrollToBottom`에 연결한다. 현재 제품은
+새 답변의 끝을 따라가는 전통적인 채팅 흐름으로 검증됐으므로 상단 turn anchor로
+바꾸지 않는다. `turnAnchor="bottom"`과 `autoScroll`을 명시해, 사용자가 위로
+스크롤한 경우에는 위치를 보존하면서 새 실행과 스트리밍의 하단 추적을 유지한다.
+
+시작 화면 예시는 런타임이 생성한 suggestion 목록이 아니라 제품에 고정된
+SMT2020 질문이다. 정적 `Suggestions` scope와 `ThreadPrimitive.Suggestions`
+iterator, `SuggestionPrimitive`를 사용한다. `ViewportProvider`,
+`MessageByIndex`와 experimental `Unstable_MessageById`는 현재 표준 목록 렌더링에
+필요하지 않다.
+
+Message는 `Root`가 제공하는 문맥과 hover 상태를 ActionBar가 사용한다. 사용자
+메시지는 현재 계약상 text만 `Parts` children renderer로 표시한다. Assistant는
+인접한 일반 Tool을 `GroupedParts`와 `groupPartByType`으로 묶고, globally registered
+Tool UI가 해석된 `part.toolUI`를 우선한 뒤 프로젝트 fallback을 사용한다. text는
+Markdown과 `MessagePartPrimitive.InProgress`, 오류는 `MessagePrimitive.Error`와
+`ErrorPrimitive.Message`로 표시한다. deprecated `components`, `Content`,
+`MessagePrimitive.If`와 unstable grouping API는 사용하지 않는다.
+
+현재 메시지 변환 계약은 text와 tool-call만 생성한다. image·file·attachment,
+quote, reasoning/source/data part는 해당 Backend·adapter 계약을 도입할 때 렌더러와
+함께 추가한다. Generative UI는 기존 Tool UI 결정을 유지하며 도입하지 않는다.
+
+근거: [assistant-ui Thread](https://www.assistant-ui.com/docs/primitives/thread),
+[assistant-ui Message](https://www.assistant-ui.com/docs/primitives/message).
+
+### assistant-ui ActionBar·BranchPicker Primitive 점검 (2026-09-16, 활성)
+
+ActionBar는 모든 메시지의 `MessagePrimitive.Root` 안에 두고 `hideWhenRunning`과
+`autohide="not-last"`를 사용한다. 마지막 메시지의 액션은 바로 보이고, 이전
+메시지의 액션은 hover 시 나타나며, 실행 중에는 숨긴다. 사용자 메시지는
+`Copy`·`Edit`, assistant 메시지는 `Copy`·`Reload`를 제공한다. 각 버튼의 실행
+가능 여부와 disabled 상태는 Primitive가 runtime capability에서 계산하고,
+프로젝트는 `asChild`로 아이콘 버튼 스타일과 접근 가능한 이름만 합성한다.
+복사 완료 상태도 runtime의 `message.isCopied`로 안내한다.
+
+현재 ActionBar가 차지하는 메시지 footer 공간은 안정적으로 유지하므로 floating
+전환과 전용 CSS를 추가하지 않는다. `Speak`·`StopSpeaking`은 폐쇄망용
+SpeechSynthesisAdapter, feedback은 저장 API와 FeedbackAdapter가 필요해 보류한다.
+`ExportMarkdown`과 `ActionBarMore`는 동작할 수 있지만 현재 복사와 겹치며 별도
+내보내기 요구가 없어 추가하지 않는다. 요구가 생기면 보조 액션을 overflow
+메뉴에 묶어 키보드·focus 동작을 함께 적용한다.
+
+BranchPicker는 현재 도입하지 않는다. External Store runtime에서 `setMessages`와
+branch adapter를 의도적으로 제공하지 않아 `switchToBranch` capability가 없고,
+편집·재생성은 선택한 지점 이후의 화면 메시지를 새 실행 결과로 교체한다.
+Backend의 `fork_from_turn_id`는 재실행 시작점을 지정할 뿐, 이전 답변을 탐색 가능한
+대안으로 보존하는 branch repository 계약이 아니다. Picker만 추가하면 1/1을
+표시하거나 비활성 제어가 생겨 실제 기능을 과장하게 된다.
+
+향후 BranchPicker 도입은 부모·대안 message id를 보존하는 저장 구조, branch 목록
+조회·전환, 세션 재접속 후 복원, Frontend branch adapter를 한 작업에서 설계한다.
+그때 사용자와 assistant 메시지 footer에 `hideWhenSingleBranch`를 적용해 대안이
+두 개 이상일 때만 Previous·Number·Count·Next를 표시한다.
+
+근거: [assistant-ui ActionBar](https://www.assistant-ui.com/docs/primitives/action-bar),
+[assistant-ui BranchPicker](https://www.assistant-ui.com/docs/primitives/branch-picker).
+
+### assistant-ui ThreadList·Suggestion Primitive 점검 (2026-09-16, 활성)
+
+현재 왼쪽 목록은 저장된 대화가 아니라 `SESSIONS` 예시 데이터를 표시하는 props
+기반 standalone ThreadList다. 새 대화와 항목 선택도 assistant-ui thread를
+생성·전환하지 않고 현재 한 개의 External Store runtime을 초기화한다. 화면에
+`예시 세션 · 현재 대화만 유지됩니다`를 표시해 영속 기능으로 오해하지 않게 한다.
+
+실제 `ThreadListPrimitive`는 thread list runtime과 함께 생성·선택·제목·보관·
+삭제 상태를 소유한다. 현재 설치 버전의 `ExternalStoreThreadListAdapter`에서
+thread 전환 API는 여전히 active development로 표시되며, 더 안정적인
+`RemoteThreadListAdapter` 경로도 list·initialize·fetch·rename·archive·delete,
+제목 생성과 thread별 message hydration이 모두 필요하다. Backend에 이 계약이
+없으므로 현재 목록을 Primitive로 감싸거나 비활성 Archive/Delete 메뉴를 추가하지
+않는다. 실제 세션 API와 권한·식별자·복원 정책이 준비되면 공식 Elements 소스를
+연결하고 `Items` children renderer, `data-active`·`aria-current`, 기본 키보드 탐색과
+`sharedFocusGroup` 메뉴를 함께 사용한다.
+
+고정 SMT2020 시작 질문은 `AuiConfig`의 `Suggestions(EXAMPLE_QUESTIONS)`로 등록하고,
+`ThreadPrimitive.Suggestions` iterator 안에서 `SuggestionPrimitive.Trigger`와
+`Title`을 렌더링한다. 클릭 즉시 실행하는 제품 동작은 `send`로 유지한다. 이로써
+정적 제안의 데이터 소유권과 화면 반복·trigger 동작이 공식 scope 경계를 따른다.
+
+동적 후속 제안은 `thread.suggestions`가 생길 때 직접 그 배열을 읽고 각 prompt를
+self-contained `ThreadPrimitive.Suggestion`으로 렌더링하는 경로가 맞다. 정적
+Suggestions scope가 동적 값을 가리기 때문에 공식 문서도 이 조합을 사용한다.
+현재 Backend는 후속 제안을 보내지 않으므로 설치된 follow-up 컴포넌트는 활성
+화면에 연결하지 않는다. deprecated `autoSend`·`method`는 사용하지 않는다.
+
+근거: [assistant-ui ThreadList](https://www.assistant-ui.com/docs/primitives/thread-list),
+[assistant-ui Suggestion](https://www.assistant-ui.com/docs/primitives/suggestion).
+
+### assistant-ui ChainOfThought·Error Primitive 점검 (2026-09-16, 활성)
+
+`ChainOfThoughtPrimitive`와 `components.ChainOfThought`는 기존 코드 유지용 legacy
+API이므로 도입하지 않는다. Assistant 메시지는 권장 API인
+`MessagePrimitive.GroupedParts`와 stable fingerprint를 제공하는
+`groupPartByType`으로 인접한 일반 Tool 호출만 묶는다. globally registered
+standalone Tool UI는 그룹 밖에 두고, 그룹·text·tool-call은 children renderer가
+각각 표시한다. synthetic indicator는 프로젝트의 공개 실행 상태 UI와 중복되므로
+`indicator="never"`를 유지한다.
+
+Backend `status` 이벤트는 모델 reasoning token이나 비공개 chain-of-thought가
+아니라 사용자에게 공개하기로 한 업무 진행 단계다. 따라서 message reasoning
+part로 변환하지 않고 metadata의 `statuses`와 `AgentPlan`으로 표시한다. Claude SDK
+thinking block은 계속 폐기하며, 향후 공개 reasoning part 계약을 별도로 도입하는
+경우에만 `GroupedParts`의 reasoning 경로를 추가한다.
+
+메시지 오류 블록은 `MessagePrimitive.Error`로 전체 UI를 조건부 렌더링하고,
+`ErrorPrimitive.Message`로 `incomplete/error` 상태의 안전한 오류 문구를 자동
+추출한다. 공용 `ErrorState`의 루트가 이미 단일 `role="alert"`를 제공하므로
+`ErrorPrimitive.Root`를 다시 중첩하지 않는다. 이 구성은 Root가 제공하는 접근성
+역할과 Message의 자동 문구 추출을 분리해 같은 경고를 스크린 리더가 두 번
+알리지 않게 한다. 오류 재실행은 `ActionBarPrimitive.Reload`를 사용해 다른 실행
+중에는 runtime이 자동으로 비활성화한다.
+
+근거: [assistant-ui ChainOfThought](https://www.assistant-ui.com/docs/primitives/chain-of-thought),
+[assistant-ui Error](https://www.assistant-ui.com/docs/primitives/error).
+
+
+### 표·차트 문맥 보존 (2026-09-16, 활성)
+
+일반 Tool은 실행 과정 그룹으로 모으되, standalone 표·차트를 포함한 도입·해석
+구간은 이후 추가 조회가 있어도 보존한다. 마지막 일반 Tool 뒤 답변도 유지한다.
+이는 중첩 Tool 결정의 중간 준비 문구 생략 정책을 표·차트 문맥에 한해 보완한다.
+중복 Markdown 표 제거는 코드 펜스를 건드리지 않는다. 결과 없이 끝난 Tool은
+완료로 추정하지 않고 미완료로 표시한다.
+
+근거: [메시지 순서 계획](../../plan/260916-tanstack-table-message-order-plan.md).

@@ -8,6 +8,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { TABLE_DISPLAY_ROW_LIMIT } from "@/lib/table-tool";
+
+export { TABLE_DISPLAY_ROW_LIMIT } from "@/lib/table-tool";
 
 export type Tone = "neutral" | "ok" | "warn" | "block" | "accent";
 
@@ -150,8 +153,8 @@ export function RuleLabel({ children }: { children: ReactNode }) {
 
 /**
  * 데이터 표 — mono, tabular-nums, 얇은 행 구분.
- * 100행 이하 inline 결과라도 세로로 화면 전체를 덮지 않도록 높이를 제한하고
- * 그 안에서만 스크롤한다(가로 스크롤은 기존과 동일하게 유지).
+ * payload에는 분석·요약용 원본 행이 더 들어 있어도 화면에는 최대 100개
+ * 데이터 행만 표시한다. 가로 스크롤은 기존과 동일하게 유지한다.
  */
 export function DataTable({
   columns,
@@ -160,35 +163,45 @@ export function DataTable({
   columns: string[];
   rows: string[][];
 }) {
+  const visibleRows = rows.slice(0, TABLE_DISPLAY_ROW_LIMIT);
+  const omittedRows = rows.length - visibleRows.length;
+
   return (
-    <div className="thin-scroll max-h-96 overflow-x-auto overflow-y-auto">
-      <table className="w-full border-collapse font-mono text-data tabular-nums">
-        <thead>
-          <tr className="border-b border-line-strong text-left text-ink-3">
-            {columns.map((c) => (
-              <th key={c} className="whitespace-nowrap px-2 py-1.5 font-medium">
-                {c}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} className="border-b border-line last:border-0">
-              {row.map((cell, j) => (
-                <td
-                  key={j}
-                  className={`whitespace-nowrap px-2 py-1.5 ${
-                    j === 0 ? "text-ink-2" : "text-ink"
-                  }`}
-                >
-                  {cell}
-                </td>
+    <div>
+      <div className="thin-scroll max-h-96 overflow-x-auto overflow-y-auto">
+        <table className="w-full border-collapse font-mono text-data tabular-nums">
+          <thead>
+            <tr className="border-b border-line-strong text-left text-ink-3">
+              {columns.map((c) => (
+                <th key={c} className="whitespace-nowrap px-2 py-1.5 font-medium">
+                  {c}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {visibleRows.map((row, i) => (
+              <tr key={i} className="border-b border-line last:border-0">
+                {row.map((cell, j) => (
+                  <td
+                    key={j}
+                    className={`whitespace-nowrap px-2 py-1.5 ${
+                      j === 0 ? "text-ink-2" : "text-ink"
+                    }`}
+                  >
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {omittedRows > 0 && (
+        <p className="border-t border-line px-2 py-1.5 text-2xs text-ink-3">
+          전체 {rows.length.toLocaleString("ko-KR")}건 중 {TABLE_DISPLAY_ROW_LIMIT}건 표시 · {omittedRows.toLocaleString("ko-KR")}건 생략
+        </p>
+      )}
     </div>
   );
 }

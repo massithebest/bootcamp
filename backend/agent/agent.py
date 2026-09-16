@@ -1,5 +1,6 @@
 """Claude Agent SDK initialization and execution."""
 
+import re
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -18,10 +19,84 @@ from agent.session_store import (
 from agent.system_prompt import SYSTEM_PROMPT
 from api.schemas import AgentEvent
 from core.config import AGENT_MODEL, CLAUDE_CLI_PATH, agent_provider_env, use_fake_runner
+from tools.table_tool import prepare_table
 
 
 #: `agent/agent_sdk/` — CLAUDE.md 와 .claude/skills 가 위치한 Agent 작업 디렉터리.
 AGENT_SDK_CWD = str((Path(__file__).parent / "agent_sdk").resolve())
+
+# '목표', '지표', '대표', 'stable'은 명시적인 표 요청이 아니다.
+_TABLE_REQUEST_PATTERN = re.compile(
+    r"(?<![\w])(?:표|테이블)(?=$|[^\w]|로|으로|를|을|에|의|만|도|가|는|은|형태|형식)"
+    r"|(?<![\w])tables?(?![a-zA-Z_])",
+    re.IGNORECASE,
+)
+_MARKDOWN_TABLE_DELIMITER = re.compile(
+    r"(?m)^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$"
+)
+_TABLE_SOURCE_TOOLS = {
+    "execute_sql",
+    "run_simulation",
+    "get_result_page",
+    "get_result_summary",
+}
+
+
+def _needs_table_fallback(message: str, response_text: str) -> bool:
+    """명시적인 표 요청 또는 Markdown 표 응답이면 Tool UI 보완이 필요하다."""
+
+    return bool(
+        _TABLE_REQUEST_PATTERN.search(message)
+        or _MARKDOWN_TABLE_DELIMITER.search(response_text)
+    )
+
+
+async def _table_fallback_events(
+    result_id: str,
+    *,
+    access_scope: str | None,
+) -> list[AgentEvent]:
+    """모델이 빠뜨린 prepare_table 호출을 공개 AgentEvent로 보완한다."""
+
+    tool_call_id = f"auto-prepare-table-{uuid.uuid4().hex}"
+    args = {"result_id": result_id}
+    result = await prepare_table(result_id=result_id, access_scope=access_scope)
+    failed = result.get("status") == "error"
+    return [
+        AgentEvent(
+            type="tool_call",
+            tool_name="prepare_table",
+            tool_call_id=tool_call_id,
+            data={"args": args},
+        ),
+        AgentEvent(
+            type="status",
+            tool_name="prepare_table",
+            tool_call_id=tool_call_id,
+            data={
+                "step": tool_call_id,
+                "status": "running",
+                "label": "대화형 표 준비",
+            },
+        ),
+        AgentEvent(
+            type="tool_result",
+            tool_name="prepare_table",
+            tool_call_id=tool_call_id,
+            data=result,
+        ),
+        AgentEvent(
+            type="status",
+            tool_name="prepare_table",
+            tool_call_id=tool_call_id,
+            data={
+                "step": tool_call_id,
+                "status": "error" if failed else "completed",
+                "label": "대화형 표 준비 실패" if failed else "대화형 표 준비 완료",
+            },
+        ),
+    ]
+
 
 def _build_options(
     resume_session_id: str | None,
@@ -56,6 +131,10 @@ def _build_options(
         env=agent_provider_env() or None,
         # PATH 에 `claude` 가 없어도 실행되도록 경로를 명시한다. (없으면 SDK 자체 탐색)
         cli_path=CLAUDE_CLI_PATH,
+        # SDK의 최종 AssistantMessage를 기다리지 않고 text_delta를 받아
+        # 기존 AgentEvent text/SSE 경로로 전달한다. Adapter가 provider
+        # message id를 기준으로 최종 누적 TextBlock의 중복 전송을 막는다.
+        include_partial_messages=True,
     )
 
 
@@ -141,9 +220,26 @@ async def run_agent(
 
     adapter = AgentEventAdapter()
     options = _build_options(resume_session_id, resume_session_at, access_scope)
+    response_text: list[str] = []
+    last_result_id: str | None = None
+    table_prepared = False
 
     async for raw_event in query(prompt=message, options=options):
         for event in adapter.convert(raw_event):
+            if event.type == "text" and event.content:
+                response_text.append(event.content)
+            if event.type == "tool_result" and isinstance(event.data, dict):
+                if (
+                    event.tool_name in _TABLE_SOURCE_TOOLS
+                    and event.data.get("status") == "ok"
+                    and isinstance(event.data.get("result_id"), str)
+                ):
+                    last_result_id = event.data["result_id"]
+                if (
+                    event.tool_name == "prepare_table"
+                    and event.data.get("status") == "ok"
+                ):
+                    table_prepared = True
             yield event
 
     # 예외/취소 cleanup에서는 완료 세션을 덮어쓰지 않는다. SDK 결과가 없이
@@ -153,6 +249,17 @@ async def run_agent(
             yield AgentEvent(type="error", content="Agent 응답이 완료되기 전에 종료되었습니다.")
         yield AgentEvent(type="done")
         return
+
+    if (
+        last_result_id is not None
+        and not table_prepared
+        and _needs_table_fallback(message, "".join(response_text))
+    ):
+        for event in await _table_fallback_events(
+            last_result_id,
+            access_scope=access_scope,
+        ):
+            yield event
 
     bind_session_id(conversation_id, adapter.session_id)
     if adapter.session_id:

@@ -58,8 +58,33 @@ def test_chat_endpoint_streams_agent_events(monkeypatch) -> None:
         "get_kpi",
         "execute_sql",
         "run_simulation",
+        "prepare_table",
         "prepare_visualization",
     ]
+    tool_call_ids = [e["tool_call_id"] for e in events if e["type"] == "tool_call"]
+    assert len(tool_call_ids) == len(set(tool_call_ids)) == 5
+    assert all(e["data"].get("args") is not None for e in events if e["type"] == "tool_call")
+    assert {
+        e["tool_call_id"] for e in events if e["type"] == "tool_result"
+    } == set(tool_call_ids)
+
+    table_call_index = next(
+        index
+        for index, event in enumerate(events)
+        if event["type"] == "tool_call" and event.get("tool_name") == "prepare_table"
+    )
+    chart_call_index = next(
+        index
+        for index, event in enumerate(events)
+        if event["type"] == "tool_call"
+        and event.get("tool_name") == "prepare_visualization"
+    )
+    text_indexes = [
+        index for index, event in enumerate(events) if event["type"] == "text"
+    ]
+    assert any(index < table_call_index for index in text_indexes)
+    assert any(table_call_index < index < chart_call_index for index in text_indexes)
+    assert any(chart_call_index < index for index in text_indexes)
 
     # 프론트가 catalog / database 두 kind 를 모두 받아본다.
     kinds = [
@@ -78,8 +103,19 @@ def test_chat_endpoint_streams_agent_events(monkeypatch) -> None:
     assert prepared["status"] == "ok"
     visualization_id = prepared["visualization_id"]
     answer = "".join(event.get("content") or "" for event in events if event["type"] == "text")
-    assert f'{{"visualization_id":"{visualization_id}"}}' in answer
+    assert visualization_id not in answer
+    assert "```chart" not in answer
     assert client.get(f"/api/visualizations/{visualization_id}").status_code == 200
+
+    prepared_table = next(
+        event["data"]
+        for event in events
+        if event.get("tool_name") == "prepare_table"
+        and event["type"] == "tool_result"
+    )
+    assert prepared_table["status"] == "ok"
+    assert prepared_table["displayed_count"] <= 100
+    assert prepared_table["columns"] == ["part", "lot_count", "piece_count"]
 
 
 def test_chat_endpoint_done_event_carries_turn_id(monkeypatch) -> None:

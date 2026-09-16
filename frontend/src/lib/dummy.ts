@@ -91,8 +91,15 @@ export const SEED_CONVERSATION: ChatMessage[] = [
       {
         kind: "tool" as const,
         id: "seed-sql",
+        toolCallId: "seed-sql",
+        toolName: "execute_sql",
+        args: {
+          sql: "SELECT part, COUNT(*) AS lot_count, SUM(pieces) AS piece_count FROM wip WHERE dataset = 'LVHM' GROUP BY part ORDER BY part",
+          purpose: "LVHM 제품별 초기 WIP Lot과 piece 수",
+        },
         result: {
           id: "seed-sql",
+          toolCallId: "seed-sql",
           toolName: "execute_sql",
           content: null,
           data: {
@@ -118,8 +125,12 @@ export const SEED_CONVERSATION: ChatMessage[] = [
       {
         kind: "tool" as const,
         id: "seed-simulation",
+        toolCallId: "seed-simulation",
+        toolName: "run_simulation",
+        args: { simulation_type: "SMT2020_입력검증", params: { dataset: "LVHM" } },
         result: {
           id: "seed-simulation",
+          toolCallId: "seed-simulation",
           toolName: "run_simulation",
           content: null,
           data: {

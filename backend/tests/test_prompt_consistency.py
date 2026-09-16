@@ -109,7 +109,7 @@ def test_no_deleted_simulate_tools_remain() -> None:
         assert "simulate_" not in path.read_text(encoding="utf-8"), path
 
 
-def test_chart_procedure_requires_validated_visualization_marker() -> None:
+def test_chart_procedure_uses_validated_tool_ui_result_without_marker() -> None:
     claude_text = CLAUDE_MD.read_text(encoding="utf-8")
     sql_skill = (SKILLS_DIR / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
     simulation_skill = (SKILLS_DIR / "simulation" / "SKILL.md").read_text(
@@ -120,4 +120,23 @@ def test_chart_procedure_requires_validated_visualization_marker() -> None:
         assert "prepare_visualization" in text
         assert "visualization_id" in text
         assert "최대 2회" in text
+        assert "Tool UI" in text
+        assert "코드 펜스를 반복하지 않는다" in text
     assert "result_id +" not in claude_text
+    assert "```chart" not in claude_text
+
+
+def test_table_procedure_uses_standalone_tool_ui_and_100_row_limit() -> None:
+    claude_text = CLAUDE_MD.read_text(encoding="utf-8")
+    sql_skill = (SKILLS_DIR / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
+    simulation_skill = (SKILLS_DIR / "simulation" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+
+    for text in (claude_text, sql_skill, simulation_skill):
+        assert "prepare_table" in text
+        assert "100행" in text
+        assert "Tool UI" in text
+        assert "반드시" in text
+        assert "도입 설명 → Tool UI → 결과 해석" in text
+        assert "Result Store 데이터를 Markdown 표로 작성하지 않는다" in text

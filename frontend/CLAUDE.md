@@ -3,8 +3,10 @@
 # Frontend 디자인 가이드
 
 2026-09-16 `frontend-design` Skill 기반 UI/UX 개선(3-pane 워크벤치)에서 확정한
-규칙과 최종 token 기준. 클래스명을 모두 나열하지 않고, 이후 작업자가 새
-화면·컴포넌트를 만들 때 일관된 판단을 내릴 수 있는 기준만 남긴다. 구현
+규칙과 최종 token 기준. 2026-09-16 assistant-ui Elements 전환으로 공통 UI
+구현 경로를 갱신했으며 아래 token과 정보 위계는 유지한다. 클래스명을 모두
+나열하지 않고, 이후 작업자가 새 화면·컴포넌트를 만들 때 일관된 판단을
+내릴 수 있는 기준만 남긴다. 구현
 근거와 검증 결과는
 [frontend-ui-ux-plan](plan/260916-frontend-ui-ux-plan.md)을 따른다.
 
@@ -26,8 +28,8 @@
   (`context-inspector.tsx`의 Prompt 패널, `app-sidebar.tsx`의 설정 버튼 참고).
 - **비공개 chain-of-thought를 노출하지 않는다.** `status` 이벤트는 모델의
   내부 reasoning이 아니라 사용자용 업무 진행 단계(질문 분석→데이터 확인→
-  SQL 조회→시뮬레이션→결과 분석→답변)다. `AgentProgress`는 이 의미만
-  표현한다.
+  SQL 조회→시뮬레이션→결과 분석→답변)다. Tool과 독립적인 공개 단계는
+  실행 과정 안의 `AgentPlan`으로만 표현한다.
 
 ## Layout 기준
 
@@ -94,8 +96,8 @@
 - `--chart-*`는 차트 시리즈에만 쓴다. 상태 표시에 절대 재사용하지 않는다.
 - 상태는 색상만으로 전달하지 않는다. `StatusDot`(색) + 텍스트(대기/진행/
   완료/오류) 또는 아이콘(`CheckIcon`/`AlertCircleIcon`류) + 텍스트를 함께
-  쓴다(`ai-elements/tool.tsx`의 `statusIcons`+`statusLabels`,
-  `agent-progress.tsx`의 `STEP_VIEW` 참고).
+  쓴다(`assistant-ui/elements/tool-call.tsx`와
+  `assistant-ui/elements/agent-plan.tsx`의 상태 아이콘·라벨 참고).
 - 다크 테마는 추가하지 않는다. 이 프로젝트는 라이트 전용이다.
 
 ## Spacing과 shape
@@ -117,25 +119,30 @@
 - **User message**: 오른쪽 정렬, `border border-line-strong bg-surface`
   말풍선. 카드 그림자 없음.
 - **Assistant message**: 왼쪽 정렬, 말풍선 없이 컬럼 전체 폭 사용. 진행
-  블록 → 본문 파트(도착 순서) → 액션바 순서를 유지한다.
-- **Agent progress**(`agent-progress.tsx`): 실행 중엔 펼침, 완료되면 접힘.
-  사용자가 직접 토글하면(`touched`) 그 상태를 그 메시지 안에서 유지한다.
-  이 열림/닫힘 패턴(`open`+`touched`+"자동 상태를 따라가되 사용자가 건드리면
-  멈춤")은 Tool 결과 카드에도 동일하게 적용한다(아래).
-- **Tool 결과**(`tool-result-card.tsx`): catalog 종류는 항상 기본 접힘(분석
-  1회에 4~6회 호출되므로). 그 외 종류는 메시지가 실행 중일 때만 기본
-  펼침이고, 완료되면 접혀 최종 답변의 위계를 회복한다. 접힌 헤더는
+  블록 → 최종 본문 → 액션바 순서를 유지한다.
+- **실행 과정**(`thread-messages.tsx`): 독립적인 공개 `status`는 `AgentPlan`,
+  Tool 호출은 `MessagePrimitive.GroupedParts`와 `ToolGroup`으로 한 블록에
+  표시한다. Tool 실행 단계는 그룹의 `part.status`로 판별하고, 회전 아이콘은
+  메시지 전체가 실행 중인 동안 유지한다. 헤더는 `요청 분석 중` → `툴 N개
+  실행 중` → `응답 작성 중` → `응답 작성 완료` 단계를 구분한다. 메시지가
+  실행 중인 동안 블록을 펼치고 최종 상태가 되면 자동으로 접는다. 완료 후
+  사용자가 다시 펼치면 공개 단계와 Tool 목록이 보인다.
+- **Tool 결과**(`tool-result-card.tsx`): 개별 Tool 상세는 종류와 관계없이
+  기본 접힘이며 ToolGroup 안에서 두 번째 disclosure 단계가 된다. 접힌 헤더는
   `label · 요약`(예: "데이터 조회 · 10행", "시뮬레이션 실행 · 지표 4개")
   형식을 유지한다 — 새 tool_name을 추가하면 `resultHeaderSummary`에 요약
   규칙을 함께 추가한다.
+- **Standalone 표**(`interactive-data-table.tsx`): `prepare_table`이 검증해 보낸
+  최대 100행 안에서 검색·열 정렬·페이지 크기 10/25/50/100과 이전/다음 이동을
+  제공한다. 원본 건수와 실제 포함 건수를 함께 표시하고 잘린 결과를 알린다.
 - **Markdown**: `AssistantText`의 `leading-[1.6]`, 표/코드/SQL은 항상 mono +
   `tabular-nums` + 가로/세로 스크롤 캡(`max-h-96`). 헤딩은 실제 문서
   위계보다 한 단계 낮춰(`h1/h2`→`text-ui-lg`) 채팅 안에서 과도하게 크지
   않게 한다.
-- **Data table**(`primitives.tsx` `DataTable`, `markdown-text.tsx` `Table`):
+- **Data table**(`primitives.tsx` `DataTable`, `assistant-ui/elements/markdown-text.tsx` `Table`):
   동일한 스크롤 래퍼(`thin-scroll max-h-96 overflow-x-auto overflow-y-auto`)
   를 공유한다. 둘 중 하나만 고치고 다른 하나를 잊지 않는다.
-- **Composer**(`message-input.tsx`): `ComposerPrimitive`가 전송/Enter/
+- **Composer**(`assistant-ui/elements/thread.aui.tsx`): `ComposerPrimitive`가 전송/Enter/
   Shift+Enter/자동 높이/실행 중 비활성을 소유한다. Send/Stop은 `AuiIf`로
   전환하고 직접 상태를 구독해 조건부 렌더하지 않는다. Input에는 반드시
   `aria-label`을 둔다(placeholder만으로 접근성 이름을 대신하지 않는다).
@@ -171,5 +178,19 @@
 - `status` 이벤트를 비공개 reasoning처럼(또는 반대로 숨겨야 할 정보를
   노출하는 방식으로) 표현하기.
 - 이유 없는 신규 UI 라이브러리·패키지 추가. 현재 카탈로그(shadcn 소스,
-  assistant-ui, 제한적 AI Elements, Recharts, Lucide)로 해결되지 않는
+  assistant-ui Elements, Recharts, Lucide)로 해결되지 않는
   화면이 생기면 먼저 결정 기록(`docs/decisions.md`)에 근거를 남긴다.
+
+## assistant-ui Elements 적용 기준
+
+- 공통 채팅은 `components/assistant-ui/elements/thread.aui.tsx`를 사용한다.
+  `App` 루트 provider 아래에 두고 `components` 슬롯 객체는 모듈 범위에 둔다.
+- 템플릿의 radius·색·폰트·그림자를 그대로 도입하지 않고 위 semantic token에
+  맞춘다. Thread의 읽기 폭은 47.5rem, composer는 sticky ViewportFooter다.
+- 빈 대화는 중앙 welcome·예시 질문·composer로 구성한다. 메시지 편집창에도
+  접근성 이름을 둔다. 접힌 pane은 마운트를 유지하되 `invisible`로 포커스에서 제외한다.
+- 공개 진행 단계는 AgentPlan, 도구 결과는 ToolCall을 사용한다. 추정 reasoning,
+  가짜 tool args나 미연결 버튼을 만들지 않는다. 실제 완료된 단계만 완료로 센다.
+- 원격 이미지·첨부·음성·Cloud 기능은 현재 계약에 없다. 공식 예제의
+  useChatRuntime은 현재 SSE에 적용하지 않는다. 상세 예외는 [AGENTS.md](AGENTS.md),
+  전환 근거는 [기술 결정](docs/decisions.md)을 따른다.

@@ -61,6 +61,7 @@ export function parseAgentEvent(payload: string): AgentEvent {
   }
   if ((event.content != null && typeof event.content !== "string") ||
       (event.tool_name != null && typeof event.tool_name !== "string") ||
+      (event.tool_call_id != null && typeof event.tool_call_id !== "string") ||
       (event.data != null && (typeof event.data !== "object" || Array.isArray(event.data)))) {
     throw new Error("Invalid AgentEvent fields");
   }

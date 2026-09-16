@@ -5,6 +5,7 @@
  *   type: "text" | "status" | "tool_call" | "tool_result" | "error" | "done"
  *   content?: string
  *   tool_name?: string
+ *   tool_call_id?: string
  *   data?: Record<string, unknown>
  *
  * Claude Agent SDK 내부 Event 는 절대 이 타입으로 노출되지 않는다.
@@ -22,6 +23,7 @@ export interface AgentEvent {
   type: AgentEventType;
   content?: string | null;
   tool_name?: string | null;
+  tool_call_id?: string | null;
   data?: Record<string, unknown> | null;
 }
 
@@ -40,6 +42,11 @@ export interface StatusStep {
   status: StepStatus;
   /** 부가 설명 한 줄. `execute_sql` 의 `purpose` 처럼 무엇을 확인하려는 호출인지. */
   detail?: string;
+  /** 같은 이름의 Tool 반복 호출도 구분하는 Backend 호출 ID. */
+  toolCallId?: string;
+  toolName?: string;
+  /** 모델이 업무 Tool에 전달한 공개 입력 파라미터. */
+  args?: Record<string, unknown>;
 }
 
 export interface ChartSpec {
@@ -71,6 +78,7 @@ export interface VisualizationResponse {
 /** tool_result Event 로부터 만들어지는 Tool 결과 항목. */
 export interface ToolResult {
   id: string;
+  toolCallId: string;
   toolName: string;
   /** Backend data 를 그대로 보관한다. tool_name 별 전용 UI 확장 지점. */
   data: Record<string, unknown> | null;
@@ -86,7 +94,14 @@ export interface ToolResult {
  */
 export type MessagePart =
   | { kind: "text"; id: string; text: string }
-  | { kind: "tool"; id: string; result: ToolResult };
+  | {
+      kind: "tool";
+      id: string;
+      toolCallId: string;
+      toolName: string;
+      args: Record<string, unknown> | null;
+      result?: ToolResult;
+    };
 
 export type ChatRole = "user" | "assistant";
 

@@ -62,7 +62,7 @@ test('done is terminal, duplicate and trailing events are ignored', async () => 
   const events = await collect(frame({ type: 'done' }) + frame({ type: 'done' }) + frame({ type: 'text', content: 'late' }));
   assert.deepEqual(events.map(e => e.type), ['done']);
 });
-for (const payload of ['{', '{"type":"unknown"}', '{"type":"text","content":3}', '{"type":"tool_result","data":[]}']) {
+for (const payload of ['{', '{"type":"unknown"}', '{"type":"text","content":3}', '{"type":"tool_result","data":[]}', '{"type":"tool_call","tool_call_id":3}']) {
   test(`invalid envelope fails safely: ${payload}`, async () => {
     const events = await collect(`data: ${payload}\n\n` + frame({ type: 'done' }));
     assert.deepEqual(events.map(e => e.type), ['error', 'done']);

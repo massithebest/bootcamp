@@ -24,7 +24,7 @@ export function ContextInspector({ onCollapse }: { onCollapse: () => void }) {
 
   return (
     <div className="flex h-full flex-col bg-surface">
-      <div className="flex items-center gap-1 border-b border-line px-2 py-2">
+        <div className="flex h-16 shrink-0 items-center gap-1 border-b border-line px-2">
         <div className="flex flex-1 gap-0.5">
           {TABS.map((t) => (
             <button

@@ -10,8 +10,8 @@ import { asRecord, asRows, asStrings, isLargeResult, str } from "./shared";
  * 최상위 `columns`/`rows` 형태도 함께 받아준다.
  *
  * `type: "large_result"`(100행 초과, plan/260915-result-store-plan.md)면 전체 행 대신
- * `sample_rows`/`summary` 요약 카드를 렌더한다 — 페이지네이션은 두지 않는다,
- * 후속 조회는 대화로 처리된다(설계 §7·§9).
+ * `sample_rows`/`summary` 요약 카드를 렌더한다. 이 실행 상세 카드에는 페이지 이동을
+ * 넣지 않고, 독립적인 검색·정렬·페이지 이동 표는 `prepare_table` Tool UI가 맡는다.
  */
 export function DatabaseResult({ data }: { data: Record<string, unknown> }) {
   const sql = str(data.sql);

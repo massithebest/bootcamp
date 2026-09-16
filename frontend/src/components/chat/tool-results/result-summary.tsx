@@ -25,7 +25,7 @@ function formatStat(v: ResultColumnSummary["min"] | ResultColumnSummary["mean"])
 /**
  * 대용량 조회 결과(`type: "large_result"`, plan/260915-result-store-plan.md) 요약 카드.
  * 원본 행 대신 표본 몇 행 + 컬럼별 기초 통계만 보여준다.
- * 페이지네이션/"더 보기"는 두지 않는다 — 전체가 필요하면 후속 대화로 처리한다(§7·§9).
+ * 이 카드에는 페이지 이동을 두지 않으며 독립 대화형 표는 `prepare_table`이 제공한다.
  */
 export function ResultSummaryCard({ data }: { data: Record<string, unknown> }) {
   const rowCount = num(data.row_count);

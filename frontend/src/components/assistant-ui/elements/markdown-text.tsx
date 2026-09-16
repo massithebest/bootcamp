@@ -11,13 +11,14 @@
  * CSS로만 스타일링하고 런타임 외부 리소스를 불러오지 않는다.
  */
 
-import type { ComponentPropsWithoutRef } from "react";
+import { Children, Fragment, type ComponentPropsWithoutRef } from "react";
 import remarkGfm from "remark-gfm";
 import {
   MarkdownTextPrimitive,
   type SyntaxHighlighterProps,
 } from "@assistant-ui/react-markdown";
-import { ChartMarker } from "./tool-results/chart-marker";
+import { ChartMarker } from "@/components/chat/tool-results/chart-marker";
+import { TABLE_DISPLAY_ROW_LIMIT } from "@/components/chat/primitives";
 
 /**
  * 자체 파서가 지원하던 `· item` 불릿을 remark 가 인식하는 `- item` 으로
@@ -111,6 +112,28 @@ function TableHead(props: ComponentPropsWithoutRef<"thead">) {
   return <thead>{props.children}</thead>;
 }
 
+/** 모델이 긴 Markdown 표를 생성해도 데이터 행은 공통 표시 한도만 렌더링한다. */
+export function MarkdownTableBody(props: ComponentPropsWithoutRef<"tbody">) {
+  const rows = Children.toArray(props.children);
+  const visibleRows = rows.slice(0, TABLE_DISPLAY_ROW_LIMIT);
+  const omittedRows = rows.length - visibleRows.length;
+
+  return (
+    <Fragment>
+      <tbody>{visibleRows}</tbody>
+      {omittedRows > 0 && (
+        <tfoot>
+          <tr>
+            <td colSpan={100} className="border-t border-line px-2 py-1.5 text-left font-sans text-2xs text-ink-3">
+              전체 {rows.length.toLocaleString("ko-KR")}건 중 {TABLE_DISPLAY_ROW_LIMIT}건 표시 · {omittedRows.toLocaleString("ko-KR")}건 생략
+            </td>
+          </tr>
+        </tfoot>
+      )}
+    </Fragment>
+  );
+}
+
 function TableRow(props: ComponentPropsWithoutRef<"tr">) {
   // thead 안의 tr 은 DataTable 과 같은 헤더 룰(진한 구분선, last 에도 룰 유지),
   // tbody 안의 tr 은 얇은 구분선(last 는 없음). react-markdown 은 부모 태그를
@@ -152,7 +175,7 @@ function Code(props: ComponentPropsWithoutRef<"code">) {
 /** 코드 펜스 블록. 하이라이팅 없음(현행과 동일) — 단색 배경 + mono. */
 function Pre(props: ComponentPropsWithoutRef<"pre">) {
   return (
-    <pre className="thin-scroll overflow-x-auto rounded bg-[#1c2530] px-3 py-2.5 font-mono text-data leading-relaxed text-[#d7dce4]">
+    <pre className="thin-scroll max-h-96 overflow-auto rounded bg-[#1c2530] px-3 py-2.5 font-mono text-data leading-relaxed text-[#d7dce4]">
       {props.children}
     </pre>
   );
@@ -188,6 +211,7 @@ export function MarkdownText() {
         a: Anchor,
         table: Table,
         thead: TableHead,
+        tbody: MarkdownTableBody,
         tr: TableRow,
         th: TableHeaderCell,
         td: TableCell,

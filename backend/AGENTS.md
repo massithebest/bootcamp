@@ -33,6 +33,10 @@ SDK 이벤트를 SSE로 전달한다. 코드 변경 전 상위 `../AGENTS.md`와
 - 차트는 `prepare_visualization`이 실제 `result_id`와 grain을 검증해 등록한다.
   `/api/visualizations/{id}`만 조회 진입점으로 사용하고 SQL·시뮬레이션 결과에
   자동 차트를 붙이지 않는다.
+- 독립 표는 `prepare_table`이 실제 `result_id`, access scope와 선택 컬럼을
+  검증해 최대 100행만 반환한다. 원본 행 배열을 모델 입력으로 받지 않는다.
+- 표 요청 또는 Markdown 표 응답에서 모델이 호출을 빠뜨리면 `run_agent`가 마지막
+  접근 가능한 Result Store 결과로 `prepare_table` 이벤트를 보완한다.
 - 환경변수는 `core/config.py`에서만 읽는다. 새 키는 실제 값 없이
   `.env.example`에도 추가한다.
 

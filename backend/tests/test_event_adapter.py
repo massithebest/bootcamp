@@ -5,6 +5,7 @@ import json
 from claude_agent_sdk import (
     AssistantMessage,
     ResultMessage,
+    StreamEvent,
     TextBlock,
     ThinkingBlock,
     ToolResultBlock,
@@ -23,6 +24,62 @@ def test_text_block_becomes_text_event() -> None:
 
     assert [e.type for e in events] == ["text"]
     assert events[0].content == "생산 실적 확인 결과 "
+
+
+def test_partial_text_delta_streams_and_final_text_is_not_duplicated() -> None:
+    adapter = AgentEventAdapter()
+
+    adapter.convert(StreamEvent(
+        uuid="stream-start",
+        session_id="s-1",
+        event={
+            "type": "message_start",
+            "message": {"id": "provider-message-1"},
+        },
+    ))
+    first = adapter.convert(StreamEvent(
+        uuid="stream-delta-1",
+        session_id="s-1",
+        event={
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {"type": "text_delta", "text": "생산 "},
+        },
+    ))
+    second = adapter.convert(StreamEvent(
+        uuid="stream-delta-2",
+        session_id="s-1",
+        event={
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {"type": "text_delta", "text": "계획"},
+        },
+    ))
+    final = adapter.convert(AssistantMessage(
+        content=[TextBlock(text="생산 계획")],
+        model="x",
+        uuid="transcript-entry-1",
+        message_id="provider-message-1",
+    ))
+
+    assert [event.content for event in first + second] == ["생산 ", "계획"]
+    assert final == []
+
+
+def test_partial_thinking_and_tool_json_are_not_exposed() -> None:
+    adapter = AgentEventAdapter()
+
+    for delta in (
+        {"type": "thinking_delta", "thinking": "비공개 추론"},
+        {"type": "signature_delta", "signature": "secret"},
+        {"type": "input_json_delta", "partial_json": '{"sql":'},
+    ):
+        events = adapter.convert(StreamEvent(
+            uuid="a-1",
+            session_id="s-1",
+            event={"type": "content_block_delta", "index": 0, "delta": delta},
+        ))
+        assert events == []
 
 
 def test_thinking_block_is_not_exposed() -> None:
@@ -54,6 +111,9 @@ def test_tool_use_emits_tool_call_and_status_with_short_name() -> None:
 
     assert [e.type for e in events] == ["tool_call", "status"]
     assert events[0].tool_name == "query_database"
+    assert events[0].tool_call_id == "t1"
+    assert events[0].data == {"args": {"question": "9월 A라인"}}
+    assert events[1].tool_call_id == "t1"
     assert events[1].data["status"] == "running"
 
 
@@ -106,7 +166,9 @@ def test_tool_result_name_resolved_from_prior_tool_use() -> None:
 
     assert [e.type for e in events] == ["tool_result", "status"]
     assert events[0].tool_name == "query_database"
+    assert events[0].tool_call_id == "t1"
     assert events[0].data == payload
+    assert events[1].tool_call_id == "t1"
     assert events[1].data["status"] == "completed"
 
 

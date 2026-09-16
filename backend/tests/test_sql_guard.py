@@ -11,6 +11,10 @@ from services.sql_guard import MAX_ROWS, SqlGuardError, check_sql
 ALLOWED = {"wip", "part", "route_step"}
 
 
+def test_max_rows_contract_is_one_thousand() -> None:
+    assert MAX_ROWS == 1000
+
+
 def test_select_passes_and_gets_limit() -> None:
     guarded = check_sql("SELECT * FROM wip", ALLOWED)
 

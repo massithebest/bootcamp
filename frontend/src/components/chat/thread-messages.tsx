@@ -1,163 +1,225 @@
-/**
- * assistant-ui `ThreadPrimitive.Messages` children renderer가 선택하는 메시지 컴포넌트.
- *
- * 기존 `message-bubble.tsx` 의 마크업을 최대한 그대로 옮긴다 — 사용자 메시지는
- * 오른쪽 정렬 원문, 어시스턴트 메시지는 진행 블록 위 + 파트 도착 순서 렌더.
- * 도메인 렌더러(`AgentProgress`, `ToolResultCard`)는 무수정으로 재사용한다.
- */
-
-import { CheckIcon, CopyIcon, PencilIcon, RotateCcwIcon } from "lucide-react";
-
+/** Production-planning extension for the assistant-ui Thread AssistantMessage slot. */
+import { useEffect, useState, type ReactNode } from "react";
+import { LoaderIcon } from "lucide-react";
 import {
-  ActionBarPrimitive,
-  ComposerPrimitive,
-  ErrorPrimitive,
   MessagePrimitive,
   MessagePartPrimitive,
+  groupPartByType,
   useAuiState,
   type ToolCallMessagePartProps,
 } from "@assistant-ui/react";
 
-import type { ToolResult } from "@/types/chat";
-import { AgentProgress } from "./agent-progress";
-import { MarkdownText } from "./markdown-text";
-import { ToolResultCard } from "./tool-result-card";
+import {
+  AgentPlan,
+  type PlanStep,
+} from "@/components/assistant-ui/elements/agent-plan";
+import { MessageActions, MessageError } from "@/components/assistant-ui/elements/message-actions.aui";
+import { MarkdownText } from "@/components/assistant-ui/elements/markdown-text";
+import { StoppedRun } from "@/components/assistant-ui/elements/stopped-run.aui";
+import {
+  ToolGroupContent,
+  ToolGroupRoot,
+  ToolGroupTrigger,
+} from "@/components/assistant-ui/elements/tool-group.aui";
 import { readAgentMetadata } from "@/lib/chat-runtime";
+import type { StatusStep, ToolResult } from "@/types/chat";
+import { ToolResultCard } from "./tool-result-card";
 
-export function UserMessage() {
+const groupMessageParts = groupPartByType({
+  "tool-call": ["group-tool"],
+  "standalone-tool-call": [],
+});
+
+export function AssistantMessage() {
+  const hasToolParts = useAuiState((s) =>
+    s.message.parts.some((part) => part.type === "tool-call"),
+  );
+  const hasTextParts = useAuiState((s) =>
+    s.message.parts.some((part) => part.type === "text"),
+  );
+  const messageRunning = useAuiState((s) => s.message.status?.type === "running");
+  const customMetadata = useAuiState((s) => s.message.metadata.custom);
+  const publicStatuses = readAgentMetadata(customMetadata)?.statuses ?? [];
+
   return (
-    <MessagePrimitive.Root>
-      <div className="flex flex-col items-end gap-1">
-        <div className="max-w-[85%] whitespace-pre-wrap break-words rounded border border-line-strong bg-surface px-3 py-2 text-ui text-ink">
-          <MessagePrimitive.Parts>
-            {({ part }) =>
-              part.type === "text" ? <MessagePartPrimitive.Text /> : null
+    <MessagePrimitive.Root data-role="assistant" className="min-w-0">
+      <div className="flex flex-col gap-3">
+        {!hasToolParts && (
+          <StandaloneExecution
+            running={messageRunning}
+            writing={hasTextParts}
+            statuses={publicStatuses}
+          />
+        )}
+
+        <MessagePrimitive.GroupedParts groupBy={groupMessageParts} indicator="never">
+          {({ part, children }) => {
+            switch (part.type) {
+              case "group-tool":
+                return (
+                  <ExecutionToolGroup
+                    count={part.indices.length}
+                    toolRunning={part.status.type === "running"}
+                    statuses={publicStatuses}
+                  >
+                    {children}
+                  </ExecutionToolGroup>
+                );
+              case "text":
+                return <AssistantText />;
+              case "tool-call":
+                return part.toolUI ?? <ToolPart {...part} />;
+              default:
+                return null;
             }
-          </MessagePrimitive.Parts>
-        </div>
-        <ActionBarPrimitive.Root
-          hideWhenRunning
-          autohide="not-last"
-          className="flex items-center"
-        >
-          <ActionBarPrimitive.Edit className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-2xs text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink-2 disabled:pointer-events-none disabled:opacity-0">
-            <PencilIcon className="size-3" /> 편집
-          </ActionBarPrimitive.Edit>
-        </ActionBarPrimitive.Root>
+          }}
+        </MessagePrimitive.GroupedParts>
+
+        <StoppedRun />
+        <MessageError />
+        <MessageActions />
       </div>
     </MessagePrimitive.Root>
   );
 }
 
-/**
- * 사용자 메시지 편집 모드. `ActionBarPrimitive.Edit` 클릭 시
- * `ThreadPrimitive.Messages` 의 `UserEditComposer` 슬롯으로 교체 렌더된다.
- * `ComposerPrimitive` 는 편집 컨텍스트에서도 그대로 동작한다 — 현재 텍스트로
- * 미리 채워지고, Send 는 onEdit(편집 저장 + 포크 재실행)을 부른다.
- */
-export function UserEditComposer() {
+/** Immediate feedback while the backend/model is preparing its first public Tool call. */
+function PendingExecution({ writing }: { writing: boolean }) {
   return (
-    <div className="flex justify-end">
-      <ComposerPrimitive.Root className="flex w-full max-w-[85%] flex-col gap-1.5 rounded border border-accent bg-surface px-3 py-2">
-        <ComposerPrimitive.Input
-          className="resize-none bg-transparent text-ui text-ink outline-none"
-          autoFocus
-        />
-        <div className="flex justify-end gap-1.5">
-          <ComposerPrimitive.Cancel className="rounded px-2 py-1 text-2xs text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink-2">
-            취소
-          </ComposerPrimitive.Cancel>
-          <ComposerPrimitive.Send className="rounded bg-accent px-2.5 py-1 text-2xs font-medium text-accent-ink transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-3">
-            저장하고 다시 실행
-          </ComposerPrimitive.Send>
-        </div>
-      </ComposerPrimitive.Root>
+    <div role="status" className="flex items-center gap-2 py-1.5 text-xs text-ink-3">
+      <LoaderIcon aria-hidden className="size-3 animate-spin [animation-duration:0.6s]" />
+      <span className="shimmer motion-reduce:animate-none">
+        {writing ? "응답 작성 중" : "요청 분석 중"}
+      </span>
     </div>
   );
 }
 
-export function AssistantMessage() {
-  // 진행 블록(statuses)은 표준 content part 유니온에 대응물이 없어
-  // metadata.custom 으로 실어 보낸다 (lib/chat-runtime.ts 참고).
-  const metaCustom = useAuiState((s) =>
-    s.message.role === "assistant" ? s.message.metadata.custom : undefined,
-  );
-  const hasContent = useAuiState((s) => s.message.content.length > 0);
-  const isRunning = useAuiState((s) => s.message.status?.type === "running");
-  const meta = readAgentMetadata(metaCustom);
-
-  const showThinking =
-    isRunning &&
-    !hasContent &&
-    (meta?.statuses.length ?? 0) === 0;
-
-  return (
-    <MessagePrimitive.Root>
-      <div className="flex flex-col gap-3">
-        {meta && (meta.statuses.length > 0 || isRunning) && (
-          <AgentProgress statuses={meta.statuses} isRunning={isRunning} />
-        )}
-
-        <MessagePrimitive.Parts>
-          {({ part }) => {
-            if (part.type === "text") return <AssistantText />;
-            if (part.type === "tool-call") {
-              return part.toolUI ?? <ToolPart {...part} isRunning={isRunning} />;
-            }
-            return null;
-          }}
-        </MessagePrimitive.Parts>
-
-        {showThinking && (
-          <p className="text-ui text-ink-3">응답을 준비하고 있습니다…</p>
-        )}
-
-        <MessagePrimitive.Error>
-          <ErrorPrimitive.Root className="border-l-2 border-block-ink bg-block-weak px-3 py-2 text-ui text-block-ink">
-            <ErrorPrimitive.Message />
-          </ErrorPrimitive.Root>
-        </MessagePrimitive.Error>
-
-        <ActionBarPrimitive.Root
-          hideWhenRunning
-          autohide="not-last"
-          autohideFloat="single-branch"
-          className="flex items-center gap-1"
-        >
-          <CopyButton />
-          <ActionBarPrimitive.Reload className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-2xs text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink-2 disabled:pointer-events-none disabled:opacity-0">
-            <RotateCcwIcon className="size-3" /> 재생성
-          </ActionBarPrimitive.Reload>
-        </ActionBarPrimitive.Root>
-      </div>
-    </MessagePrimitive.Root>
-  );
-}
-
-/** 복사 버튼. `data-copied` 대신 `message.isCopied` 를 직접 읽어 아이콘/라벨을 바꾼다. */
-function CopyButton() {
-  const isCopied = useAuiState((s) => s.message.isCopied);
-  return (
-    <ActionBarPrimitive.Copy className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-2xs text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink-2 disabled:pointer-events-none disabled:opacity-0">
-      {isCopied ? (
-        <>
-          <CheckIcon className="size-3" /> 복사됨
-        </>
-      ) : (
-        <>
-          <CopyIcon className="size-3" /> 복사
-        </>
-      )}
-    </ActionBarPrimitive.Copy>
-  );
-}
-
 /**
- * 텍스트 파트 렌더러. `MessagePartPrimitive.InProgress` 가 "이 파트가 현재
- * 스트리밍 중인 마지막 파트인지" 를 판정해준다(assistant-ui 의 auto-status —
- * 메시지가 running 이면 마지막 파트만 running). 기존 `lastTextId` 수동 계산을
- * 대체한다.
+ * 실행 중에는 펼쳐 두어 진행 상황을 보여주고, 최종 응답이 확정되면 전체
+ * Tool 목록을 접는다. 이후에는 사용자가 원하는 단계까지만 다시 펼칠 수 있다.
  */
+function ExecutionToolGroup({
+  count,
+  toolRunning,
+  statuses,
+  children,
+}: {
+  count: number;
+  toolRunning: boolean;
+  statuses: readonly StatusStep[];
+  children: ReactNode;
+}) {
+  const messageStatus = useAuiState((s) => s.message.status);
+  const messageRunning = messageStatus?.type === "running";
+  const isComplete = messageStatus?.type === "complete";
+  const isFailed = messageStatus?.type === "incomplete" && messageStatus.reason === "error";
+  const isCancelled = messageStatus?.type === "incomplete" && messageStatus.reason === "cancelled";
+  const [open, setOpen] = useState(messageRunning);
+
+  useEffect(() => {
+    setOpen(messageRunning);
+  }, [messageRunning]);
+
+  let label = `응답 작성 완료 · 툴 ${count}개 사용`;
+  if (toolRunning && messageRunning) label = `툴 ${count}개 실행 중`;
+  else if (messageRunning) label = `응답 작성 중 · 툴 ${count}개 사용`;
+  else if (isFailed) label = `툴 ${count}개 사용 · 오류`;
+  else if (isCancelled) label = `툴 ${count}개 사용 · 중단`;
+
+  return (
+    <ToolGroupRoot
+      variant="ghost"
+      open={open}
+      onOpenChange={setOpen}
+      className="max-w-full"
+    >
+      <ToolGroupTrigger
+        count={count}
+        active={messageRunning}
+        completed={isComplete}
+        label={label}
+      />
+      <ToolGroupContent aria-busy={messageRunning}>
+        {statuses.length > 0 && (
+          <AgentPlan steps={toPlanSteps(statuses, messageRunning, isFailed, isCancelled)} />
+        )}
+        {children}
+      </ToolGroupContent>
+    </ToolGroupRoot>
+  );
+}
+
+/** Tool 호출과 별개로 Backend가 공개한 업무 진행 단계를 같은 실행 과정에 둔다. */
+function StandaloneExecution({
+  running,
+  writing,
+  statuses,
+}: {
+  running: boolean;
+  writing: boolean;
+  statuses: readonly StatusStep[];
+}) {
+  const messageStatus = useAuiState((s) => s.message.status);
+  const isComplete = messageStatus?.type === "complete";
+  const isFailed = messageStatus?.type === "incomplete" && messageStatus.reason === "error";
+  const isCancelled = messageStatus?.type === "incomplete" && messageStatus.reason === "cancelled";
+  const [open, setOpen] = useState(running);
+
+  useEffect(() => {
+    setOpen(running);
+  }, [running]);
+
+  if (statuses.length === 0) return running ? <PendingExecution writing={writing} /> : null;
+
+  const hasRunningStatus = statuses.some((step) => step.status === "running");
+  let label = "응답 작성 완료";
+  if (running && hasRunningStatus) label = "실행 과정 진행 중";
+  else if (running) label = "응답 작성 중";
+  else if (isFailed) label = "실행 과정 · 오류";
+  else if (isCancelled) label = "실행 과정 · 중단";
+
+  return (
+    <ToolGroupRoot
+      variant="ghost"
+      open={open}
+      onOpenChange={setOpen}
+      className="max-w-full"
+    >
+      <ToolGroupTrigger
+        count={0}
+        active={running}
+        completed={isComplete}
+        label={label}
+      />
+      <ToolGroupContent aria-busy={running}>
+        <AgentPlan steps={toPlanSteps(statuses, running, isFailed, isCancelled)} />
+      </ToolGroupContent>
+    </ToolGroupRoot>
+  );
+}
+
+function toPlanSteps(
+  statuses: readonly StatusStep[],
+  messageRunning: boolean,
+  failed: boolean,
+  cancelled: boolean,
+): PlanStep[] {
+  return statuses.map((step) => {
+    let status: PlanStep["status"] = step.status;
+    if (!messageRunning && (status === "pending" || status === "running")) {
+      status = cancelled ? "stopped" : failed ? "error" : "unknown";
+    }
+    return {
+      id: step.step,
+      label: step.label,
+      detail: step.detail,
+      status,
+    };
+  });
+}
+
+/** assistant text with a small streaming cursor on the current part. */
 function AssistantText() {
   return (
     <div className="text-ui-lg leading-[1.6] text-ink">
@@ -169,17 +231,23 @@ function AssistantText() {
   );
 }
 
-/**
- * 툴 파트 렌더러. `ToolResult` 객체를 통째로 실어 보냈으므로(chat-runtime.ts)
- * `ToolResultCard` 의 props 를 그대로 쓴다 — 그 안의 `tool_name`/`data.kind`
- * 분기는 무수정.
- */
-function ToolPart(props: ToolCallMessagePartProps & { isRunning: boolean }) {
+/** A second disclosure level for one tool's public parameters and result. */
+function ToolPart(props: ToolCallMessagePartProps) {
   const result = props.result as ToolResult | undefined;
-  if (!result) return null;
+  const args = isRecord(props.args) ? props.args : {};
+  const messageRunning = useAuiState((s) => s.message.status?.type === "running");
+
   return (
-    <div className="border-t border-line pt-3">
-      <ToolResultCard result={result} isRunning={props.isRunning} />
-    </div>
+    <ToolResultCard
+      toolName={props.toolName}
+      args={args}
+      result={result}
+      running={props.status.type === "running"}
+      messageRunning={messageRunning}
+    />
   );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
