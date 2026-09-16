@@ -57,6 +57,7 @@
 | 20 | 공개 실행 안내 가독성·지속성 | - | 해당 없음 | 완료 | [실행 안내 가독성 계획](260916-reasoning-readability-plan.md) | 2026-09-16 |
 | 21 | 지식 관리 구조화 상세 가독성 | - | 해당 없음 | 완료 | [지식 상세 가독성 계획](260916-knowledge-detail-readability-plan.md) | 2026-09-16 |
 | 22 | 지식 Query 규칙·시각화 안내 계약 | - | 완료 | 완료 | [지식 Query 규칙 계획](260916-knowledge-query-rules-plan.md) | 2026-09-16 |
+| 23 | 개발 지침·README 동기화 | - | 완료 | 완료 | [문서 동기화 계획](260916-guidance-readme-sync-plan.md) | 2026-09-16 |
 | - | Agent Workbench UI/UX 감사 후속 개선 | - | 계약 검증 완료 | 완료 | F01~F17 범위 내 구현·검증 완료, 후속 계약 검토 보류 — [상위·파트별 계획](260916-agent-workbench-ux-audit-plan.md) | - |
 | - | 후속질문 동적 생성 | P1 | 미착수 | 미착수 | [후속질문 계획](260916-followup-suggestions-plan.md) | - |
 

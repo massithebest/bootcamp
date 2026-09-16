@@ -59,6 +59,9 @@ Vite 7, React 18, strict TypeScript 기반의 라우터 없는 SPA다. 코드 �
   원본 행 배열을 Tool 입력이나 Markdown 표로 반복하지 않는다.
 - 성공한 `prepare_table`이 텍스트 뒤에 도착해도 설명을 유지하고, 같은 응답의
   중복 GFM 표 블록만 제거한다. fenced code 안의 표 예시는 제거하지 않는다.
+- 구조화 지식 상세는 `query_rules`를 조회 규칙, `aggregation_rules`를 집계 규칙,
+  `visualization_hints`를 시각화 안내로 표시한다. table/recipe의
+  `sample_queries`는 질문과 SQL만 렌더링하며 존재하지 않는 답변 값을 만들지 않는다.
 - 세 pane의 스크롤 체인에 필요한 `min-h-0`, `overflow-hidden`, `shrink-0`을
   유지한다.
 
@@ -70,6 +73,8 @@ Vite 7, React 18, strict TypeScript 기반의 라우터 없는 SPA다. 코드 �
   registry CLI가 필요한 소스는 외부에서 생성해 저장소에 포함한다.
 - backend 접근은 `lib`의 API 모듈에만 두고 transport 오류를 사용자에게 안전한
   상태로 변환한다. live SSE 응답은 캐시하지 않는다.
+- Playwright·브라우저 자동화 산출물은 루트 `.playwright-mcp/` 또는 `artifacts/`에
+  두고 Git에 포함하지 않는다.
 
 ## 명령과 검증
 
@@ -87,6 +92,7 @@ npm run preview
 
 - `npm run build`가 type check를 포함한다. `npm test`는 Node 내장 실행기로
   SSE·상태 전이·결과 렌더 회귀를 검증한다. 브라우저 lifecycle 검증은
-  개발 서버의 `/tests/chat-browser.html`을 사용한다. formatter는 아직 없다.
+  개발 서버의 `/tests/chat-browser.html`, `/tests/knowledge-browser.html`,
+  `/tests/workbench-browser.html`을 목적에 맞게 사용한다. formatter는 아직 없다.
 - UI 변경은 loading·empty·error, 키보드·focus·label, tool card와 chart/table
   fallback, 좁은 화면부터 desktop까지 수동 확인한다.

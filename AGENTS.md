@@ -24,8 +24,19 @@
   백엔드 스키마와 프론트엔드 타입·파서를 같은 작업에서 갱신한다.
 - SQL 실행은 읽기 전용이어야 하며, mock과 real 서비스의 함수 시그니처와
   반환 형태를 동일하게 유지한다.
+- 구조화 지식의 table·recipe는 `query_rules`, `aggregation_rules`,
+  `visualization_hints`를 역할별로 구분한다. `sample_queries`는 데이터에 종속되는
+  답변을 저장하지 않고 `question`, `sql`만 유지한다.
 - 런타임 생산계획 Agent 지침인 `backend/agent/agent_sdk/CLAUDE.md`는 개발용
   저장소 지침과 별개다.
+
+## 로컬 데이터와 산출물
+
+- `.env*`, `.playwright-mcp/`, `artifacts/`, `backend/data/`, 로컬 SMT2020
+  원본·생성 DB와 변환 스크립트는 Git에 포함하지 않는다. 이미 추적된 로컬
+  산출물을 제외할 때는 파일을 지우지 말고 Git 추적만 해제한다.
+- README의 실행 절차는 새 clone에서 필요한 파일과 별도 반입해야 하는 로컬
+  자산을 구분한다. Git에 없는 데이터나 스크립트가 기본 제공되는 것처럼 쓰지 않는다.
 
 ## UI/UX 작업
 
@@ -58,6 +69,8 @@
 - `backend/docs`, `frontend/docs`: 폐쇄망 이전·운영, 도메인 지식, 기술 결정 등
   반복해서 참고할 운영 문서를 둔다. 실행 일정과 Task는 두지 않는다.
 - 작업 상태가 달라지면 관련 계획의 상태와 `plan/Todo.md`를 함께 갱신한다.
+- `README.md`는 현재 사용자의 설치·실행·검증 진입점이다. 구현·환경변수·명령이
+  바뀌면 루트와 해당 파트 README를 함께 확인한다.
 
 ## 기본 검증
 

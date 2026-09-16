@@ -17,6 +17,10 @@ SDK 이벤트를 SSE로 전달한다. 코드 변경 전 상위 `../AGENTS.md`와
 - `knowledge/` YAML이 catalog, join, KPI, recipe/CTE, simulation, glossary와
   scenario의 source of truth다. 로드·검증은 `services/knowledge_service.py`,
   Agent 접근은 등록된 지식 tool을 통한다.
+- table과 recipe의 `query_rules`는 기본 날짜·필터·정렬·조인 전제,
+  `aggregation_rules`는 grain·집계 함수·중복·재집계 규칙,
+  `visualization_hints`는 표현 권고를 담는다. table/recipe의 `sample_queries`는
+  `question`, `sql`만 허용하며 현재 데이터 값인 `answer`를 저장하지 않는다.
 - SQL은 `services/sql_guard.py`의 읽기 전용 검사를 통과해야 한다. Mock의 DB
   authorizer와 read-only 연결을 유지하고, real 구현도 DB 권한과 실행 계층에서
   쓰기를 차단한다. 카탈로그 스키마 변경 시 YAML, 시드 스크립트와 테스트를
@@ -51,6 +55,9 @@ SDK 이벤트를 SSE로 전달한다. 코드 변경 전 상위 `../AGENTS.md`와
   접근 가능한 Result Store 결과로 `prepare_table` 이벤트를 보완한다.
 - 환경변수는 `core/config.py`에서만 읽는다. 새 키는 실제 값 없이
   `.env.example`에도 추가한다.
+- 작성형 텍스트 지식은 `services/document_store.py`의 로컬 SQLite에서 버전·검토·
+  활성화 상태를 관리한다. 구조화 YAML은 계속 읽기 전용이며 두 저장소를 섞어
+  수정하지 않는다.
 
 ## 폐쇄망과 지식 관리
 
@@ -58,6 +65,9 @@ SDK 이벤트를 SSE로 전달한다. 코드 변경 전 상위 `../AGENTS.md`와
   [폐쇄망 배포 및 이식 가이드](docs/CLOSED_NETWORK_SETUP.md)를 읽는다.
 - table, KPI, recipe/CTE, RAG 지식을 추가하거나 검토할 때는
   [도메인 지식 관리 지침](docs/domain-knowledge-management.md)을 따른다.
+- 로컬 `datasets/`, `data/`, `.env`, 변환용 `scripts/`는 배포 저장소에 자동으로
+  포함되지 않는다. 테스트 fixture와 달리 운영·benchmark 자산이 필요한 명령은
+  해당 파일의 별도 반입 여부를 먼저 확인한다.
 - API 키, 비밀번호, 사내 URL을 코드·로그·문서·예시 설정에 넣지 않는다.
 
 ## 명령과 검증

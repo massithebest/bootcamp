@@ -4,6 +4,10 @@
 MIT 고지는 [../LICENSE](../LICENSE)에 포함한다. 파일은 복사 후 프로젝트가
 관리하며 npm 패키지 업그레이드만으로 자동 갱신되지 않는다.
 
+이 문서는 반입 출처와 Elements 조정 이력을 기록한다. 현재 애플리케이션 실행·
+검증 방법은 [Frontend README](../../../../README.md), 제품 UI 규칙은
+[Frontend 디자인 가이드](../../../../CLAUDE.md)를 기준으로 한다.
+
 | 원본 registry | 반입 시 SHA-256 |
 | --- | --- |
 | https://r.assistant-ui.com/thread.json | `19374a0dde5fb240a2f0eab710fc0b6d1ffa62a40ee836edaea9b5ee94b462a2` |
@@ -85,7 +89,7 @@ PromptLibrary는 후속 UI 요청에서 제거했으며 아래 hash는 검토 �
 
 공용 DataTable과 assistant Markdown 표는 데이터 행을 최대 100개만 렌더링하고
 전체 건수와 생략 건수를 안내한다. Composer 왼쪽 아래에는 첨부, 현재 모델
-`GLM-5.3-Flash`, 추론 강도 `Low`가 보인다. attachment adapter와 실행 옵션
+`GLM-5.3-Flash`, 추론 강도 `중간`이 보인다. attachment adapter와 실행 옵션
 계약이 추가되기 전까지 세 제어는 준비 중인 비활성 UI로 유지한다.
 
 ## 중첩 Tool 실행 과정

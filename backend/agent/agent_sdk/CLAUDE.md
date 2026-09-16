@@ -19,7 +19,7 @@
 | SQL 로 데이터 조회 | `sql-analysis` Skill |
 | 시뮬레이션 실행·해석 | `simulation` Skill |
 | KPI 의 정의·공식·판정 기준 | `list_kpis` → `get_kpi` |
-| 테이블·컬럼·조인·코드값 | `list_tables` → `describe_table` |
+| 테이블·컬럼·조인·코드값·조회 기본값 | `list_tables` → `describe_table` |
 | 시뮬레이션 종류·파라미터 | `list_simulation` |
 | 집계 단위·조인·재집계 가이드 | `get_kpi` 의 `recipe_refs` 또는 `list_recipes` → `get_recipe` |
 | 용어·매뉴얼·정책 | `search_knowledge` |
@@ -57,6 +57,9 @@
   throughput, 병목, 납기 달성률을 계산한 simulation으로 해석하지 않는다.
 - `execute_sql` 결과가 `type: "large_result"`면 `get_result_summary`로 성격을 파악하고, 필요한 구간만 `get_result_page`로 조회한다.
 - 비교·추이가 유용하거나 사용자가 차트를 요청하면 실제 `columns`와 결과 grain을 확인한 뒤 `prepare_visualization`을 호출한다. 오류 원인을 확인한 뒤 명세 수정 또는 새 집계 결과로 최대 2회 보정하며, 성공한 같은 명세를 다시 호출하지 않는다. 성공 결과는 Tool UI가 자동으로 표시하므로 최종 답변에 `visualization_id`나 `chart` 코드 펜스를 반복하지 않는다. 실패하거나 지원하지 않는 표현이면 표·텍스트로 답한다.
+- table·recipe의 `visualization_hints`는 차트 종류와 컬럼 선택의 권고로만 사용한다.
+  실제 결과가 힌트의 grain·컬럼과 다르면 결과를 우선하며, 힌트를 맞추기 위해
+  수치를 임의로 재집계하지 않는다.
 - 사용자가 표를 요청했거나 조회·시뮬레이션 결과에서 2행 이상을 나열하려면 반드시 `prepare_table(result_id, columns?, title?)`을 호출한다. `get_result_page`로 일부 행을 확인했더라도 원래 `result_id`로 호출한다. 성공 결과는 Tool UI가 최대 100행을 표시한다. Result Store 데이터를 Markdown 표로 작성하지 않는다.
 - 표와 차트는 각각 사용자에게 공개할 짧은 `도입 설명 → Tool UI → 결과 해석` 순서로 배치한다. 둘을 함께 제공하면 표의 도입·호출·해석을 마친 뒤 차트의 도입·호출·해석을 이어 쓴다. 도입과 해석에는 내부 추론을 쓰지 않고, 해당 결과의 범위·핵심 수치·주의점만 설명한다. Tool UI 호출 뒤의 해석에서는 `위·아래·다음 표/차트`처럼 화면 위치를 가리키지 말고 `표에는…`, `차트에서는…`처럼 대상 자체를 지칭한다.
 
