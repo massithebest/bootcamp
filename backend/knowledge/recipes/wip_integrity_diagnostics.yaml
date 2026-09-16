@@ -39,6 +39,10 @@ output_columns:
   - {name: route_missing_tool, role: measure, unit: row, desc: 설비 Family가 없는 Route Step 수}
   - {name: cross_dataset_part_matches, role: measure, unit: row, desc: dataset 키 생략 시 다른 dataset으로 잘못 연결되는 후보 수}
   - {name: route_join_rows, role: measure, unit: row, desc: 모든 Route Step 조인 시 행 수}
+query_rules:
+  - 진단 대상 benchmark의 dataset을 바깥 SELECT에서 필수로 제한한다
+  - 결과가 0인 누락 지표도 생략하지 않고 함께 조회한다
+  - 이 레시피 결과를 실제 생산실적이나 납기 성과로 해석하지 않는다
 aggregation_rules:
   - 연결 누락 세 지표는 0이 기대값이며 같은 WIP 행이 여러 검사에 포함될 수 있어 합산하지 않는다.
   - cross_dataset_part_matches는 잘못된 조인의 위험이며 원본 데이터 오류나 생산 부진의 증거가 아니다.
@@ -49,10 +53,8 @@ visualization_hints: []
 sample_queries:
   - question: LVHM WIP 입력 연결과 Route 조인 중복 위험은 어때?
     sql: SELECT * FROM wip_integrity_diagnostics WHERE dataset = 'LVHM'
-    answer: WIP 2,156 Lot·53,900 pieces이며 Part·현재 Step·설비 연결 누락은 모두 0건이다. dataset 키를 빼면 489건의 교차 연결 후보가 있고 전체 Route 조인 행은 920,373건이므로 WIP를 먼저 집계해야 한다.
   - question: HVLM WIP 입력 연결과 Route 조인 중복 위험은 어때?
     sql: SELECT * FROM wip_integrity_diagnostics WHERE dataset = 'HVLM'
-    answer: WIP 2,255 Lot·56,375 pieces이며 Part·현재 Step·설비 연결 누락은 모두 0건이다. dataset 키를 빼면 2,255건의 교차 연결 후보가 있고 전체 Route 조인 행은 1,117,145건이므로 WIP를 먼저 집계해야 한다.
 status: draft
 owner: ""
 source: SMT2020 입력 관계 및 테스트 전용 오류 fixture

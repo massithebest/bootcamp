@@ -37,6 +37,24 @@ def test_all_yaml_loads(store: KnowledgeStore) -> None:
     assert store.kpis, "KPI 가 하나도 로드되지 않았다"
 
 
+def test_tables_and_recipes_have_query_guidance(store: KnowledgeStore) -> None:
+    for table in store.tables.values():
+        assert table.query_rules, f"테이블 {table.table} 에 query_rules가 없다"
+        assert table.visualization_hints, (
+            f"테이블 {table.table} 에 visualization_hints가 없다"
+        )
+        assert all(
+            set(sample.model_dump()) == {"question", "sql"}
+            for sample in table.sample_queries
+        )
+    for recipe in store.recipes.values():
+        assert recipe.query_rules, f"레시피 {recipe.recipe_id} 에 query_rules가 없다"
+        assert all(
+            set(sample.model_dump()) == {"question", "sql"}
+            for sample in recipe.sample_queries
+        )
+
+
 def test_column_refs_point_to_existing_table_column(store: KnowledgeStore) -> None:
     for table in store.tables.values():
         for column in table.columns:

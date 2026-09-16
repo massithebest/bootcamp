@@ -56,6 +56,7 @@
 | 19 | 좌측 채팅 메뉴 단일화 | - | 해당 없음 | 완료 | [채팅 메뉴 단일화 계획](260916-chat-navigation-unification-plan.md) | 2026-09-16 |
 | 20 | 공개 실행 안내 가독성·지속성 | - | 해당 없음 | 완료 | [실행 안내 가독성 계획](260916-reasoning-readability-plan.md) | 2026-09-16 |
 | 21 | 지식 관리 구조화 상세 가독성 | - | 해당 없음 | 완료 | [지식 상세 가독성 계획](260916-knowledge-detail-readability-plan.md) | 2026-09-16 |
+| 22 | 지식 Query 규칙·시각화 안내 계약 | - | 완료 | 완료 | [지식 Query 규칙 계획](260916-knowledge-query-rules-plan.md) | 2026-09-16 |
 | - | Agent Workbench UI/UX 감사 후속 개선 | - | 계약 검증 완료 | 완료 | F01~F17 범위 내 구현·검증 완료, 후속 계약 검토 보류 — [상위·파트별 계획](260916-agent-workbench-ux-audit-plan.md) | - |
 | - | 후속질문 동적 생성 | P1 | 미착수 | 미착수 | [후속질문 계획](260916-followup-suggestions-plan.md) | - |
 
@@ -102,11 +103,12 @@ P1~P3는 미수행 항목 간 상대적 우선순위이며 숫자가 낮을수�
 - [x] 기존 합성 FGS/MP 시드와 mock을 SMT2020 SQL·입력 검증 mock으로 교체
 - [x] SMT2020 기반 Fake Runner와 프론트 예시·관통 흐름 검증
 - [x] 도메인 지식 Phase 2: SMT2020 입력 관계·dataset 혼합·조인 중복 집계 diagnostics 보강
+- [x] table·recipe 조회 규칙과 table 시각화 안내 추가, sample query의 데이터 종속 답변 제거
 - [ ] 실제 생산 부진 원인 시나리오와 현업 지식 검증 — 업무 데이터 확보 후
 - [x] 텍스트 지식 등록·검토·버전·활성화·공용 관리 모드 구현
 - [x] 지식 조회·관리 화면, 도구/Skills 설명, local 검색과 정확한 버전 인용 구현
 - [x] 별도 관리 활성화 환경변수 없이 기존 구조화 YAML을 항상 읽기 전용으로 표시
-- [x] table·recipe 샘플 SQL을 현재 데이터 기반 질문·SQL·답변 형식으로 통일
+- [x] table·recipe 샘플 SQL을 데이터 비종속 질문·SQL 형식으로 통일
 - [x] 우측 패널을 도구·스킬·지식 순서와 설명이 보이는 간결한 지식 목록으로 개편
 - [ ] 도메인 지식 Phase 3: 폐쇄망용 비정형 문서 색인과 real RAG 연결
 - [x] assistant-ui 감사 계획의 6개 후속 개선 항목 구현

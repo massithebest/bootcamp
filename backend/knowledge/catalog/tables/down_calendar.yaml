@@ -16,8 +16,14 @@ columns:
 joins: []
 caveats:
   - calendar_attach.calname과 연결할 때 caltype이 down인지 함께 확인한다
+query_rules:
+  - 특정 benchmark 질문은 dataset을 필수로 제한한다
+  - MTTF 또는 MTTR을 비교할 때 분포와 단위 컬럼을 함께 조회한다
 aggregation_rules:
   - MTTF/MTTR은 각각의 분포와 단위를 포함해 해석하며 서로 다른 단위를 바로 합산하지 않는다
+visualization_hints:
+  - 같은 분포·단위의 calendar별 MTTF 또는 MTTR 비교에는 bar 차트가 적합하다
+  - MTTF와 MTTR은 의미가 다르므로 같은 수량 계열처럼 누적하지 않는다
 sample_queries:
   - question: benchmark별 breakdown 캘린더는 몇 개야?
     sql: |
@@ -25,7 +31,6 @@ sample_queries:
       FROM down_calendar
       GROUP BY dataset
       ORDER BY dataset
-    answer: HVLM과 LVHM에 각각 11개의 breakdown 캘린더가 있다.
 status: verified
 owner: ""
 updated: 2026-09-15

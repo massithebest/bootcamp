@@ -33,19 +33,21 @@
 | `list_simulation` | 시뮬레이션 종류·파라미터·출력 확인 |
 | `run_simulation` | 시뮬레이션 실행 |
 | `list_tables` | 테이블 목록 (keyword/tag 로 좁힐 수 있다) |
-| `describe_table` | 테이블 상세와 질문·SQL·답변 예시. SQL 을 쓰기 전에 반드시 호출 |
+| `describe_table` | 테이블 상세와 조회·집계 규칙, 시각화 안내, 질문·SQL 예시. SQL 을 쓰기 전에 반드시 호출 |
 | `list_kpis` | KPI 목록 |
 | `get_kpi` | KPI 상세. 정의·공식·판정 규칙·원인 후보(diagnostics) |
 | `list_recipes` | 재사용 가능한 집계·조인 CTE 목록 |
-| `get_recipe` | 레시피 상세. 적용 목적·출력 단위·집계 가이드·CTE SQL·질문·SQL·답변 예시 |
+| `get_recipe` | 레시피 상세. 적용 목적·출력 단위·조회·집계 규칙·CTE SQL·질문·SQL 예시 |
 | `get_result_summary` | 대용량 조회 결과(`large_result`)의 메타데이터·요약 통계 확인 |
 | `get_result_page` | 대용량 조회 결과의 특정 구간(offset/limit) 조회 |
 | `prepare_table` | 저장된 result_id를 검색·정렬·페이지 이동 가능한 standalone 표로 준비 |
 | `prepare_visualization` | 집계된 result_id의 실제 컬럼·grain을 검증해 bar/line 시각화 등록 |
 
-- SQL 을 작성하기 전에 `describe_table` 로 컬럼과 주의사항(caveats)을 확인한다.
-  `sample_queries`의 SQL은 질문 표현과 집계 방식을 참고하는 검증 예시이며,
-  답변 값은 현재 기준 데이터가 바뀌면 다시 실행해 확인한다.
+- SQL 을 작성하기 전에 `describe_table` 로 컬럼, 주의사항(caveats),
+  `query_rules`, `aggregation_rules`를 확인한다. 날짜 미지정 시 오늘을 적용하는
+  규칙처럼 `query_rules`에 기본 조건이 있으면 사용자가 다른 조건을 명시하지 않은
+  경우 SQL에 반영한다. `sample_queries`의 SQL은 질문 표현과 조회·집계 방식을
+  참고하는 검증 예시이며 결과 값은 실행해서 확인한다.
 - SQL은 조회 전용이다. 데이터 변경문, DDL, PRAGMA, ATTACH와 여러 문장을 만들지
   않는다. 필요한 테이블만 조회하고 이미 얻은 동일 결과를 이유 없이 다시 조회하지
   않는다.

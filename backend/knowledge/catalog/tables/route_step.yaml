@@ -39,9 +39,16 @@ joins:
 caveats:
   - ptime과 관련 시간은 ptunits/ptper 및 분포 파라미터와 함께 해석한다
   - 빈 optional 필드를 0으로 간주하지 않는다
+query_rules:
+  - 특정 benchmark 질문은 dataset을 필수로 제한한다
+  - 특정 Route의 공정 순서는 step 오름차순으로 조회한다
+  - part 또는 tool과 조인할 때 dataset과 route 또는 stnfam을 함께 조인 조건에 포함한다
 aggregation_rules:
   - 공정 Step 수는 dataset과 route별 COUNT(step)으로 센다
   - 서로 다른 ptper 또는 시간 단위의 ptime을 바로 합산하지 않는다
+visualization_hints:
+  - Route별 Step 수나 같은 단위의 처리시간 비교에는 bar 차트가 적합하다
+  - Step 순서와 공정 설명은 차트보다 step 오름차순 표가 적합하다
 sample_queries:
   - question: benchmark별 Route Step은 총 몇 개야?
     sql: |
@@ -49,7 +56,6 @@ sample_queries:
       FROM route_step
       GROUP BY dataset
       ORDER BY dataset
-    answer: Route Step은 HVLM 926개, LVHM 4,013개다.
 status: verified
 owner: ""
 updated: 2026-09-15

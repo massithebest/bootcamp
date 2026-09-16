@@ -41,12 +41,20 @@ test('structured knowledge renders consistent labels, chips, columns, and empty 
     tags: ['SMT2020', '설비'],
     columns: [{ name: 'dataset', type: 'varchar', desc: 'benchmark 구분', ref: null }],
     caveats: ['dataset을 먼저 확정한다'],
+    query_rules: ['날짜 미지정 시 work_dt = CURRENT_DATE를 적용한다'],
+    visualization_hints: ['dataset별 비교에는 bar 차트가 적합하다'],
+    sample_queries: [{ question: '오늘 작업은?', sql: 'SELECT * FROM work WHERE work_dt = CURRENT_DATE' }],
   } }));
   assert.match(html, /시간 컬럼/);
   assert.match(html, /태그/);
   assert.match(html, /컬럼/);
   assert.match(html, /dataset/);
   assert.match(html, /benchmark 구분/);
+  assert.match(html, /조회 규칙/);
+  assert.match(html, /시각화 안내/);
+  assert.match(html, /질문·SQL 예시/);
+  assert.match(html, /오늘 작업은/);
+  assert.doesNotMatch(html, />답변</);
   assert.match(html, /없음/);
   assert.doesNotMatch(html, /&quot;(name|type|desc|ref)&quot;|>null</);
 });

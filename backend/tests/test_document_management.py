@@ -111,7 +111,9 @@ def test_catalog_matches_sdk_wire_and_structured_readonly(store):
     detail = client.get("/api/knowledge/entries/kpi/initial_wip").json()
     assert detail["detail"] == get_store().kpis["initial_wip"].model_dump(mode="json")
     table_detail = client.get("/api/knowledge/entries/table/wip").json()["detail"]
-    assert set(table_detail["sample_queries"][0]) == {"question", "sql", "answer"}
+    assert set(table_detail["sample_queries"][0]) == {"question", "sql"}
+    assert table_detail["query_rules"]
+    assert table_detail["visualization_hints"]
     assert client.put("/api/knowledge/entries/kpi/initial_wip", json={}).status_code == 405
     assert client.get("/api/knowledge/skills/sql-analysis").json()["content"]
 

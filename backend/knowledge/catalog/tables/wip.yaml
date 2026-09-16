@@ -20,9 +20,16 @@ joins:
 caveats:
   - curstep은 part의 route를 거쳐 route_step과 연결한다
   - 빈 hotlot/trace는 NULL이며 일반 Lot 여부를 별도 값으로 보정하지 않는다
+query_rules:
+  - 특정 benchmark 질문은 dataset을 필수로 제한하고 HVLM/LVHM 비교일 때만 두 dataset을 함께 조회한다
+  - part 또는 route_step과 조인할 때 dataset과 업무 키를 모두 조인 조건에 포함한다
+  - 납기 기간 요청은 due를 사용하고 start를 실제 투입 시각으로 단정하지 않는다
 aggregation_rules:
   - 초기 WIP Lot 수는 dataset과 part별 COUNT(*)로 센다
   - 초기 WIP piece 수는 dataset과 part별 SUM(pieces)로 센다
+visualization_hints:
+  - part별 lot_count 또는 piece_count 비교에는 bar 차트가 적합하다
+  - due 기준 추이는 시간 grain으로 다시 집계한 뒤 line 차트로 표현한다
 sample_queries:
   - question: benchmark별 초기 WIP Lot과 piece 합계는 얼마야?
     sql: |
@@ -30,7 +37,6 @@ sample_queries:
       FROM wip
       GROUP BY dataset
       ORDER BY dataset
-    answer: 초기 WIP는 HVLM 2,255 Lot·56,375 pieces, LVHM 2,156 Lot·53,900 pieces다.
 status: verified
 owner: ""
 updated: 2026-09-15

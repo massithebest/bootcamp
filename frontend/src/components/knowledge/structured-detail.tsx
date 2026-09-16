@@ -22,6 +22,7 @@ const FIELD_LABELS: Record<string, string> = {
   output_columns: "출력 컬럼",
   joins: "조인",
   caveats: "주의사항",
+  query_rules: "조회 규칙",
   aggregation_rules: "집계 규칙",
   when_to_use: "사용 시점",
   visualization_hints: "시각화 안내",
@@ -53,7 +54,6 @@ const FIELD_LABELS: Record<string, string> = {
   params: "입력값",
   expectation: "기대 결과",
   sql: "SQL",
-  answer: "답변",
 };
 
 const CHIP_COLLECTION_KEYS = new Set([
@@ -135,7 +135,7 @@ function StructuredValue({ fieldKey, value }: { fieldKey: string; value: unknown
 
   if (Array.isArray(value)) {
     if (value.length === 0) return <EmptyValue />;
-    if (fieldKey === "sample_queries" && isSqlQuestionAnswers(value)) {
+    if (fieldKey === "sample_queries" && isSqlQueryExamples(value)) {
       return <SqlExamples samples={value} />;
     }
     if ((fieldKey === "columns" || fieldKey === "output_columns") && value.every(isRecord)) {
@@ -253,7 +253,7 @@ function RecordFields({ data, compact = false }: { data: Record<string, unknown>
   );
 }
 
-function SqlExamples({ samples }: { samples: { question: string; sql: string; answer: string }[] }) {
+function SqlExamples({ samples }: { samples: { question: string; sql: string }[] }) {
   return (
     <div className="space-y-3">
       {samples.map((sample, index) => (
@@ -262,8 +262,6 @@ function SqlExamples({ samples }: { samples: { question: string; sql: string; an
           <p className="mt-1 whitespace-pre-wrap break-words text-ui leading-relaxed text-ink">{sample.question}</p>
           <p className="mt-3 text-2xs font-semibold text-ink-2">SQL</p>
           <pre className="thin-scroll mt-1 max-h-96 overflow-auto whitespace-pre-wrap break-words border-l-2 border-line-strong bg-canvas px-3 py-2 font-mono text-data leading-relaxed text-ink">{sample.sql}</pre>
-          <p className="mt-3 text-2xs font-semibold text-ink-2">답변</p>
-          <p className="mt-1 whitespace-pre-wrap break-words text-ui leading-relaxed text-ink-2">{sample.answer}</p>
         </article>
       ))}
     </div>
@@ -304,6 +302,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isSqlQuestionAnswers(value: unknown): value is { question: string; sql: string; answer: string }[] {
-  return Array.isArray(value) && value.every(item => isRecord(item) && typeof item.question === "string" && typeof item.sql === "string" && typeof item.answer === "string");
+function isSqlQueryExamples(value: unknown): value is { question: string; sql: string }[] {
+  return Array.isArray(value) && value.every(item => isRecord(item) && typeof item.question === "string" && typeof item.sql === "string");
 }

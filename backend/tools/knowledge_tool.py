@@ -34,7 +34,7 @@ async def list_tables(keyword: str | None = None, tag: str | None = None) -> dic
 
 
 async def describe_table(table: str) -> dict:
-    """Describe one table: columns, grain, joins, caveats and aggregation rules.
+    """Describe one table: columns, grain, joins, query/aggregation rules and visualization hints.
 
     Always call this before writing SQL against a table.
     """
@@ -75,7 +75,7 @@ async def list_recipes(keyword: str | None = None) -> dict:
 
 
 async def get_recipe(recipe_id: str) -> dict:
-    """Get one recipe: intended uses, output grain/columns, aggregation rules,
+    """Get one recipe: intended uses, output grain/columns, query/aggregation rules,
     visualization hints, CTE SQL, source tables and sample queries.
 
     Copy `cte_sql` into your own `WITH <cte_name> AS (...)` clause when

@@ -12,8 +12,14 @@ columns:
 joins: []
 caveats:
   - 빈 cursetup은 NULL로 보존하며 이전 행의 값을 채우지 않는다
+query_rules:
+  - 특정 benchmark 질문은 dataset을 필수로 제한한다
+  - setup 변경 시간을 조회할 때 stunits를 함께 조회하고 NULL cursetup을 임의 값으로 치환하지 않는다
 aggregation_rules:
   - stime은 stunits가 같은 행끼리만 비교하거나 합산한다
+visualization_hints:
+  - 같은 시간 단위의 setup 전환별 stime 비교에는 bar 차트가 적합하다
+  - cursetup→newsetup 전환 관계는 차트보다 표가 적합하다
 sample_queries:
   - question: benchmark별 setup 전환 정의는 몇 건이야?
     sql: |
@@ -21,7 +27,6 @@ sample_queries:
       FROM setup
       GROUP BY dataset
       ORDER BY dataset
-    answer: HVLM과 LVHM에 각각 13건의 setup 전환 정의가 있다.
 status: verified
 owner: ""
 updated: 2026-09-15

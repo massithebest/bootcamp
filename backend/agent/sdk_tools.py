@@ -124,8 +124,8 @@ async def _list_tables(args: _ListTablesInput) -> dict[str, Any]:
 
 @tool(
     "describe_table",
-    "테이블 하나의 컬럼·키·조인·코드값·주의사항·집계 가이드와 "
-    "질문·SQL·답변 예시를 조회한다. "
+    "테이블 하나의 컬럼·키·조인·코드값·주의사항·조회 규칙·집계 가이드·"
+    "시각화 안내와 질문·SQL 예시를 조회한다. "
     "SQL 을 작성하기 전에 반드시 호출한다.",
     {"table": str},
 )
@@ -168,8 +168,8 @@ async def _list_recipes(args: _OptionalKeywordInput) -> dict[str, Any]:
 
 @tool(
     "get_recipe",
-    "레시피의 적용 목적·출력 단위·컬럼 의미·집계 가이드·표현 힌트·CTE SQL과 "
-    "질문·SQL·답변 예시를 조회한다. "
+    "레시피의 적용 목적·출력 단위·컬럼 의미·조회 규칙·집계 가이드·표현 힌트·"
+    "CTE SQL과 질문·SQL 예시를 조회한다. "
     "cte_sql 을 WITH 절로 복사해 execute_sql 에 조합해 쓴다 (자동 치환 없음).",
     {"recipe_id": str},
 )
@@ -301,7 +301,7 @@ async def tool_catalog() -> list[dict]:
         "search_knowledge": "검색 문서 발췌·출처·검토 버전",
         "list_simulation": "시뮬레이션 종류·입력·출력 정의",
         "run_simulation": "시뮬레이션 결과와 검증 상태",
-        "list_tables": "테이블 이름·설명 목록", "describe_table": "컬럼·조인·집계 규칙",
+        "list_tables": "테이블 이름·설명 목록", "describe_table": "컬럼·조인·조회·집계 규칙",
         "list_kpis": "KPI 요약 목록", "get_kpi": "KPI 공식·진단·SQL 정의",
         "list_recipes": "집계 recipe 요약 목록", "get_recipe": "CTE·출력 grain·사용 예시",
         "get_result_summary": "저장 결과 메타데이터·수치 요약", "get_result_page": "저장 결과의 일부 행",

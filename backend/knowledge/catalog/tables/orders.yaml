@@ -22,9 +22,16 @@ joins:
   - {to: part, on: [dataset, part], kind: many-to-one}
 caveats:
   - 한 행을 rpt_no만큼 물리적으로 확장하지 않은 원본 투입 정의다
+query_rules:
+  - 특정 benchmark 질문은 dataset을 필수로 제한한다
+  - 기간 요청은 투입 기준이면 start, 납기 기준이면 due를 사용하고 어느 날짜인지 답변에 밝힌다
+  - 사용자가 반복 Lot의 실제 생성량을 요청하면 repeat, runits, rpt_no, lotsperrpt 해석 기준을 먼저 확인한다
 aggregation_rules:
   - 행 수는 투입 정의 수이며 전체 생성 Lot 수와 동일하지 않다
   - pieces를 총 투입량으로 해석하려면 repeat/rpt_no/lotsperrpt 규칙을 별도로 적용해야 한다
+visualization_hints:
+  - benchmark 또는 part별 투입 정의 수 비교에는 bar 차트가 적합하다
+  - start 기준 추이는 동일 시간 단위로 집계한 line 차트가 적합하다
 sample_queries:
   - question: benchmark별 신규 투입 정의는 몇 건이야?
     sql: |
@@ -32,7 +39,6 @@ sample_queries:
       FROM orders
       GROUP BY dataset
       ORDER BY dataset
-    answer: 신규 투입 정의는 HVLM 5건, LVHM 21건이다.
 status: verified
 owner: ""
 updated: 2026-09-15

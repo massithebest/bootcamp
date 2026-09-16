@@ -23,6 +23,10 @@ output_columns:
   - {name: lot_count, role: measure, unit: lot, desc: 초기 WIP Lot 수}
   - {name: piece_count, role: measure, unit: piece, desc: 초기 WIP pieces 합계}
   - {name: earliest_due, role: time, desc: Part 내 가장 빠른 due 시각}
+query_rules:
+  - 특정 benchmark 질문은 바깥 SELECT에서 dataset을 필수로 제한한다
+  - 상위 N개 질문은 기준 measure를 명시해 내림차순 정렬하고 LIMIT을 적용한다
+  - 납기 조건은 earliest_due가 Part 내 최솟값이라는 점을 전제로 해석한다
 aggregation_rules:
   - CTE가 이미 dataset과 part grain이므로 Lot 수 재집계는 SUM(lot_count)를 사용한다
   - HVLM/LVHM을 비교하지 않는 질문은 바깥 SELECT에서 dataset을 반드시 필터한다
@@ -38,14 +42,12 @@ sample_queries:
       WHERE dataset = 'LVHM'
       ORDER BY piece_count DESC
       LIMIT 1
-    answer: part_3이며 초기 WIP는 310 Lot, 7,750 pieces이고 earliest_due는 2018-01-01 20:25:43이다.
   - question: benchmark별 초기 WIP Lot과 piece 합계는 얼마야?
     sql: |
       SELECT dataset, SUM(lot_count) AS lot_count, SUM(piece_count) AS piece_count
       FROM initial_wip_by_part
       GROUP BY dataset
       ORDER BY dataset
-    answer: HVLM은 2,255 Lot·56,375 pieces, LVHM은 2,156 Lot·53,900 pieces다.
 status: draft
 owner: ""
 updated: 2026-09-15

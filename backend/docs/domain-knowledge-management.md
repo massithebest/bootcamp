@@ -41,7 +41,8 @@ updated: 2026-09-15
 ## 테이블 카탈로그 작성
 
 테이블 정의에는 원본 한 행의 의미를 나타내는 `grain`, 시간 컬럼, 키, 컬럼 타입과
-설명, 코드값, join, caveat와 `aggregation_rules`를 기록한다.
+설명, 코드값, join, caveat, `query_rules`, `aggregation_rules`,
+`visualization_hints`를 기록한다.
 
 ```yaml
 table: wip
@@ -56,8 +57,12 @@ joins:
   - to: part
     on: [dataset, part]
     kind: many-to-one
+query_rules:
+  - 특정 benchmark 질문은 dataset을 필수로 제한한다.
 aggregation_rules:
   - Lot 수는 COUNT(*), piece 수는 SUM(pieces)로 구분한다.
+visualization_hints:
+  - Part별 Lot 수 비교에는 bar 차트가 적합하다.
 caveats:
   - HVLM/LVHM을 조인할 때 dataset을 반드시 포함한다.
 sample_queries:
@@ -67,7 +72,6 @@ sample_queries:
       FROM wip
       GROUP BY dataset
       ORDER BY dataset
-    answer: 현재 SMT2020 기준 HVLM 2,255 Lot, LVHM 2,156 Lot이다.
 ```
 
 작성할 때 다음을 반드시 확인한다.
@@ -77,9 +81,23 @@ sample_queries:
 - nullable 값과 누락 행의 업무 의미
 - join cardinality와 일대다 join으로 인한 중복 합산 가능성
 - 코드와 표시 이름, 버전 키, 수량 단위
+- 사용자가 생략했을 때 적용할 기준일·필수 필터·정렬·조인 전제를 `query_rules`에 기록했는지
 - 합산 가능한 차원과 합산하면 안 되는 식별자·비율
-- `sample_queries`의 질문에 SQL이 직접 답하고, 답변은 같은 SQL을 현재 기준
-  데이터에서 실행한 결과와 일치하는지
+- `sample_queries`의 질문에 SQL이 직접 답하는지
+
+`query_rules`는 SQL 작성 시 적용할 업무 기본값을 자유 서술형 문자열로 기록한다.
+날짜 기본값이 있는 운영 테이블은 다음처럼 명시할 수 있다. 컬럼이 없는 테이블에
+예시 규칙을 복사하지 말고 실제 스키마와 업무 기준이 확인된 경우에만 기록한다.
+
+```yaml
+query_rules:
+  - 사용자가 작업일을 지정하지 않으면 work_dt = CURRENT_DATE를 적용한다.
+  - plan_dt는 인터페이스 기준일이므로 별도 요청이 없으면 plan_dt = CURRENT_DATE를 적용한다.
+```
+
+기본 날짜를 적용하지 않아야 하는 이력·기간 질문이나 마감 기준도 함께 적는다.
+`query_rules`는 필터·기준일·정렬·조인 전제, `aggregation_rules`는 grain·집계
+함수·중복·재집계 규칙으로 역할을 구분한다.
 
 실제 스키마가 바뀌면 catalog YAML, `scripts/build_smt2020_db.py`와 관련 정합성
 테스트를 같은 변경에서 갱신한다. 생성된 `datasets/smt2020.db`를 직접 수정하지 않는다.
@@ -238,9 +256,10 @@ Recipe YAML은 다음 필드로 질문을 실행 가능한 결과 계약에 연�
 | `sources` | 참조하는 catalog table |
 | `output_grain` | CTE 결과 한 행을 식별하는 출력 컬럼 |
 | `output_columns` | `category`, `measure`, `time` 역할과 단위·설명 |
+| `query_rules` | 기본 날짜·필터·정렬과 조회 시 반드시 지킬 전제 |
 | `aggregation_rules` | 필터 위치, join 전제, 재집계 가능 범위 |
 | `visualization_hints` | 비교·추이에 적합한 표현 제안 |
-| `sample_queries` | 자연어 `question`, 실행 가능한 `sql`, 현재 기준 데이터의 `answer` 예시 |
+| `sample_queries` | 자연어 `question`과 실행 가능한 `sql` 예시 |
 
 파일명은 `<recipe_id>.yaml`로 맞추고 `recipe_id`와 `cte_name`에는 SQL 식별자로
 안전한 소문자 `snake_case`를 사용한다. 새 파일은 담당자 검토 전까지 `draft`로
@@ -269,6 +288,8 @@ output_columns:
   - {name: dataset, role: category, desc: 데이터셋 구분}
   - {name: business_key, role: category, desc: 업무 키}
   - {name: row_count, role: measure, unit: row, desc: 원천 행 수}
+query_rules:
+  - 특정 dataset 질문은 바깥 SELECT에서 dataset을 필수로 제한한다
 aggregation_rules:
   - 서로 다른 dataset을 섞지 않는다
 visualization_hints:
@@ -279,7 +300,6 @@ sample_queries:
       SELECT * FROM example_by_key
       WHERE dataset = 'LVHM'
       ORDER BY business_key
-    answer: 현재 기준 데이터에서 확인한 키별 건수를 자연어로 기록한다.
 status: draft
 owner: ""
 source: source_table 원본과 생성 SQLite 확인
@@ -300,9 +320,8 @@ WHERE dataset = 'LVHM';
 
 작성 시 SQL 계약은 다음과 같다.
 
-- table과 recipe의 `sample_queries`는 `question`, `sql`, `answer`를 모두 기록한다.
-  `answer`는 SQL을 현재 기준 데이터에서 실행해 확인한 값이며 데이터 갱신 시 함께
-  재검증한다.
+- table과 recipe의 `sample_queries`는 `question`, `sql`만 기록한다. 현재 데이터에
+  종속되는 `answer`는 지식에 저장하지 않고 실행 결과로 확인한다.
 - `cte_sql`과 `sample_queries[].sql`은 읽기 전용 `SELECT`만 사용한다.
 - `sources`에는 CTE의 `FROM`/`JOIN`에 나타나는 실제 catalog table을 모두 적는다.
   CTE 자신의 이름은 `sources`에 넣지 않는다.
@@ -313,6 +332,8 @@ WHERE dataset = 'LVHM';
 - recipe는 문자열 템플릿 엔진이 아니다. `:dataset` 같은 placeholder를 썼다면
   호출자가 실행 전에 허용 값을 명시적으로 치환해야 한다. 가능한 경우 CTE는
   dataset별로 집계하고 바깥 SELECT에서 `WHERE dataset = 'LVHM'`처럼 필터한다.
+- `query_rules`의 기본 날짜·필터·정렬은 사용자가 다른 조건을 명시하지 않은 경우
+  바깥 SELECT를 포함한 최종 SQL에 적용한다.
 - 이미 집계된 CTE를 다시 합칠 때는 `aggregation_rules`에 재집계 함수와 보존할
   grain을 명시한다. 비율은 분자·분모 없이 평균내지 않는다.
 - 각 sample query는 `WITH <cte_name> AS (<cte_sql>)` 뒤에 붙였을 때 그대로
@@ -322,11 +343,12 @@ CTE를 추가할 때는 다음 순서로 검토한다.
 
 1. catalog에서 원본 grain과 join cardinality를 확인한다.
 2. KPI의 공식, 필터, 비교 모집단과 분모 정책을 확인한다.
-3. CTE의 출력 grain과 모든 출력 컬럼을 선언한다.
-4. 집계 전에 필요한 필터를 적용하고 join으로 늘어난 행을 점검한다.
-5. 작은 고정 데이터로 중복, 누락, 0, NULL, 연월 경계를 검증한다.
-6. 재집계에서 보존해야 할 분자·분모와 차원을 `aggregation_rules`에 적는다.
-7. 담당자 검토 전에는 `draft`를 유지한다.
+3. 기본 날짜·필터·정렬과 조회 전제를 `query_rules`에 적는다.
+4. CTE의 출력 grain과 모든 출력 컬럼을 선언한다.
+5. 집계 전에 필요한 필터를 적용하고 join으로 늘어난 행을 점검한다.
+6. 작은 고정 데이터로 중복, 누락, 0, NULL, 연월 경계를 검증한다.
+7. 재집계에서 보존해야 할 분자·분모와 차원을 `aggregation_rules`에 적는다.
+8. 담당자 검토 전에는 `draft`를 유지한다.
 
 `visualization_hints`는 Agent의 제안 자료이며 차트 종류나 컬럼을 강제하지 않는다.
 최종 SQL의 alias나 grain이 CTE와 달라질 수 있으므로 차트는 실제 Result Store
@@ -418,8 +440,8 @@ python -m pytest -q \
 
 `agent/sdk_tools.py::TOOL_NAMES`, 런타임 CLAUDE의 tool 표, Skill의 tool 이름과
 fake runner가 어긋나지 않게 prompt 정합성 테스트를 유지한다. Agent가 SQL을
-작성하기 전 `describe_table`을 호출하고, `draft` 지식을 사용한 계산은 답변에
-미검증 기준임을 표시한다.
+작성하기 전 `describe_table`을 호출하고 `query_rules`의 기본 조건을 반영하며,
+`draft` 지식을 사용한 계산은 답변에 미검증 기준임을 표시한다.
 
 ## SMT2020 데이터와 검증
 

@@ -30,10 +30,11 @@ def root(tmp_path: Path) -> Path:
         joins:
           - {to: part, on: [dataset, part], kind: many-to-one}
         caveats: ["JOIN에 dataset을 포함"]
+        query_rules: ["dataset을 필수로 제한"]
+        visualization_hints: ["Part별 비교는 bar 차트"]
         sample_queries:
           - question: WIP 원본을 보여줘
             sql: SELECT * FROM wip
-            answer: WIP 원본 행을 반환한다.
         status: verified
         """,
     )
@@ -106,10 +107,10 @@ def root(tmp_path: Path) -> Path:
           JOIN part p ON p.dataset = w.dataset AND p.part = w.part
           GROUP BY w.dataset, w.part
         sources: [wip, part]
+        query_rules: ["dataset을 필수로 제한"]
         sample_queries:
           - question: 데이터셋별 WIP 합계는?
             sql: SELECT dataset, SUM(cnt) FROM wip_by_part GROUP BY dataset
-            answer: 데이터셋별 WIP 건수를 반환한다.
         status: draft
         """,
     )
@@ -183,7 +184,10 @@ def test_describe_table_full_and_verified(root: Path) -> None:
     described = store.describe_table("wip")
     assert described["verified"] is True
     assert described["caveats"] == ["JOIN에 dataset을 포함"]
+    assert described["query_rules"] == ["dataset을 필수로 제한"]
+    assert described["visualization_hints"] == ["Part별 비교는 bar 차트"]
     assert described["columns"][2]["ref"] == "part.part"
+    assert set(described["sample_queries"][0]) == {"question", "sql"}
 
     assert store.describe_table("part")["verified"] is False
 
@@ -262,8 +266,9 @@ def test_get_recipe_full_and_verified(root: Path) -> None:
     recipe = store.get_recipe("wip_by_part")
     assert recipe["cte_name"] == "wip_by_part"
     assert recipe["sources"] == ["wip", "part"]
+    assert recipe["query_rules"] == ["dataset을 필수로 제한"]
     assert recipe["sample_queries"][0]["question"] == "데이터셋별 WIP 합계는?"
-    assert recipe["sample_queries"][0]["answer"] == "데이터셋별 WIP 건수를 반환한다."
+    assert set(recipe["sample_queries"][0]) == {"question", "sql"}
     assert recipe["verified"] is False
 
 
@@ -305,6 +310,19 @@ def test_legacy_yaml_without_aggregation_guide_still_loads(root: Path) -> None:
     assert recipe["output_grain"] == []
     assert recipe["output_columns"] == []
     assert recipe["aggregation_rules"] == []
+
+
+def test_sample_query_rejects_removed_answer_field(root: Path) -> None:
+    _write(
+        root / "catalog/tables/invalid_sample.yaml",
+        "table: invalid_sample\ndescription: invalid\ngrain: [id]\n"
+        "columns: [{name: id, type: int}]\nsample_queries:\n"
+        "  - question: invalid\n    sql: SELECT * FROM invalid_sample\n"
+        "    answer: 더 이상 허용하지 않는 필드\n",
+    )
+
+    with pytest.raises(ValueError, match="invalid_sample.yaml"):
+        KnowledgeStore.load(root)
 
 
 @pytest.mark.parametrize(

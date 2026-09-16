@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
 from core.config import KNOWLEDGE_DIR
 
@@ -60,12 +60,13 @@ class Join(BaseModel):
         return raw
 
 
-class SqlQuestionAnswer(BaseModel):
-    """자연어 질문과 실행 SQL, 현재 기준 데이터의 답변 예시."""
+class SqlQueryExample(BaseModel):
+    """자연어 질문과 실행 가능한 SQL 예시."""
+
+    model_config = ConfigDict(extra="forbid")
 
     question: str
     sql: str
-    answer: str
 
 
 class KnowledgeTable(KnowledgeMeta):
@@ -77,8 +78,10 @@ class KnowledgeTable(KnowledgeMeta):
     columns: list[Column]
     joins: list[Join] = []
     caveats: list[str] = []
+    query_rules: list[str] = []
     aggregation_rules: list[str] = []
-    sample_queries: list[SqlQuestionAnswer] = []
+    visualization_hints: list[str] = []
+    sample_queries: list[SqlQueryExample] = []
 
 
 class Diagnostic(BaseModel):
@@ -180,9 +183,10 @@ class KnowledgeRecipe(KnowledgeMeta):
     when_to_use: list[str] = []
     output_grain: list[str] = []
     output_columns: list[RecipeOutputColumn] = []
+    query_rules: list[str] = []
     aggregation_rules: list[str] = []
     visualization_hints: list[str] = []
-    sample_queries: list[SqlQuestionAnswer] = []
+    sample_queries: list[SqlQueryExample] = []
 
     @model_validator(mode="after")
     def _validate_output_contract(self) -> KnowledgeRecipe:
