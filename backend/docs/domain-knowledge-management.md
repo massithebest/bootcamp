@@ -60,6 +60,14 @@ aggregation_rules:
   - Lot 수는 COUNT(*), piece 수는 SUM(pieces)로 구분한다.
 caveats:
   - HVLM/LVHM을 조인할 때 dataset을 반드시 포함한다.
+sample_queries:
+  - question: benchmark별 초기 WIP Lot은 몇 개야?
+    sql: |
+      SELECT dataset, COUNT(*) AS lot_count
+      FROM wip
+      GROUP BY dataset
+      ORDER BY dataset
+    answer: 현재 SMT2020 기준 HVLM 2,255 Lot, LVHM 2,156 Lot이다.
 ```
 
 작성할 때 다음을 반드시 확인한다.
@@ -70,6 +78,8 @@ caveats:
 - join cardinality와 일대다 join으로 인한 중복 합산 가능성
 - 코드와 표시 이름, 버전 키, 수량 단위
 - 합산 가능한 차원과 합산하면 안 되는 식별자·비율
+- `sample_queries`의 질문에 SQL이 직접 답하고, 답변은 같은 SQL을 현재 기준
+  데이터에서 실행한 결과와 일치하는지
 
 실제 스키마가 바뀌면 catalog YAML, `scripts/build_smt2020_db.py`와 관련 정합성
 테스트를 같은 변경에서 갱신한다. 생성된 `datasets/smt2020.db`를 직접 수정하지 않는다.
@@ -230,7 +240,7 @@ Recipe YAML은 다음 필드로 질문을 실행 가능한 결과 계약에 연�
 | `output_columns` | `category`, `measure`, `time` 역할과 단위·설명 |
 | `aggregation_rules` | 필터 위치, join 전제, 재집계 가능 범위 |
 | `visualization_hints` | 비교·추이에 적합한 표현 제안 |
-| `sample_queries` | CTE를 사용하는 검증 가능한 SELECT 예시 |
+| `sample_queries` | 자연어 `question`, 실행 가능한 `sql`, 현재 기준 데이터의 `answer` 예시 |
 
 파일명은 `<recipe_id>.yaml`로 맞추고 `recipe_id`와 `cte_name`에는 SQL 식별자로
 안전한 소문자 `snake_case`를 사용한다. 새 파일은 담당자 검토 전까지 `draft`로
@@ -264,11 +274,12 @@ aggregation_rules:
 visualization_hints:
   - 키별 row_count 비교에는 bar 차트를 고려한다
 sample_queries:
-  - description: LVHM 키별 건수
+  - question: LVHM의 키별 건수는 얼마야?
     sql: |
       SELECT * FROM example_by_key
       WHERE dataset = 'LVHM'
       ORDER BY business_key
+    answer: 현재 기준 데이터에서 확인한 키별 건수를 자연어로 기록한다.
 status: draft
 owner: ""
 source: source_table 원본과 생성 SQLite 확인
@@ -289,6 +300,9 @@ WHERE dataset = 'LVHM';
 
 작성 시 SQL 계약은 다음과 같다.
 
+- table과 recipe의 `sample_queries`는 `question`, `sql`, `answer`를 모두 기록한다.
+  `answer`는 SQL을 현재 기준 데이터에서 실행해 확인한 값이며 데이터 갱신 시 함께
+  재검증한다.
 - `cte_sql`과 `sample_queries[].sql`은 읽기 전용 `SELECT`만 사용한다.
 - `sources`에는 CTE의 `FROM`/`JOIN`에 나타나는 실제 catalog table을 모두 적는다.
   CTE 자신의 이름은 `sources`에 넣지 않는다.
@@ -438,3 +452,58 @@ join 및 입력 관계 unmatched 건수를 포함한다.
 
 전체 설치와 real 서비스 이식은 [폐쇄망 배포 및 이식 가이드](CLOSED_NETWORK_SETUP.md)를
 따른다.
+
+## 텍스트 지식 관리 (2026-09-16)
+
+텍스트 지식은 별도 SQLite(`KNOWLEDGE_DB_PATH`, 기본 `backend/data/knowledge.sqlite3`)에
+저장한다. 구조화 YAML과 운영 SQL DB를 수정하지 않는다. 이 파일에는 사용자 작성
+자료가 있으므로 소스와 함께 커밋하지 않는다. 배포 볼륨으로 영속 보관한다.
+
+구조화 지식은 `backend/knowledge/`의 기존 YAML을 별도 활성화 설정 없이 항상
+읽기 전용으로 조회한다. 텍스트 지식의 작성·검토·활성화·보관은 이 폐쇄망 앱의
+내부 공용 관리 기능으로 바로 제공한다. 작성자·검토자 이름은 기록용이며 인증된
+사용자 신원이나 조직 권한을 의미하지 않는다. 기존 pp_session_scope도 인증으로
+사용하지 않는다.
+
+본문 수정은 새 draft 버전이며 검색 중인 검토본을 덮어쓰지 않는다. 담당자가 내용·출처를
+확인해 검토 완료하고, 명시적으로 활성화해야 모든 대화의 이후 검색에 적용된다.
+최신 버전만 검토·적용할 수 있다. 비활성화와 보관은 이후 검색에서 제외하며 기존 인용
+버전과 이력은 계속 조회할 수 있다. 보관 후 편집·복구·영구 삭제는 지원하지 않는다.
+동시 변경은 revision 충돌로 거부한다. 최신 내용을 확인한 뒤 다시 작성한다.
+
+`KNOWLEDGE_SEARCH_BACKEND=local`이 기본이며 SQL의 SERVICE_MODE와 독립이다.
+한글·영문을 NFKC 정규화한 단어/부분일치로 제목·태그·본문을 검색해 최대 10개 발췌를
+반환한다. 의미 유사도나 벡터 검색이 아니며 결과가 없으면 빈 목록을 반환한다.
+`service`는 기존 mock/real 어댑터 연결용이고 real Milvus 구현은 여전히 후속이다.
+문서의 지시문은 실행 권한이 아니며 Agent는 제목·출처·버전을 근거로 인용한다.
+
+### 백업과 복구
+
+SQLite backup API로 일관된 백업을 만든다. 아래 명령은 backend에서 실행하며 경로는
+운영자가 승인한 백업 위치로 지정한다. 백업에도 본문·출처·작성 기록이 포함된다.
+
+```bash
+python - /approved/backup/knowledge.sqlite3 <<'PY'
+import sqlite3
+import sys
+from core.config import KNOWLEDGE_DB_PATH
+with sqlite3.connect(KNOWLEDGE_DB_PATH) as source:
+    with sqlite3.connect(sys.argv[1]) as backup:
+        source.backup(backup)
+        assert backup.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
+PY
+```
+
+복구 시 API 서버를 중지하고 현재 저장소를 별도 보관한 뒤 검증된 백업을
+KNOWLEDGE_DB_PATH에 복사한다. 소유자·쓰기 권한을 확인하고 서버를 시작한다.
+문서 수·활성 버전·이력과 대표 검색어를 확인한다. Result Store 정리 작업은 이 DB를
+삭제하지 않는다. 최초 실행 시 빈 스키마를 만들며 기존 문서를 자동 활성화하지 않는다.
+
+### SMT2020 진단 범위
+
+`wip_integrity_diagnostics`는 WIP→Part, 현재 Step→Route, Route→설비 Family 누락과
+교차 dataset 연결·Route 조인 중복 합산의 위험을 확인한다. 정상 Route 다중 Step은
+입력 오류가 아니다. cross_dataset_part_matches와 route_join_rows는 쿼리를 잘못
+작성할 때의 위험이며 실제 생산 부진의 증거로 사용할 수 없다.
+새 recipe와 diagnostics를 확장한 initial_wip KPI는 현업 재검토 전 draft다.
+원본 benchmark를 변경하지 않으며 오류는 테스트 전용 fixture에서 재현한다.

@@ -10,11 +10,17 @@ SDK 이벤트를 SSE로 전달한다. 코드 변경 전 상위 `../AGENTS.md`와
   route에는 SQL, provider 설정, 시각화 검증과 업무 로직을 넣지 않는다.
 - `api/schemas.py`가 API 계약, `agent/event_adapter.py`가 SDK 이벤트 변환,
   `agent/sdk_tools.py::TOOL_NAMES`가 등록 tool 목록의 기준이다.
+- `agent/system_prompt.py`에는 짧은 역할·안전 원칙, 런타임
+  `agent/agent_sdk/CLAUDE.md`에는 Tool/Skill 인덱스와 공통 절차,
+  `.claude/skills/*/SKILL.md`에는 업무별 실행 절차만 둔다. 스키마와 업무 정의를
+  이 세 계층에 복제하지 않는다.
 - `knowledge/` YAML이 catalog, join, KPI, recipe/CTE, simulation, glossary와
   scenario의 source of truth다. 로드·검증은 `services/knowledge_service.py`,
   Agent 접근은 등록된 지식 tool을 통한다.
-- SQL은 `services/sql_guard.py`의 읽기 전용 검사를 통과해야 한다. 카탈로그
-  스키마 변경 시 YAML, 시드 스크립트와 테스트를 함께 갱신한다.
+- SQL은 `services/sql_guard.py`의 읽기 전용 검사를 통과해야 한다. Mock의 DB
+  authorizer와 read-only 연결을 유지하고, real 구현도 DB 권한과 실행 계층에서
+  쓰기를 차단한다. 카탈로그 스키마 변경 시 YAML, 시드 스크립트와 테스트를
+  함께 갱신한다.
 - `services/mock`과 `services/real`의 함수 시그니처와 결과 형태를 같게 유지하고
   mock 구현을 삭제하지 않는다.
 
@@ -23,6 +29,12 @@ SDK 이벤트를 SSE로 전달한다. 코드 변경 전 상위 `../AGENTS.md`와
 - 안정적인 `AgentEvent` 종류는 `text`, `status`, `tool_call`, `tool_result`,
   `error`, `done`이다. 성공한 `done.data.turn_id`와
   `ChatRequest.fork_from_turn_id`의 포크 계약을 유지한다.
+- 같은 업무 Tool 호출의 `tool_call`, 연결된 `status`, `tool_result`는 동일한
+  `tool_call_id`를 사용한다. `tool_call.data.args`에는 공개 가능한 모델 입력만
+  넣고 access scope, provider 설정과 내부 SDK 이벤트는 노출하지 않는다.
+- partial `text_delta`만 `text`로 전달하고 같은 provider message의 최종 누적
+  `TextBlock`을 중복 전송하지 않는다. thinking/signature/불완전 tool JSON은
+  공개 이벤트로 변환하지 않는다.
 - 포크 anchor에는 transcript에 존재하는 `AssistantMessage` 또는 `UserMessage`
   UUID만 사용한다. `ResultMessage.uuid`를 `resume_session_at`에 전달하지 않는다.
   fork ID 생략은 계속 진행, 빈 문자열은 새 대화, 알 수 없는 ID는 오류 후 안전한
@@ -66,6 +78,7 @@ python -m pytest -m e2e
 - 기본 테스트는 mock 서비스와 fake runner를 우선한다. E2E는 실제 CLI/provider
   인증이 필요한 동작에만 사용한다.
 - 새 tool은 wrapper, 런타임 지침, prompt 정합성 테스트, fake runner와
-  프론트 tool 메타데이터를 함께 갱신한다.
+  프론트 renderer/toolkit 필요 여부를 함께 갱신한다. 입력 기본값과 선택 필드는
+  업무 함수 시그니처와 MCP 광고 JSON Schema에서 같은 의미여야 한다.
 - 현재 별도 linter, formatter와 coverage 기준은 없다. 설정 없이 필수라고
   문서화하지 않는다.

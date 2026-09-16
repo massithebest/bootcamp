@@ -8,7 +8,7 @@ import {
   type FC,
   type PropsWithChildren,
 } from "react";
-import { CheckIcon, ChevronDownIcon, LoaderIcon } from "lucide-react";
+import { AlertCircleIcon, CheckIcon, ChevronDownIcon, LoaderIcon } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { useScrollLock } from "@assistant-ui/react";
 import {
@@ -96,6 +96,7 @@ function ToolGroupTrigger({
   count,
   active = false,
   completed = false,
+  attention = false,
   label,
   className,
   ...props
@@ -103,6 +104,7 @@ function ToolGroupTrigger({
   count: number;
   active?: boolean;
   completed?: boolean;
+  attention?: boolean;
   label?: string;
 }) {
   const displayLabel = label ?? `${count} tool ${count === 1 ? "call" : "calls"}`;
@@ -110,9 +112,10 @@ function ToolGroupTrigger({
   return (
     <CollapsibleTrigger
       data-slot="tool-group-trigger"
+      data-disclosure-trigger
       className={cn(
         "aui-tool-group-trigger group/trigger flex origin-left items-center gap-2 text-sm transition-[color,scale] active:scale-[0.98]",
-        "group-data-[variant=ghost]/tool-group-root:text-muted-foreground group-data-[variant=ghost]/tool-group-root:hover:text-foreground group-data-[variant=ghost]/tool-group-root:py-1.5",
+        "group-data-[variant=ghost]/tool-group-root:text-ink-2 group-data-[variant=ghost]/tool-group-root:hover:text-foreground group-data-[variant=ghost]/tool-group-root:py-1.5",
         "group-data-[variant=outline]/tool-group-root:w-full group-data-[variant=outline]/tool-group-root:px-4",
         "group-data-[variant=muted]/tool-group-root:w-full group-data-[variant=muted]/tool-group-root:px-4",
         className,
@@ -122,10 +125,12 @@ function ToolGroupTrigger({
       {active && (
         <LoaderIcon
           data-slot="tool-group-trigger-loader"
-          className="aui-tool-group-trigger-loader size-3 shrink-0 animate-spin [animation-duration:0.6s]"
+          aria-hidden
+          className="aui-tool-group-trigger-loader execution-activity-spinner relative top-px size-3.5 shrink-0 animate-spin text-accent"
         />
       )}
-      {!active && completed && (
+      {!active && attention && <AlertCircleIcon aria-hidden className="size-3.5 shrink-0 text-warn-ink" />}
+      {!active && completed && !attention && (
         <CheckIcon
           data-slot="tool-group-trigger-complete"
           className="size-3 shrink-0 text-ok-ink"
@@ -134,11 +139,10 @@ function ToolGroupTrigger({
       <span
         data-slot="tool-group-trigger-label"
         className={cn(
-          "aui-tool-group-trigger-label-wrapper inline-block text-start text-xs leading-none font-medium",
-          "group-data-[variant=ghost]/tool-group-root:font-normal",
+          "aui-tool-group-trigger-label-wrapper inline-block text-start text-ui leading-none font-medium",
           "group-data-[variant=outline]/tool-group-root:grow",
           "group-data-[variant=muted]/tool-group-root:grow",
-          active && "shimmer motion-reduce:animate-none",
+          active && "text-ink-2",
         )}
       >
         {displayLabel}
@@ -165,6 +169,7 @@ function ToolGroupContent({
   return (
     <CollapsibleContent
       data-slot="tool-group-content"
+      data-disclosure-content
       className={cn(
         "aui-tool-group-content relative overflow-hidden text-sm outline-none",
         "group/collapsible-content ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:animate-none",

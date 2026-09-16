@@ -146,8 +146,8 @@ def test_get_kpi_unknown_is_error() -> None:
 def test_get_kpi_exposes_diagnostics() -> None:
     result = asyncio.run(get_kpi("initial_wip"))
 
-    assert result["verified"] is True
-    assert [d["how"] for d in result["data"]["diagnostics"]] == ["simulation"]
+    assert result["verified"] is False  # expanded diagnostics await domain review
+    assert {d["how"] for d in result["data"]["diagnostics"]} == {"sql", "simulation"}
 
 
 def test_get_result_summary_unknown_id_is_error() -> None:

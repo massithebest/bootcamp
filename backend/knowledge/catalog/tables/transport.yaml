@@ -15,7 +15,13 @@ caveats:
   - dtime/dtime2는 ddist와 dunits를 포함해 해석한다
 aggregation_rules:
   - 이동시간은 dataset과 위치 쌍별 분포 파라미터이며 단순 실적 합계가 아니다
-sample_sql: SELECT dataset, fromloc, toloc, ddist, dtime, dtime2, dunits FROM transport
+sample_queries:
+  - question: benchmark의 Fab 내부 운반시간 분포는 어떻게 정의돼 있어?
+    sql: |
+      SELECT dataset, fromloc, toloc, ddist, dtime, dtime2, dunits
+      FROM transport
+      ORDER BY dataset, fromloc, toloc
+    answer: HVLM과 LVHM 모두 Fab→Fab 운반시간은 uniform 분포이며 파라미터는 7.5분과 2.5분이다.
 status: verified
 owner: ""
 updated: 2026-09-15

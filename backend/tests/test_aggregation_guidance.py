@@ -32,9 +32,9 @@ def test_initial_wip_kpi_contract(store: KnowledgeStore) -> None:
     kpi = asyncio.run(get_kpi("initial_wip"))["data"]
     assert kpi["grain"] == ["dataset", "part"]
     assert kpi["aggregation_rules"]
-    assert kpi["diagnostics"] == [
-        {"hypothesis": "SMT2020 입력 테이블 관계가 완전함", "how": "simulation", "ref": "SMT2020_입력검증"}
-    ]
+    assert {("simulation", "SMT2020_입력검증"), ("sql", "recipes/wip_integrity_diagnostics")} <= {
+        (item["how"], item["ref"]) for item in kpi["diagnostics"]
+    }
 
 
 def test_initial_wip_sql_matches_source(db, store: KnowledgeStore) -> None:

@@ -56,7 +56,7 @@ export function ResultSummaryCard({ data }: { data: Record<string, unknown> }) {
             const stat = summary[col.name];
             return (
               <div key={col.name} className="flex flex-col gap-0.5">
-                <dt className="flex items-center gap-1.5 text-2xs text-ink-3">
+                <dt className="flex items-center gap-1.5 text-2xs text-ink-2">
                   <span className="font-mono text-ink-2">{col.name}</span>
                   {col.role && <Tag>{ROLE_LABEL[col.role] ?? col.role}</Tag>}
                 </dt>

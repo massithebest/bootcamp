@@ -19,6 +19,7 @@ import {
 } from "@assistant-ui/react-markdown";
 import { ChartMarker } from "@/components/chat/tool-results/chart-marker";
 import { TABLE_DISPLAY_ROW_LIMIT } from "@/components/chat/primitives";
+import { remarkChatHeadings } from "@/lib/markdown-headings";
 
 /**
  * 자체 파서가 지원하던 `· item` 불릿을 remark 가 인식하는 `- item` 으로
@@ -28,20 +29,24 @@ function preprocess(text: string): string {
   return text.replace(/^([ \t]*)·[ \t]+/gm, "$1- ");
 }
 
-function Heading1or2(props: ComponentPropsWithoutRef<"h1">) {
+function Heading3(props: ComponentPropsWithoutRef<"h3">) {
   return <h3 className="text-ui-lg font-semibold text-ink">{props.children}</h3>;
 }
 
-function Heading3(props: ComponentPropsWithoutRef<"h3">) {
+function Heading4(props: ComponentPropsWithoutRef<"h4">) {
   return <h4 className="text-ui font-semibold text-ink">{props.children}</h4>;
 }
 
-function Heading4to6(props: ComponentPropsWithoutRef<"h4">) {
+function Heading5(props: ComponentPropsWithoutRef<"h5">) {
   return <h5 className="text-ui font-semibold text-ink-2">{props.children}</h5>;
 }
 
+function Heading6(props: ComponentPropsWithoutRef<"h6">) {
+  return <h6 className="text-ui font-semibold text-ink-2">{props.children}</h6>;
+}
+
 function Paragraph(props: ComponentPropsWithoutRef<"p">) {
-  return <p className="leading-[1.6]">{props.children}</p>;
+  return <p className="min-w-0 [overflow-wrap:anywhere] leading-[1.6]">{props.children}</p>;
 }
 
 function Strong(props: ComponentPropsWithoutRef<"strong">) {
@@ -124,7 +129,7 @@ export function MarkdownTableBody(props: ComponentPropsWithoutRef<"tbody">) {
       {omittedRows > 0 && (
         <tfoot>
           <tr>
-            <td colSpan={100} className="border-t border-line px-2 py-1.5 text-left font-sans text-2xs text-ink-3">
+            <td colSpan={100} className="border-t border-line px-2 py-1.5 text-left font-sans text-2xs text-ink-2">
               전체 {rows.length.toLocaleString("ko-KR")}건 중 {TABLE_DISPLAY_ROW_LIMIT}건 표시 · {omittedRows.toLocaleString("ko-KR")}건 생략
             </td>
           </tr>
@@ -139,7 +144,7 @@ function TableRow(props: ComponentPropsWithoutRef<"tr">) {
   // tbody 안의 tr 은 얇은 구분선(last 는 없음). react-markdown 은 부모 태그를
   // props 로 넘기지 않으므로 `thead &` 조상 선택자로 갈라서 색은 상속시킨다.
   return (
-    <tr className="border-b border-line last:border-0 [thead_&]:border-line-strong [thead_&]:text-ink-3 [thead_&]:last:border-b">
+    <tr className="border-b border-line last:border-0 [thead_&]:border-line-strong [thead_&]:text-ink-2 [thead_&]:last:border-b">
       {props.children}
     </tr>
   );
@@ -189,17 +194,15 @@ function ChartFence({ code }: SyntaxHighlighterProps) {
 export function MarkdownText() {
   return (
     <MarkdownTextPrimitive
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkChatHeadings]}
       preprocess={preprocess}
-      className="flex flex-col gap-2"
+      className="flex min-w-0 flex-col gap-2 [overflow-wrap:anywhere] [&_pre]:[overflow-wrap:normal] [&_table]:[overflow-wrap:normal]"
       componentsByLanguage={{ chart: { SyntaxHighlighter: ChartFence } }}
       components={{
-        h1: Heading1or2,
-        h2: Heading1or2,
         h3: Heading3,
-        h4: Heading4to6,
-        h5: Heading4to6,
-        h6: Heading4to6,
+        h4: Heading4,
+        h5: Heading5,
+        h6: Heading6,
         p: Paragraph,
         strong: Strong,
         em: Em,

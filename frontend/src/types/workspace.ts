@@ -21,40 +21,12 @@ export interface Session {
 /**
  * 에이전트가 선택해 쓰는 Skill. `GET /api/knowledge/skills` 응답 형태다.
  *
- * 활성/비활성 토글은 두지 않는다 — 끄는 것이 `allowed_tools` 제한인지 Skill
- * 비활성화인지 아직 정해지지 않았다 (plan/260914-domain-knowledge-plan.md).
+ * 활성/비활성 토글은 두지 않는다 — Skills는 읽기 전용이며 텍스트 지식 활성화와는 별개다.
  */
 export interface Skill {
   name: string;
   description: string;
   status: string;
-}
-
-/** 현재 세션의 실행 정보. */
-export interface SessionMetadata {
-  model: string;
-  toolCallCount: number;
-  lastResponseSeconds: number | null;
-  avgResponseSeconds: number | null;
-  /** 참조한 데이터 기준일자. */
-  dataAsOf: string;
-  /** 시뮬레이션 서버 상태. */
-  simulationServer: {
-    status: "ok" | "warn" | "block";
-    label: string;
-  };
-}
-
-export interface PromptRevision {
-  version: string;
-  editedAt: string;
-  editedBy: string;
-  note: string;
-}
-
-export interface SystemPromptState {
-  content: string;
-  revisions: PromptRevision[];
 }
 
 export interface CurrentUser {

@@ -12,6 +12,10 @@ steps:
     ref: part_route_tool_summary
     params: {dataset: LVHM}
     expectation: 10개 Part와 4013개 Route Step이 조회되고 설비 Family 연결 차이가 없다.
+  - action: recipe
+    ref: wip_integrity_diagnostics
+    params: {dataset: LVHM}
+    expectation: 세 연결 누락 지표가 0이고 dataset 생략 및 Route 조인 위험을 원본 오류와 구분한다.
   - action: simulation
     ref: SMT2020_입력검증
     params: {dataset: LVHM}

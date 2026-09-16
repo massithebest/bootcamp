@@ -39,18 +39,21 @@ visualization_hints:
   - Part별 step_count 비교에는 bar 차트가 적합하다
   - 연결 누락은 required_tool_family_count와 matched_tool_family_count의 차이로 표에 표시한다
 sample_queries:
-  - description: LVHM Part별 Route Step과 설비 Family 수
+  - question: LVHM에서 Route Step이 가장 많은 Part는 무엇이야?
     sql: |
       SELECT *
       FROM part_route_tool_summary
       WHERE dataset = 'LVHM'
-      ORDER BY part
-  - description: 설비 Family 연결이 완전하지 않은 Part
+      ORDER BY step_count DESC
+      LIMIT 1
+    answer: part_3의 r_3 Route가 583 Step으로 가장 많고, 요구 설비 Family 105개가 모두 연결되어 있다.
+  - question: 설비 Family 연결이 완전하지 않은 Part가 있어?
     sql: |
       SELECT *
       FROM part_route_tool_summary
       WHERE required_tool_family_count <> matched_tool_family_count
       ORDER BY dataset, part
+    answer: 현재 SMT2020 원본에는 설비 Family 연결이 불완전한 Part가 없다.
 status: draft
 owner: ""
 updated: 2026-09-15

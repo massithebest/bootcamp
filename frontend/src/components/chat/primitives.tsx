@@ -171,7 +171,7 @@ export function DataTable({
       <div className="thin-scroll max-h-96 overflow-x-auto overflow-y-auto">
         <table className="w-full border-collapse font-mono text-data tabular-nums">
           <thead>
-            <tr className="border-b border-line-strong text-left text-ink-3">
+            <tr className="border-b border-line-strong text-left text-ink-2">
               {columns.map((c) => (
                 <th key={c} className="whitespace-nowrap px-2 py-1.5 font-medium">
                   {c}
@@ -198,7 +198,7 @@ export function DataTable({
         </table>
       </div>
       {omittedRows > 0 && (
-        <p className="border-t border-line px-2 py-1.5 text-2xs text-ink-3">
+        <p className="border-t border-line px-2 py-1.5 text-2xs text-ink-2">
           전체 {rows.length.toLocaleString("ko-KR")}건 중 {TABLE_DISPLAY_ROW_LIMIT}건 표시 · {omittedRows.toLocaleString("ko-KR")}건 생략
         </p>
       )}

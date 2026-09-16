@@ -4,10 +4,7 @@
 
 2026-09-16 `frontend-design` Skill 기반 UI/UX 개선(3-pane 워크벤치)에서 확정한
 규칙과 최종 token 기준. 2026-09-16 assistant-ui Elements 전환으로 공통 UI
-구현 경로를 갱신했으며 아래 token과 정보 위계는 유지한다. 클래스명을 모두
-나열하지 않고, 이후 작업자가 새 화면·컴포넌트를 만들 때 일관된 판단을
-내릴 수 있는 기준만 남긴다. 구현
-근거와 검증 결과는
+구현 경로를 갱신했으며 아래 token과 정보 위계는 유지한다. 구현 근거와 검증 결과는
 [frontend-ui-ux-plan](plan/260916-frontend-ui-ux-plan.md)을 따른다.
 
 ## 제품 UX 원칙
@@ -19,13 +16,13 @@
   카드도 헤더 한 줄로 결과 종류·상태·행 수/핵심 수치를 알 수 있어야 한다
   (raw JSON·payload를 기본 화면의 중심 정보로 남기지 않는다).
 - **Context Inspector는 Progressive Disclosure다.** 탭 진입 시 가장 중요한
-  정보(Skills)부터 보여주고, 나머지는 필요할 때 펼친다.
+  정보(지식)부터 보여주고, 나머지는 필요할 때 펼친다.
 - **정확성과 밀도를 장식보다 우선한다.** 카드·그림자·그라디언트로 꾸미지
   않는다. 구분은 1px 룰과 배경 톤 한 단계 차이로 만든다.
 - **실제로 연결되지 않은 기능을 동작하는 것처럼 표현하지 않는다.** 버튼을
   누르면 정말 무언가 바뀌어야 한다. 저장·설정처럼 아직 백엔드 계약이 없는
   기능은 읽기 전용으로 보여주거나 명시적으로 비활성화하고 이유를 밝힌다
-  (`context-inspector.tsx`의 Prompt 패널, `app-sidebar.tsx`의 설정 버튼 참고).
+  (`app-sidebar.tsx`의 설정 버튼 참고). 지식 변경은 서버에서 관리 기능을 켠 경우에만 제공한다.
 - **비공개 chain-of-thought를 노출하지 않는다.** `status` 이벤트는 모델의
   내부 reasoning이 아니라 사용자용 업무 진행 단계(질문 분석→데이터 확인→
   SQL 조회→시뮬레이션→결과 분석→답변)다. Tool과 독립적인 공개 단계는
@@ -33,10 +30,13 @@
 
 ## Layout 기준
 
-- 3-pane 구조: `Sidebar(15.5rem) | Chat(1fr) | Inspector(20rem/w-80)`.
-  Chat이 항상 남은 공간을 모두 갖는다. 폭을 더 좁히거나 넓히지 않는다.
-- 대화 읽기 폭은 `max-w-reading`(47.5rem/760px)로 고정한다. 메시지, 진행
-  블록, Composer 모두 이 폭 안에서 `mx-auto`로 정렬한다.
+- 3-pane 구조: `Sidebar(15.5rem) | Chat(1fr) | Inspector(기본 20rem, 1280px 이상 23rem)`.
+  Inspector는 세션 동안 `16~35rem` 범위에서 좌측 경계를 드래그하거나
+  `←/→`, `Home/End`로 조절할 수 있다. 실제 상한은 Chat 최소 `32.5rem`과
+  현재 viewport를 우선해 더 작아질 수 있다. Chat이 항상 남은 공간을 모두
+  갖는다. 폭을 바꿀 때는 좁은 화면 임계값과 헤더 정렬, 중앙 읽기 폭을 함께 검증한다.
+- 대화 읽기 폭은 Thread의 `--thread-max-width: 47.5rem`을 기준으로 한다.
+  메시지, 진행 블록, Composer를 같은 중앙 축에 정렬한다.
 - Sidebar/Inspector는 폭 0으로 접힌다(언마운트하지 않음). 접힌 pane을 다시
   여는 버튼은 헤더 좌/우 끝에 두고, 아이콘 방향으로 "펼쳐질 방향"을 알려준다.
 - 좁은 화면 자동 접힘 임계값: Inspector `< 1180px`, Sidebar `< 860px`.
@@ -102,43 +102,62 @@
 
 ## Spacing과 shape
 
-- Border radius는 `rounded`(기본값 0.3125rem/5px) 하나로 통일한다. 카드마다
-  다른 radius를 쓰지 않는다.
+- 일반 패널과 결과 surface는 `rounded`를 기본으로 한다. 홈페이지형 Composer는
+  입력 affordance를 위해 `rounded-2xl`을 쓰는 명시적 예외다. 공식 Elements의
+  radius를 그대로 복사해 새 예외를 늘리지 않는다.
 - Panel 헤더: `px-4 py-2.5` (Sidebar/Inspector 헤더는 `px-2~3 py-2~3`로 더
   좁음). Composer: `px-4 py-3`. 메시지 컬럼 세로 간격: `gap-6 py-6`.
 - 카드로 감싸는 대신 좌측 룰(`border-l`)과 배경 톤 한 단계 차이로 구분한다.
   카드(둥근 테두리 박스)는 차트, 대용량 결과 요약(`ResultSummaryCard`)처럼
   화면 안에서 독립된 시각 단위로 다뤄야 하는 콘텐츠에만 쓴다. Tool 결과·
   진행 블록·지식 카드는 좌측 룰만 쓴다.
-- 그림자는 쓰지 않는다(ScrollToBottom 버튼의 `shadow-sm` 등 최소 예외만
-  기존 유지). 그라디언트·glassmorphism은 쓰지 않는다.
+- 그림자는 Composer와 ScrollToBottom 버튼의 `shadow-sm`처럼 입력·부유 제어를
+  구분하는 최소 예외만 유지한다. 그라디언트·glassmorphism은 쓰지 않는다.
 - Compact 컨트롤(아이콘 버튼, 탭, 태그) 높이는 `text-2xs` 기준 `py-1~1.5`.
 
 ## Component별 규칙
 
 - **User message**: 오른쪽 정렬, `border border-line-strong bg-surface`
   말풍선. 카드 그림자 없음.
-- **Assistant message**: 왼쪽 정렬, 말풍선 없이 컬럼 전체 폭 사용. 진행
-  블록 → 최종 본문 → 액션바 순서를 유지한다.
+- **Assistant message**: 왼쪽 정렬, 말풍선 없이 컬럼 전체 폭 사용. 일반 Tool
+  실행 그룹을 먼저 두고, standalone 표·차트와 각 도입·해석은 이벤트 문맥
+  순서대로 배치한 뒤 액션바를 둔다.
 - **실행 과정**(`thread-messages.tsx`): 독립적인 공개 `status`는 `AgentPlan`,
   Tool 호출은 `MessagePrimitive.GroupedParts`와 `ToolGroup`으로 한 블록에
   표시한다. Tool 실행 단계는 그룹의 `part.status`로 판별하고, 회전 아이콘은
   메시지 전체가 실행 중인 동안 유지한다. 헤더는 `요청 분석 중` → `툴 N개
   실행 중` → `응답 작성 중` → `응답 작성 완료` 단계를 구분한다. 메시지가
   실행 중인 동안 블록을 펼치고 최종 상태가 되면 자동으로 접는다. 완료 후
-  사용자가 다시 펼치면 공개 단계와 Tool 목록이 보인다.
+  사용자가 다시 펼치면 공개 단계와 Tool 목록이 보인다. 초기·진행 상태 문구는
+  `text-ui`와 `text-ink-2` 이상의 가독성을 유지한다. 일반 Tool 직전에 공개된
+  `text`는 해당 Tool이 실행 중일 때만 현재 Tool 행 바로 위에 일반 텍스트로
+  유지한다. ToolGroup 상단의 별도 강조 블록으로 올리지 않고, Tool 결과가
+  도착하면 즉시 제거한다. 일반 모션 환경에서 실행 중 헤더의 좌측 아이콘은 계속 회전하고,
+  reduced-motion에서는 정적 아이콘과 상태 텍스트를 사용한다. 한글 라벨과 아이콘의 광학적 중심을 맞춘다. 비공개 SDK thinking을 이
+  UI에 연결하지 않는다.
 - **Tool 결과**(`tool-result-card.tsx`): 개별 Tool 상세는 종류와 관계없이
   기본 접힘이며 ToolGroup 안에서 두 번째 disclosure 단계가 된다. 접힌 헤더는
-  `label · 요약`(예: "데이터 조회 · 10행", "시뮬레이션 실행 · 지표 4개")
-  형식을 유지한다 — 새 tool_name을 추가하면 `resultHeaderSummary`에 요약
-  규칙을 함께 추가한다.
+  `tool_name · 요약`(예: `execute_sql · 10행`) 형식을 유지한다. 결과가 도착하기
+  전에 실행이 끝난 Tool은 완료로 추정하지 않고 `미완료`로 표시한다.
+  그룹 헤더에도 오류·미완료 개수를 반영한다. 자동 접힘으로 숨겨질 내부 포커스는
+  보이는 trigger로 복원하며 외부 입력 포커스는 유지한다.
+  실제로 측정한 클라이언트 관측 시간만 표시하고 서버 실행 시간으로 표현하지 않는다.
 - **Standalone 표**(`interactive-data-table.tsx`): `prepare_table`이 검증해 보낸
   최대 100행 안에서 검색·열 정렬·페이지 크기 10/25/50/100과 이전/다음 이동을
   제공한다. 원본 건수와 실제 포함 건수를 함께 표시하고 잘린 결과를 알린다.
+  표 본문은 최대 `32rem` 높이에서 내부 스크롤한다.
 - **Markdown**: `AssistantText`의 `leading-[1.6]`, 표/코드/SQL은 항상 mono +
-  `tabular-nums` + 가로/세로 스크롤 캡(`max-h-96`). 헤딩은 실제 문서
-  위계보다 한 단계 낮춰(`h1/h2`→`text-ui-lg`) 채팅 안에서 과도하게 크지
-  않게 한다.
+  `tabular-nums` + 가로/세로 스크롤 캡(`max-h-96`). 답변의 숨김 h2 아래에서
+  Markdown 제목을 h3~h6으로 정규화하되 시각적 크기는 기존 type scale로 유지한다.
+  긴 본문·링크·inline code는 줄바꿈하고 표·코드 블록의 내부 스크롤은 보존한다.
+  표 중복 제거는 standalone payload와 컬럼·행이 확인된 경우에만 적용한다.
+- **메시지 액션**: Copy/Edit/Reload primitives를 유지하며 hover 없이도 키보드로
+  접근하도록 액션 DOM을 유지한다. 재생성은 손실 영향을 먼저 확인하고 취소 시
+  대화를 보존한다. 사용자 요청에 따라 새 채팅·예시 세션 교체에는 확인창을 띄우지 않는다.
+  지식 편집의 미저장 변경 보호는 별도로 유지한다. DB 세션 관리는 후속 범위다.
+- **좁은 화면 패널**: 기존 860/1180px 접힘 임계값을 유지한다. 임계값 아래 재개방은
+  Chat 폭을 줄이지 않는 비모달 overlay이며 Escape/닫기 시 여는 조작으로 복귀한다.
+  Tab으로 패널을 벗어나면 닫되 이동한 포커스를 빼앗지 않는다.
 - **Data table**(`primitives.tsx` `DataTable`, `assistant-ui/elements/markdown-text.tsx` `Table`):
   동일한 스크롤 래퍼(`thin-scroll max-h-96 overflow-x-auto overflow-y-auto`)
   를 공유한다. 둘 중 하나만 고치고 다른 하나를 잊지 않는다.
@@ -147,14 +166,29 @@
   전환하고 직접 상태를 구독해 조건부 렌더하지 않는다. Input에는 반드시
   `aria-label`을 둔다(placeholder만으로 접근성 이름을 대신하지 않는다).
 - **Sidebar**(`app-sidebar.tsx`): 세션 목록이 아직 영속 저장소가 아니므로
+  상단 전역 메뉴는 `새 채팅` → `지식 관리`, 그 아래는 최근 대화 목록으로
+  구성한다. 지식 관리에서 채팅으로 돌아갈 때 중앙 헤더에 별도 복귀 버튼이나
+  `채팅` 메뉴를 두지 않고, 현재로 표시된 최근 대화 항목을 사용한다. 같은 항목을
+  누르면 Composer·스트리밍·스크롤을 보존해 복귀한다. `새 채팅`은 대화를
+  초기화하고 현재 실행 동안 `새 대화 · 방금 전` 항목을 최근 목록에 추가한다.
+  세션 목록이 아직 영속 저장소가 아니므로
   "예시 세션 · 현재 대화만 유지됩니다" 같은 안내를 목록 위에 유지한다.
   실제 persistence 계약이 생기기 전까지 이 안내를 지우지 않는다. 실제로
   연결되지 않은 액션(설정 등)은 `disabled` + `title`로 이유를 밝힌다.
-- **Inspector**(`context-inspector.tsx`): 탭 순서는 실제 연결(Skills) →
-  참고용 예시(메타) → 참고용 예시(프롬프트) 순을 유지한다. 실제 API가 없는
-  탭은 패널 첫 줄에 "예시 · 아직 실제 연결 값이 아닙니다" 류의 caption을
-  둔다. 저장처럼 실행해도 아무 일도 일어나지 않는 버튼은 만들지 않는다 —
-  계약이 생기기 전에는 읽기 전용으로 보여준다.
+- **Inspector**(`context-inspector.tsx`): 도구 → 스킬 → 지식 순의 읽기 전용 조회다.
+  지식은 제목·유형·검토 상태와 짧은 설명을 간결한 목록으로 함께 보여준다.
+  우측 패널에는 출처와 중앙 관리 화면 이동 링크를 표시하지 않는다.
+  텍스트 등록·검토·활성화는 좌측 지식 관리 메뉴에서 수행한다. 구조화 YAML과
+  도구·Skills에는 활성화 토글을 두지 않는다. 메타·프롬프트 예시 탭은 제거했다.
+  도구 상세에는 설명과 결과 형태만 표시하고 입력 JSON Schema는 노출하지 않는다.
+  Skills는 이름·요약을 항상 표시하고 disclosure를 열었을 때 상세 Markdown을
+  제목·목록·코드로 렌더링한다. 버튼은 `aria-expanded`/`aria-controls`를 제공한다.
+  1280px 이상에서는 긴 절차의 줄바꿈을 줄이기 위해 23rem 폭을 쓴다.
+- **지식 관리 상세**(`knowledge/structured-detail.tsx`): 구조화 YAML의 배열·객체를
+  raw JSON으로 기본 출력하지 않는다. 최상위는 필드명과 값의 2열 구조, 태그·grain은
+  줄바꿈 chip, 설명 목록은 불릿, 컬럼은 이름·형식·설명 행, SQL은 제한 높이의 mono
+  블록으로 표시한다. 최상위 빈 값은 `없음`으로 알리고 반복 행의 선택적 빈 필드는
+  생략한다. 좁은 폭에서는 1열로 재배치하며 전체 페이지 가로 스크롤을 만들지 않는다.
 - **Empty/loading/error 상태**: 오류는 항상 "무엇이 실패했고 무엇을 하면
   되는지"까지 문장으로 설명한다(`ConnectionBanner` 참고). 로딩은
   스켈레톤보다 짧은 문구("불러오는 중…")나 `role="status"` pulse 블록을
@@ -163,7 +197,8 @@
   채움, 나머지는 텍스트/ghost. 파괴적 액션은 이 저장소에 아직 없다 — 추가할
   때는 `--block-ink` 텍스트 + 명확한 확인 문구를 쓴다.
 - **focus-visible/keyboard**: 모든 대화형 요소는 `:focus-visible`의 전역
-  outline(`--accent`, 2px)에 기대고 별도 outline 제거하지 않는다. 새 버튼도
+  outline(`--accent`, 2px)을 기본으로 한다. Composer textarea만 form의
+  `focus-within` 테두리와 중복되지 않도록 내부 outline을 제거한다. 새 버튼은
   `<button type="button">` + `aria-label`(아이콘만 있을 때) 규칙을 따른다.
 
 ## 금지 사항

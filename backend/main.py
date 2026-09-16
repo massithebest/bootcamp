@@ -5,7 +5,9 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from services.document_store import KnowledgeError
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes_chat import router as chat_router
@@ -88,3 +90,8 @@ app.include_router(
 async def health_check() -> dict:
     """Return backend health status."""
     return {"status": "ok"}
+
+
+@app.exception_handler(KnowledgeError)
+async def knowledge_error_handler(_request: Request, exc: KnowledgeError):
+    return JSONResponse(status_code=exc.status, content={"detail": exc.message})

@@ -31,18 +31,21 @@ visualization_hints:
   - Part별 lot_count 또는 piece_count 비교에는 bar 차트가 적합하다
   - earliest_due는 수량 축으로 사용하지 않는다
 sample_queries:
-  - description: LVHM Part별 초기 WIP
+  - question: LVHM에서 초기 WIP piece가 가장 많은 Part는 무엇이야?
     sql: |
       SELECT dataset, part, lot_count, piece_count, earliest_due
       FROM initial_wip_by_part
       WHERE dataset = 'LVHM'
-      ORDER BY part
-  - description: benchmark별 초기 WIP 합계
+      ORDER BY piece_count DESC
+      LIMIT 1
+    answer: part_3이며 초기 WIP는 310 Lot, 7,750 pieces이고 earliest_due는 2018-01-01 20:25:43이다.
+  - question: benchmark별 초기 WIP Lot과 piece 합계는 얼마야?
     sql: |
       SELECT dataset, SUM(lot_count) AS lot_count, SUM(piece_count) AS piece_count
       FROM initial_wip_by_part
       GROUP BY dataset
       ORDER BY dataset
+    answer: HVLM은 2,255 Lot·56,375 pieces, LVHM은 2,156 Lot·53,900 pieces다.
 status: draft
 owner: ""
 updated: 2026-09-15

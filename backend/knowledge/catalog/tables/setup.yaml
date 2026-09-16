@@ -14,7 +14,14 @@ caveats:
   - 빈 cursetup은 NULL로 보존하며 이전 행의 값을 채우지 않는다
 aggregation_rules:
   - stime은 stunits가 같은 행끼리만 비교하거나 합산한다
-sample_sql: SELECT dataset, cursetup, newsetup, stime, stunits FROM setup ORDER BY dataset, ignore_value
+sample_queries:
+  - question: benchmark별 setup 전환 정의는 몇 건이야?
+    sql: |
+      SELECT dataset, COUNT(*) AS transition_count
+      FROM setup
+      GROUP BY dataset
+      ORDER BY dataset
+    answer: HVLM과 LVHM에 각각 13건의 setup 전환 정의가 있다.
 status: verified
 owner: ""
 updated: 2026-09-15

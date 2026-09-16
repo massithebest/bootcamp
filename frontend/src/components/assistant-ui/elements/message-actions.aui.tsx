@@ -7,7 +7,7 @@ import { TooltipIconButton } from "./tooltip-icon-button";
 
 export function MessageActions({ user = false }: { user?: boolean }) {
   return (
-    <ActionBarPrimitive.Root hideWhenRunning autohide="not-last" className="flex items-center gap-1">
+    <ActionBarPrimitive.Root hideWhenRunning autohide="never" className="flex items-center gap-1">
       <ActionBarPrimitive.Copy asChild>
         <TooltipIconButton tooltip="복사">
           <AuiIf condition={(s) => s.message.isCopied}><CheckIcon /></AuiIf>

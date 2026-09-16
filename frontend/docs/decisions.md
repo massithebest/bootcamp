@@ -18,11 +18,13 @@
 | 2026-09-16 | 조회 1,000행·표시 10행과 Composer 준비 중 제어 | 같은 날 100행 결정으로 대체 |
 | 2026-09-16 | 검증된 차트를 standalone Tool UI로 표시 | 활성 |
 | 2026-09-16 | 표시 100행과 standalone 대화형 표 Tool UI | 활성 |
+| 2026-09-16 | ChatGPT형 좌측 전역 내비게이션 | 같은 날 단일 채팅 메뉴 결정으로 대체 |
+| 2026-09-16 | 좌측 채팅 메뉴 단일화 | 활성 — `새 채팅`만 유지 |
 
 ## 3-pane 워크벤치
 
 사이드바, 대화, context inspector를 한 화면에 둔다. 대화와 Skills는 실제 API,
-세션 목록·사용자·Metadata·Prompt는 아직 로컬 데이터다. 실제 연결되지 않은
+세션 목록·사용자는 아직 로컬 데이터다. Metadata·Prompt 패널은 아래 지식 관리 결정으로 제거했다. 실제 연결되지 않은
 패널을 영속 기능으로 설명하지 않는다.
 
 왼쪽 sidebar 셸은 `components/chat/app-sidebar.tsx`, 목록은 assistant-ui의
@@ -443,3 +445,132 @@ thinking block은 계속 폐기하며, 향후 공개 reasoning part 계약을 �
 완료로 추정하지 않고 미완료로 표시한다.
 
 근거: [메시지 순서 계획](../../plan/260916-tanstack-table-message-order-plan.md).
+
+### 공개 실행 안내의 가독성과 수명 (2026-09-16, 활성)
+
+`요청 분석 중`과 실행 중 헤더는 13px `text-ui`, `text-ink-2` 이상의 고정 대비로
+표시한다. 회전 아이콘이 이미 진행 상태를 전달하므로 텍스트 shimmer에 의존하지 않는다.
+독립 공개 status의 단계 본문도 같은 크기 계열로 표시한다.
+
+일반 Tool 직전의 공개 `AgentEvent.text`는 해당 Tool이 실행되는 동안 metadata의
+`progressText`로 유지한다. ToolGroup 상단에 강조 블록으로 배치하지 않고,
+이전 Tool 행 뒤와 현재 실행 Tool 행 사이에 일반 본문 스타일로 표시한다.
+Tool 결과 또는 다음 공개 텍스트가 도착하거나 메시지가 종료되면 제거한다.
+실행 중 헤더의 좌측 아이콘은 동작 상태가 유지되는 동안 계속 회전한다.
+이는 Backend adapter를 통과한 공개 문구에만 적용한다. Claude SDK의
+thinking/signature/tool input delta는 계속 폐기하며 reasoning UI로 변환하지 않는다.
+
+근거: [공개 실행 안내 가독성 계획](../../plan/260916-reasoning-readability-plan.md).
+
+### 지식 관리와 조회 패널 (2026-09-16, 활성)
+
+좌측 상단 전역 메뉴에 새 채팅·지식 관리를 두고 그 아래 최근 대화 목록을
+배치한다. 중앙 관리 화면은 텍스트 등록·검토·
+활성화·이력을 제공하고 구조화 YAML은 읽기 전용으로 표시한다. 우측은 도구·스킬·지식
+조회 탭이며 Metadata·Prompt 예시 패널과 더미 값은 제거했다. 지식 탭은 제목·유형·
+검토 상태와 짧은 설명을 간결한 목록으로 함께 제공한다. 출처와 관리 화면 이동은 우측
+패널에서 제거했다.
+
+라우터나 신규 패키지는 도입하지 않았다. 루트 AssistantRuntimeProvider와 useAgentChat을
+유지하고 Thread를 언마운트하지 않는다. 관리 화면에서는 채팅 viewport의 크기를 보존한
+채 숨기고 자동 추적을 중지한다. display:none은 SDK가 viewport를 하단으로 오인해 스크롤
+위치를 잃게 하므로 채팅 영역에 사용하지 않는다. 지식 관리에서 중앙 헤더의 별도
+복귀 버튼과 별도 `채팅` 메뉴는 두지 않는다. 현재로 표시된 최근 대화 항목으로
+복귀하며 스크롤과 진입 요소 포커스를 복원한다. `새 채팅`은 현재 대화를 초기화하고
+현재 실행 동안 최근 목록에 `새 대화` 항목을 추가한다. 영속 세션 계약은 아직 없으며
+문서 인용은 document_id와 version으로 보존된 본문을 연다.
+
+입력은 일반 텍스트이며 임의 HTML을 렌더링하지 않는다. 관리 API 응답은 런타임 검증하고
+실패해도 편집 내용을 보존한다. 변경 후 목록·패널을 갱신하되 열린 편집본을 자동으로
+덮어쓰지 않는다. 동시 변경은 서버 revision 충돌 후 수동 새로고침으로 해결한다.
+
+근거: [지식 관리 계약](../../plan/260916-knowledge-management-plan.md),
+[사이드바 내비게이션 계획](../../plan/260916-sidebar-navigation-plan.md),
+[채팅 메뉴 단일화 계획](../../plan/260916-chat-navigation-unification-plan.md).
+
+### 지식 관리 구조화 상세 표현 (2026-09-16, 활성)
+
+구조화 YAML 상세는 raw JSON 대신 값의 의미에 맞는 UI로 표시한다. 최상위는
+사용자용 필드 라벨과 값의 2열 구조로 통일하고, 태그·grain은 wrap 가능한 chip,
+문장 배열은 불릿 목록, 컬럼 배열은 이름·형식·설명의 반복 행, 중첩 객체는 작은
+정의 목록, SQL 예시는 질문·SQL·답변 블록을 사용한다. 원본 값은 변경하거나
+추측하지 않는다. 최상위 빈 값은 `없음`으로 알리되 컬럼마다 반복되는 선택적
+빈 필드는 생략해 비교 밀도를 유지한다.
+
+좌측 지식 목록은 유형과 상태를 같은 행에 두고 제목·요약을 아래로 정렬한다.
+현재 선택은 색상만이 아니라 accent 좌측 룰과 `aria-current`로 함께 표현한다.
+
+근거: [지식 상세 가독성 계획](../../plan/260916-knowledge-detail-readability-plan.md).
+
+### Agent Workbench 감사 후속 정책 (2026-09-16, 활성)
+
+기존 assistant-ui primitives·Elements와 ExternalStoreRuntime/SSE 소유권을 유지한다.
+이 결정은 앞선 완료 이력을 취소하지 않고 다음 표시 정책만 보완한다.
+
+- 성공한 standalone 표의 존재만으로 다른 Markdown 표를 지우지 않는다.
+  검증된 payload의 컬럼·전체 행과 일치하는 단순 표만 중복 처리하고 서식·의미가 모호하면 남긴다.
+- ActionBar의 hover 기반 unmount를 사용하지 않는다. 기존 Copy/Edit/Reload는
+  키보드 접근 가능한 DOM으로 유지한다. 교체·재생성 전 브라우저 기본 확인창으로
+  대화/초안 손실·후속 메시지 수·복원 불가를 안내하며 취소는 상태를 바꾸지 않는다.
+- 턴 종료와 Tool 성공을 구별해 그룹에 오류·미완료 개수를 남긴다.
+  빈 응답, 0행 성공, 결과 누락은 별도 문구로 표시한다. 자동 접힘은 유지하되
+  숨겨질 상세에 포커스가 있으면 보이는 trigger로 돌리고 외부 포커스는 유지한다.
+- 실행 단계는 안정적인 polite 상태 영역으로 알린다. 오류 alert와 중복하지 않고
+  토큰·타이머는 알림에 포함하지 않는다. reduced-motion에서는 회전을 멈춘다.
+- 경과 시간은 performance.now로 관측한 프론트 로컬 metadata다.
+  요청 시작→종료/오류/취소, 동일 Tool 호출 수신→결과 수신만 측정하며 과거 값은 합성하지 않는다.
+  서버 시간과 별개이며 작은 표시 컴포넌트만 초 단위로 갱신한다.
+- 기존 860/1180px 임계값 아래 재개방은 같은 DOM을 쓰는 비모달 overlay로 처리한다.
+  Escape/닫기는 trigger로 복귀하고 Tab 이탈은 패널을 닫되 외부 포커스를 유지한다.
+  400px에서도 Chat 400px/입력창 334px을 유지한다. 확대 시 패널을 자동으로 펼치지 않는다.
+- 핵심 메타·표 헤더는 ink-2, 긴 본문은 overflow-wrap:anywhere,
+  SQL/CTE는 max-h-96 내부 스크롤을 쓴다. main·명명된 aside·답변 h2와 내용 h3~h6으로
+  의미를 전달하되 글자 크기는 기존 dense type scale을 유지한다.
+- 차트에는 기존 chart.data의 축/단위/값을 읽는 접이식 표를 제공한다.
+  Inspector 탭은 숨김 상태로 mount를 유지해 필터·스크롤을 보존한다.
+  모델·추론 제어는 실제 설정으로 표시하지 않고 준비 중·미연결임을 명시한다.
+
+새 라이브러리나 API는 추가하지 않았다. 서버 timing·모델 설정 API·대화 영속 저장은
+별도 계약 검토로 보류한다. 실제 스크린리더·모바일 가상 키보드·대규모 대화 성능은
+브라우저 DOM/키보드·fixture 통과와 구분해 운영 인수에서 확인한다.
+
+근거: [감사 후속 구현·검증 기록](../../plan/260916-agent-workbench-ux-audit-plan.md),
+[assistant-ui ActionBar](https://www.assistant-ui.com/docs/primitives/action-bar),
+[assistant-ui Message timing](https://www.assistant-ui.com/docs/guides/message-timing).
+
+### 대화 화면 전환 확인창 제거 (2026-09-16, 활성)
+
+사용자가 현재 비영속 세션의 한계를 알고 있으며 DB 세션 관리는 추후 연결하기로 했다.
+따라서 앞선 감사 후속 정책 중 새 채팅·예시 세션 교체의 기본 확인창만 제거한다.
+전환 시 기존 초기화 동작과 Sidebar의 비영속 안내는 유지한다. 지식 편집의 미저장
+변경 보호·답변 재생성 확인은 제거 대상이 아니다. 저장 API나 로컬 persistence는 추가하지 않는다.
+일반적인 확인창 권고보다 명시적인 사용자 요청을 우선하며 반복 전환을 막지 않는다.
+
+근거: [감사 계획 후속 단계](../../plan/260916-agent-workbench-ux-audit-plan.md#9-후속-정책-화면-전환-확인창-제거).
+
+### Inspector 도구·Skills 가독성 (2026-09-16, 활성)
+
+도구 상세는 사용자가 탐색에 필요한 설명과 결과 형태만 남기고 입력 JSON Schema를
+표시하지 않는다. API 계약과 Agent의 tool schema는 변경하지 않는다.
+
+Skills 탭은 각 절차를 다시 펼치는 버튼을 제거하고 등록된 절차 본문을 바로 보여준다.
+원문 Markdown은 HTML 제목·번호/불릿 목록·강조·인라인 코드로 안전하게 렌더링하며
+임의 HTML은 무시한다. Skill 이름 h3 아래 본문 제목은 h4부터 시작한다. 항목 간 구분선,
+본문 좌측 룰, 기존 semantic token과 type scale로 긴 절차의 읽기 흐름을 구분한다.
+1280px 이상에서는 Inspector를 23rem으로 넓히고, 그 아래 및 작은 화면 overlay는
+기존 20rem을 유지해 Chat 작업 폭을 보호한다.
+
+기존 `@assistant-ui/react-markdown`이 사용하는 `react-markdown` 10.1.0을 직접 의존성으로
+명시해 정적 Skill 본문에도 같은 GFM 파서를 재사용한다. 신규 디자인 라이브러리나
+Backend payload는 추가하지 않는다.
+
+근거: [지식 관리 Frontend 후속 기록](../plan/260916-knowledge-management-plan.md#inspector-가독성-후속-2026-09-16).
+
+### Skills disclosure 복원 (2026-09-16, 활성)
+
+사용자 요청에 따라 Skills 항목의 disclosure를 복원한다. 이름·상태·요약은 접힌
+상태에서도 보이고, 상세 절차는 사용자가 선택한 항목만 펼친다. 앞선 결정의 Markdown
+HTML 렌더링, 제목 위계, 여백, 23rem 데스크톱 폭은 유지한다. trigger는 네이티브
+button과 `aria-expanded`·`aria-controls`를 사용하고, 펼친 항목만 상세 API를 호출한다.
+
+근거: [지식 관리 Frontend 후속 기록](../plan/260916-knowledge-management-plan.md#skills-disclosure-복원-2026-09-16).

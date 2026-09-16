@@ -60,6 +60,14 @@ class Join(BaseModel):
         return raw
 
 
+class SqlQuestionAnswer(BaseModel):
+    """자연어 질문과 실행 SQL, 현재 기준 데이터의 답변 예시."""
+
+    question: str
+    sql: str
+    answer: str
+
+
 class KnowledgeTable(KnowledgeMeta):
     table: str
     description: str
@@ -70,7 +78,7 @@ class KnowledgeTable(KnowledgeMeta):
     joins: list[Join] = []
     caveats: list[str] = []
     aggregation_rules: list[str] = []
-    sample_sql: str = ""
+    sample_queries: list[SqlQuestionAnswer] = []
 
 
 class Diagnostic(BaseModel):
@@ -147,13 +155,6 @@ class KnowledgeScenario(KnowledgeMeta):
     expected: ScenarioExpected
 
 
-class RecipeSample(BaseModel):
-    """CTE 를 사용하는 완전한 실행 가능 SQL 예시 하나."""
-
-    description: str
-    sql: str
-
-
 class RecipeOutputColumn(BaseModel):
     """CTE 출력 컬럼의 의미. role/unit 은 작성자가 명시한 집계 가이드다."""
 
@@ -181,7 +182,7 @@ class KnowledgeRecipe(KnowledgeMeta):
     output_columns: list[RecipeOutputColumn] = []
     aggregation_rules: list[str] = []
     visualization_hints: list[str] = []
-    sample_queries: list[RecipeSample] = []
+    sample_queries: list[SqlQuestionAnswer] = []
 
     @model_validator(mode="after")
     def _validate_output_contract(self) -> KnowledgeRecipe:

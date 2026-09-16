@@ -56,7 +56,7 @@ function TableToolMessage({
   return (
     <div
       className="flex min-h-24 items-center justify-center rounded border border-line bg-surface-2 px-4 text-ui text-ink-2"
-      role={alert ? "alert" : "status"}
+      role={alert ? "alert" : undefined}
       aria-busy={loading || undefined}
     >
       <span className={loading ? "shimmer motion-reduce:animate-none" : undefined}>{message}</span>

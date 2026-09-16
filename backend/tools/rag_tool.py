@@ -1,16 +1,15 @@
-"""RAG tool for production planning knowledge search."""
-
+"""Search reference material, never executable instructions."""
+from asyncio import to_thread
+from core import config
 from services import rag_service
+from services.document_store import get_document_store, KnowledgeError
 
 
 async def search_knowledge(query: str) -> dict:
-    """Search production planning knowledge.
-
-    Use this tool for:
-    - process manuals
-    - business terminology
-    - production planning policies
-    - non-structured domain knowledge
-    """
-
-    return await rag_service.search(query)
+    try:
+        if config.KNOWLEDGE_SEARCH_BACKEND == "local":
+            return await to_thread(get_document_store().search, query)
+        return await rag_service.search(query)
+    except KnowledgeError as exc:
+        return {"kind": "knowledge", "status": "error", "query": query,
+                "documents": [], "message": exc.message}

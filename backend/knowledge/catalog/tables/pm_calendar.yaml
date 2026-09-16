@@ -18,7 +18,14 @@ caveats:
   - calendar_attach.calname과 연결할 때 caltype이 pm인지 함께 확인한다
 aggregation_rules:
   - mtbpm과 mttr은 각각의 분포와 단위를 포함해 해석한다
-sample_sql: SELECT dataset, pmcalname, mtbpm, mtbpmunits, mttr, mttrunits FROM pm_calendar
+sample_queries:
+  - question: benchmark별 예방보전 캘린더는 몇 개야?
+    sql: |
+      SELECT dataset, COUNT(*) AS calendar_count
+      FROM pm_calendar
+      GROUP BY dataset
+      ORDER BY dataset
+    answer: HVLM과 LVHM에 각각 292개의 예방보전 캘린더가 있다.
 status: verified
 owner: ""
 updated: 2026-09-15

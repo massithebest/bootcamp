@@ -14,7 +14,14 @@ caveats:
   - 빈 setupgrp은 NULL로 보존하며 이전 행의 group을 채우지 않는다
 aggregation_rules:
   - setup 상태 수는 dataset과 setup 기준으로 센다
-sample_sql: SELECT dataset, setupgrp, setup, minrun FROM setup_group ORDER BY dataset, ignore_value, setup
+sample_queries:
+  - question: benchmark별 setup group 상태는 몇 건이야?
+    sql: |
+      SELECT dataset, COUNT(*) AS setup_state_count
+      FROM setup_group
+      GROUP BY dataset
+      ORDER BY dataset
+    answer: HVLM과 LVHM에 각각 9건의 setup group 상태가 있다.
 status: verified
 owner: ""
 updated: 2026-09-15

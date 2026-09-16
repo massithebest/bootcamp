@@ -112,7 +112,7 @@ function RecipeDetail({ data }: { data: unknown }) {
       {str(recipe.name) && <p className="font-medium text-ink">{str(recipe.name)}</p>}
       {description && <Note text={description} />}
       {asStrings(recipe.output_grain).length > 0 && <Note text={`결과 단위: ${asStrings(recipe.output_grain).join(" · ")}`} />}
-      {sql && <Disclosure summary="CTE SQL" dense><pre className="thin-scroll overflow-x-auto font-mono text-data text-ink-2">{sql}</pre></Disclosure>}
+      {sql && <Disclosure summary="CTE SQL" dense><pre tabIndex={0} aria-label="CTE SQL 전체 내용" className="thin-scroll max-h-96 overflow-auto font-mono text-data text-ink-2">{sql}</pre></Disclosure>}
     </div>
   );
 }

@@ -7,8 +7,6 @@ import type { ChatMessage } from "@/types/chat";
 import type {
   CurrentUser,
   Session,
-  SessionMetadata,
-  SystemPromptState,
 } from "@/types/workspace";
 
 export const CURRENT_USER: CurrentUser = {
@@ -24,37 +22,6 @@ export const SESSIONS: Session[] = [
   { id: "s-0905", title: "제품별 공정 Step 수", lastActivity: "6일 전", group: "week", traces: ["query"] },
   { id: "s-0906", title: "SMT2020 입력 관계 검증", lastActivity: "3주 전", group: "earlier", traces: ["simulation"] },
 ];
-
-export const SESSION_METADATA: SessionMetadata = {
-  model: "claude-sonnet-4",
-  toolCallCount: 4,
-  lastResponseSeconds: 2.1,
-  avgResponseSeconds: 2.4,
-  dataAsOf: "SMT2020 공개 benchmark · 시작 시점 2018-01-01",
-  simulationServer: { status: "ok", label: "입력 정합성 Mock" },
-};
-
-export const SYSTEM_PROMPT: SystemPromptState = {
-  content: `당신은 SMT2020 반도체 FAB benchmark를 조회하는 생산계획 에이전트다.
-
-역할:
-- 제품, Route, 공정 Step, 설비 Family, 초기 WIP와 신규 Lot 투입 정보를 조회한다.
-- SQL과 입력 검증 Mock의 근거 수치를 함께 제시한다.
-
-원칙:
-- 질의 대상 dataset을 HVLM 또는 LVHM으로 먼저 확정한다.
-- 여러 테이블을 JOIN할 때 업무 키와 dataset을 함께 사용한다.
-- 데이터에 없는 completion, throughput, 병목, 납기 달성률을 추정하지 않는다.
-- 입력 검증 Mock을 실제 이산사건 시뮬레이션 결과로 표현하지 않는다.`,
-  revisions: [
-    {
-      version: "v1",
-      editedAt: "2026-09-15 21:00",
-      editedBy: "손흥민",
-      note: "SMT2020 SQLite와 입력 정합성 Mock 기준으로 전환",
-    },
-  ],
-};
 
 export const EXAMPLE_QUESTIONS: string[] = [
   "LVHM에서 제품별 초기 WIP Lot과 piece 수를 조회해줘.",

@@ -129,7 +129,17 @@ def test_recipe_sample_queries_reference_declared_or_own_cte(store: KnowledgeSto
             used = _referenced_tables(sample.sql)
             assert used <= allowed, (
                 f"레시피 {recipe.recipe_id} 의 샘플 쿼리가 선언되지 않은 대상을 쓴다: "
-                f"{used - allowed} (샘플: {sample.description})"
+                f"{used - allowed} (질문: {sample.question})"
+            )
+
+
+def test_table_sample_queries_reference_own_table(store: KnowledgeStore) -> None:
+    for table in store.tables.values():
+        for sample in table.sample_queries:
+            used = _referenced_tables(sample.sql)
+            assert used <= {table.table.upper()}, (
+                f"테이블 {table.table} 의 샘플 쿼리가 다른 테이블을 쓴다: "
+                f"{used - {table.table.upper()}} (질문: {sample.question})"
             )
 
 

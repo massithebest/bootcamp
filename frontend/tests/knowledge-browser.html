@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8" />
+<title>Knowledge workspace regression</title>
+<body><pre id="results">검증 중…</pre>
+<script type="module">
+import { runKnowledgeWorkspaceRegressions } from './knowledge-browser.tsx';
+try {
+  const results = await runKnowledgeWorkspaceRegressions();
+  document.querySelector('#results').textContent = JSON.stringify(results, null, 2);
+  document.title = results.some(r => r.error) ? 'FAIL' : 'PASS';
+} catch (error) { document.querySelector('#results').textContent = String(error); document.title = 'FAIL'; }
+</script>
+</body></html>

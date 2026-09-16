@@ -19,10 +19,11 @@ export interface ThreadComponents {
 
 const EMPTY_COMPONENTS: ThreadComponents = {};
 
-export function Thread({ components = EMPTY_COMPONENTS, notice, autoFocus = true }: {
+export function Thread({ components = EMPTY_COMPONENTS, notice, autoFocus = true, autoScroll = true }: {
   components?: ThreadComponents;
   notice?: ReactNode;
   autoFocus?: boolean;
+  autoScroll?: boolean;
 }) {
   const { Welcome = ThreadWelcome, Suggestions = ThreadSuggestions, AssistantMessage: Assistant = AssistantMessage } = components;
   return (
@@ -30,7 +31,7 @@ export function Thread({ components = EMPTY_COMPONENTS, notice, autoFocus = true
       <ThreadPrimitive.Viewport
         data-slot="aui_thread-viewport"
         turnAnchor="bottom"
-        autoScroll
+        autoScroll={autoScroll}
         className="thin-scroll relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-4"
       >
         <div className="mx-auto flex w-full max-w-[var(--thread-max-width)] flex-1 flex-col">
@@ -105,8 +106,8 @@ function Composer({ autoFocus }: { autoFocus: boolean }) {
             type="button"
             aria-disabled="true"
             tabIndex={-1}
-            title="모델 선택 기능 준비 중"
-            aria-label="현재 모델 GLM-5.3-Flash, 모델 선택 기능 준비 중"
+            title="표시 모델: GLM-5.3-Flash · 모델 설정 조회·선택 기능은 준비 중입니다."
+            aria-label="모델 GLM-5.3-Flash, 설정 기능 미연결"
             className="inline-flex h-7 min-w-0 cursor-default items-center gap-1 rounded-md px-1.5 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
           >
             <SparklesIcon className="size-3.5 shrink-0" aria-hidden />
@@ -117,12 +118,12 @@ function Composer({ autoFocus }: { autoFocus: boolean }) {
             type="button"
             aria-disabled="true"
             tabIndex={-1}
-            title="추론 강도 조절 기능 준비 중"
-            aria-label="현재 추론 강도 Low, 조절 기능 준비 중"
+            title="표시 추론 강도: 중간 · 추론 강도 조절 기능은 준비 중입니다."
+            aria-label="추론 강도 중간, 조절 기능 미연결"
             className="inline-flex h-7 cursor-default items-center gap-1 rounded-md px-1.5 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
           >
             <GaugeIcon className="size-3.5" aria-hidden />
-            <span>Low</span>
+            <span className="whitespace-nowrap">중간</span>
             <ChevronDownIcon className="size-3 text-ink-3" aria-hidden />
           </button>
         </div>
@@ -146,7 +147,8 @@ function Composer({ autoFocus }: { autoFocus: boolean }) {
 function UserMessage() {
   return (
     <MessagePrimitive.Root data-role="user" className="flex min-w-0 flex-col items-end gap-1">
-      <div className="max-w-[85%] whitespace-pre-wrap break-words rounded border border-line-strong bg-surface px-3 py-2 text-ui">
+      <h2 className="sr-only">사용자 질문</h2>
+      <div className="max-w-[85%] whitespace-pre-wrap [overflow-wrap:anywhere] rounded border border-line-strong bg-surface px-3 py-2 text-ui">
         <MessagePrimitive.Parts>{({ part }) => part.type === "text" ? <MessagePartPrimitive.Text /> : null}</MessagePrimitive.Parts>
       </div>
       <MessageActions user />

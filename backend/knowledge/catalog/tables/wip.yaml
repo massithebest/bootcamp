@@ -23,7 +23,14 @@ caveats:
 aggregation_rules:
   - 초기 WIP Lot 수는 dataset과 part별 COUNT(*)로 센다
   - 초기 WIP piece 수는 dataset과 part별 SUM(pieces)로 센다
-sample_sql: SELECT dataset, part, COUNT(*) AS lot_count, SUM(pieces) AS piece_count FROM wip GROUP BY dataset, part
+sample_queries:
+  - question: benchmark별 초기 WIP Lot과 piece 합계는 얼마야?
+    sql: |
+      SELECT dataset, COUNT(*) AS lot_count, SUM(pieces) AS piece_count
+      FROM wip
+      GROUP BY dataset
+      ORDER BY dataset
+    answer: 초기 WIP는 HVLM 2,255 Lot·56,375 pieces, LVHM 2,156 Lot·53,900 pieces다.
 status: verified
 owner: ""
 updated: 2026-09-15

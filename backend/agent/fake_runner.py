@@ -16,6 +16,7 @@ from tools.knowledge_tool import get_kpi
 from tools.simulation_tool import run_simulation
 from tools.sql_tool import execute_sql
 from tools.table_tool import prepare_table
+from tools.rag_tool import search_knowledge
 from tools.visualization_tool import prepare_visualization
 
 
@@ -37,6 +38,19 @@ async def run_fake_agent(
         type="status",
         data={"step": "plan", "status": "running", "label": "질의 분석"},
     )
+
+    if any(word in message for word in ("지식", "문서", "정책", "매뉴얼", "용어")):
+        call_id = "fake-search-knowledge"
+        yield AgentEvent(type="tool_call", tool_name="search_knowledge", tool_call_id=call_id, data={"args": {"query": message}})
+        result = await search_knowledge(message)
+        yield AgentEvent(type="tool_result", tool_name="search_knowledge", tool_call_id=call_id, data=result)
+        yield AgentEvent(type="status", data={"step": "plan", "status": "completed", "label": "지식 검색"})
+        for doc in result.get("documents", []):
+            yield AgentEvent(type="text", content=f"{doc['title']} (v{doc['version']}, 출처: {doc['source']}): {doc['snippet']}\n")
+        if not result.get("documents"):
+            yield AgentEvent(type="text", content=result.get("message", "검토 완료한 활성 지식에서 관련 근거를 찾지 못했습니다."))
+        yield AgentEvent(type="done", data={"turn_id": str(uuid.uuid4())})
+        return
 
     # 1) KPI 정의 확인 (kind: catalog)
     kpi_call_id = "fake-get-kpi"

@@ -18,7 +18,14 @@ caveats:
 aggregation_rules:
   - Part 수는 dataset과 part의 조합으로 센다
   - route_step과 조인한 뒤 Part 수를 셀 때는 중복 Step을 제거한다
-sample_sql: SELECT dataset, part, route FROM part ORDER BY dataset, part
+sample_queries:
+  - question: benchmark별 Part는 몇 개야?
+    sql: |
+      SELECT dataset, COUNT(*) AS part_count
+      FROM part
+      GROUP BY dataset
+      ORDER BY dataset
+    answer: Part는 HVLM 2개, LVHM 10개다.
 status: verified
 owner: ""
 updated: 2026-09-15

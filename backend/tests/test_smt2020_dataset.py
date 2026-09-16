@@ -142,6 +142,15 @@ def test_recipe_samples_execute_against_generated_database(db: Path) -> None:
                 conn.execute(guarded).fetchall()
 
 
+def test_table_samples_execute_against_generated_database(db: Path) -> None:
+    store = KnowledgeStore.load(KNOWLEDGE_DIR)
+    with sqlite3.connect(db) as conn:
+        for table in store.tables.values():
+            for sample in table.sample_queries:
+                guarded = check_sql(sample.sql, store.table_names())
+                conn.execute(guarded).fetchall()
+
+
 def test_scenario_expectations_match_generated_database(
     db: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

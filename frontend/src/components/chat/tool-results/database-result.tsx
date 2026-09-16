@@ -33,15 +33,18 @@ export function DatabaseResult({ data }: { data: Record<string, unknown> }) {
     typeof data.result_id === "string" && data.summary !== null &&
     typeof data.summary === "object" && !Array.isArray(data.summary)
   );
-  if (!summary && (columns.length === 0 || rows.length === 0)) return null;
+  const empty = data.row_count === 0 && rows.length === 0;
 
   return (
     <div className="flex flex-col gap-2">
-      {summary ? <ResultSummaryCard data={data} /> : <DataTable columns={columns} rows={rows} />}
-      {note && <p className="font-mono text-2xs text-ink-3">{note}</p>}
+      {empty ? <p className="text-ui text-ink-2">조회 결과 0건입니다. 조건에 맞는 데이터가 없습니다.</p>
+        : summary ? <ResultSummaryCard data={data} />
+          : columns.length && rows.length ? <DataTable columns={columns} rows={rows} />
+            : <p className="text-ui text-ink-2">표시할 조회 데이터가 전달되지 않았습니다. 실행 상태와 조건을 확인하세요.</p>}
+      {note && <p className="font-mono text-2xs text-ink-2">{note}</p>}
       {sql && (
         <Disclosure summary="실행된 SQL" dense>
-          <pre className="thin-scroll mt-1 overflow-x-auto rounded bg-[#1c2530] px-3 py-2.5 font-mono text-data leading-relaxed text-[#d7dce4]">
+          <pre tabIndex={0} aria-label="실행된 SQL 전체 내용" className="thin-scroll mt-1 max-h-96 overflow-auto rounded bg-[#1c2530] px-3 py-2.5 font-mono text-data leading-relaxed text-[#d7dce4]">
             {sql}
           </pre>
         </Disclosure>

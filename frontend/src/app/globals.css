@@ -92,6 +92,15 @@ body {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
   }
+
+  /* The adjacent status text still communicates activity without motion. */
+  .execution-activity-spinner {
+    animation: none !important;
+  }
+}
+
+.execution-activity-spinner {
+  animation-duration: 0.6s;
 }
 
 /* 얇은 스크롤바 (업무툴 밀도) */

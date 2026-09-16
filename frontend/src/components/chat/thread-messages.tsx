@@ -1,5 +1,8 @@
 /** Production-planning extension for the assistant-ui Thread AssistantMessage slot. */
-import { useEffect, useState, type ReactNode } from "react";
+import { Children, type ReactNode } from "react";
+import { useExecutionDisclosure } from "@/hooks/use-execution-disclosure";
+import { executionSummary } from "@/lib/execution-summary";
+import { ObservedDuration } from "./observed-duration";
 import { LoaderIcon } from "lucide-react";
 import {
   MessagePrimitive,
@@ -38,11 +41,23 @@ export function AssistantMessage() {
     s.message.parts.some((part) => part.type === "text"),
   );
   const messageRunning = useAuiState((s) => s.message.status?.type === "running");
+  const messageStatus = useAuiState((s) => s.message.status);
+  const parts = useAuiState((s) => s.message.parts);
   const customMetadata = useAuiState((s) => s.message.metadata.custom);
-  const publicStatuses = readAgentMetadata(customMetadata)?.statuses ?? [];
+  const agentMetadata = readAgentMetadata(customMetadata);
+  const publicStatuses = agentMetadata?.statuses ?? [];
+  const progressText = agentMetadata?.progressText;
+  const summary = executionSummary(parts, messageRunning);
+  const isEmpty = !parts.some((part) => part.type === "tool-call" || (part.type === "text" && part.text.trim()));
+  const announcement = messageRunning
+    ? summary.pending ? `툴 ${summary.pending}개 실행 중` : hasTextParts ? "응답 작성 중" : "요청 분석 중"
+    : messageStatus?.type === "incomplete" ? (messageStatus.reason === "cancelled" ? "요청 중단" : "")
+      : summary.issues ? `응답 종료 · ${summary.issues}` : isEmpty ? "빈 응답으로 종료되었습니다" : "응답 작성 완료";
 
   return (
     <MessagePrimitive.Root data-role="assistant" className="min-w-0">
+      <h2 className="sr-only">에이전트 답변</h2>
+      <p role="status" aria-atomic="true" className="sr-only" data-slot="execution-announcement">{announcement}</p>
       <div className="flex flex-col gap-3">
         {!hasToolParts && (
           <StandaloneExecution
@@ -61,6 +76,7 @@ export function AssistantMessage() {
                     count={part.indices.length}
                     toolRunning={part.status.type === "running"}
                     statuses={publicStatuses}
+                    progressText={progressText}
                   >
                     {children}
                   </ExecutionToolGroup>
@@ -77,6 +93,11 @@ export function AssistantMessage() {
 
         <StoppedRun />
         <MessageError />
+        {!messageRunning && messageStatus?.type === "complete" && isEmpty && (
+          <p data-slot="empty-response" className="text-ui text-ink-2">응답 내용 없이 종료되었습니다. 질문을 구체화하거나 재생성으로 다시 시도하세요.</p>
+        )}
+        {!parts.some(part => part.type === "tool-call" && !["prepare_table", "prepare_visualization"].includes(part.toolName)) &&
+          <ObservedDuration timing={agentMetadata?.observedTiming} running={messageRunning} />}
         <MessageActions />
       </div>
     </MessagePrimitive.Root>
@@ -86,11 +107,16 @@ export function AssistantMessage() {
 /** Immediate feedback while the backend/model is preparing its first public Tool call. */
 function PendingExecution({ writing }: { writing: boolean }) {
   return (
-    <div role="status" className="flex items-center gap-2 py-1.5 text-xs text-ink-3">
-      <LoaderIcon aria-hidden className="size-3 animate-spin [animation-duration:0.6s]" />
-      <span className="shimmer motion-reduce:animate-none">
-        {writing ? "응답 작성 중" : "요청 분석 중"}
-      </span>
+    <div
+      data-slot="execution-pending"
+      className="flex items-center gap-2 py-1.5 text-ui font-medium text-ink-2"
+    >
+      <LoaderIcon
+        data-slot="execution-pending-spinner"
+        aria-hidden
+        className="execution-activity-spinner relative top-px size-3.5 shrink-0 animate-spin text-accent"
+      />
+      <span>{writing ? "응답 작성 중" : "요청 분석 중"}</span>
     </div>
   );
 }
@@ -103,11 +129,13 @@ function ExecutionToolGroup({
   count,
   toolRunning,
   statuses,
+  progressText,
   children,
 }: {
   count: number;
   toolRunning: boolean;
   statuses: readonly StatusStep[];
+  progressText?: string;
   children: ReactNode;
 }) {
   const messageStatus = useAuiState((s) => s.message.status);
@@ -115,20 +143,22 @@ function ExecutionToolGroup({
   const isComplete = messageStatus?.type === "complete";
   const isFailed = messageStatus?.type === "incomplete" && messageStatus.reason === "error";
   const isCancelled = messageStatus?.type === "incomplete" && messageStatus.reason === "cancelled";
-  const [open, setOpen] = useState(messageRunning);
-
-  useEffect(() => {
-    setOpen(messageRunning);
-  }, [messageRunning]);
+  const { rootRef, open, setOpen } = useExecutionDisclosure(messageRunning);
+  const parts = useAuiState((s) => s.message.parts);
+  const metadata = useAuiState((s) => s.message.metadata.custom);
+  const summary = executionSummary(parts.filter(part => part.type !== "tool-call" || !["prepare_table", "prepare_visualization"].includes(part.toolName)), messageRunning);
+  const toolChildren = Children.toArray(children);
 
   let label = `응답 작성 완료 · 툴 ${count}개 사용`;
   if (toolRunning && messageRunning) label = `툴 ${count}개 실행 중`;
   else if (messageRunning) label = `응답 작성 중 · 툴 ${count}개 사용`;
   else if (isFailed) label = `툴 ${count}개 사용 · 오류`;
   else if (isCancelled) label = `툴 ${count}개 사용 · 중단`;
+  else if (!messageRunning && summary.issues) label = `응답 종료 · 툴 ${count}개 사용`;
+  if (summary.issues) label += ` · ${summary.issues}`;
 
   return (
-    <ToolGroupRoot
+    <div ref={rootRef}><ToolGroupRoot
       variant="ghost"
       open={open}
       onOpenChange={setOpen}
@@ -138,15 +168,33 @@ function ExecutionToolGroup({
         count={count}
         active={messageRunning}
         completed={isComplete}
+        attention={Boolean(summary.issues) || isFailed || isCancelled}
         label={label}
       />
+      <ObservedDuration timing={readAgentMetadata(metadata)?.observedTiming} running={messageRunning} />
       <ToolGroupContent aria-busy={messageRunning}>
         {statuses.length > 0 && (
           <AgentPlan steps={toPlanSteps(statuses, messageRunning, isFailed, isCancelled)} />
         )}
-        {children}
+        {toolChildren.slice(0, -1)}
+        {toolRunning && progressText && toolChildren.length > 0 && (
+          <ExecutionProgressText text={progressText} />
+        )}
+        {toolChildren.slice(-1)}
       </ToolGroupContent>
-    </ToolGroupRoot>
+    </ToolGroupRoot></div>
+  );
+}
+
+/** Backend가 공개한 작업 안내를 현재 실행 중인 Tool 바로 위에 유지한다. */
+function ExecutionProgressText({ text }: { text: string }) {
+  return (
+    <p
+      data-slot="execution-progress-text"
+      className="whitespace-pre-wrap break-words px-4 py-1 text-ui leading-relaxed text-ink-2"
+    >
+      {text}
+    </p>
   );
 }
 
@@ -164,11 +212,7 @@ function StandaloneExecution({
   const isComplete = messageStatus?.type === "complete";
   const isFailed = messageStatus?.type === "incomplete" && messageStatus.reason === "error";
   const isCancelled = messageStatus?.type === "incomplete" && messageStatus.reason === "cancelled";
-  const [open, setOpen] = useState(running);
-
-  useEffect(() => {
-    setOpen(running);
-  }, [running]);
+  const { rootRef, open, setOpen } = useExecutionDisclosure(running);
 
   if (statuses.length === 0) return running ? <PendingExecution writing={writing} /> : null;
 
@@ -180,7 +224,7 @@ function StandaloneExecution({
   else if (isCancelled) label = "실행 과정 · 중단";
 
   return (
-    <ToolGroupRoot
+    <div ref={rootRef}><ToolGroupRoot
       variant="ghost"
       open={open}
       onOpenChange={setOpen}
@@ -195,7 +239,7 @@ function StandaloneExecution({
       <ToolGroupContent aria-busy={running}>
         <AgentPlan steps={toPlanSteps(statuses, running, isFailed, isCancelled)} />
       </ToolGroupContent>
-    </ToolGroupRoot>
+    </ToolGroupRoot></div>
   );
 }
 
@@ -236,6 +280,7 @@ function ToolPart(props: ToolCallMessagePartProps) {
   const result = props.result as ToolResult | undefined;
   const args = isRecord(props.args) ? props.args : {};
   const messageRunning = useAuiState((s) => s.message.status?.type === "running");
+  const metadata = useAuiState((s) => s.message.metadata.custom);
 
   return (
     <ToolResultCard
@@ -244,6 +289,7 @@ function ToolPart(props: ToolCallMessagePartProps) {
       result={result}
       running={props.status.type === "running"}
       messageRunning={messageRunning}
+      observedTiming={readAgentMetadata(metadata)?.toolTimings?.[props.toolCallId]}
     />
   );
 }

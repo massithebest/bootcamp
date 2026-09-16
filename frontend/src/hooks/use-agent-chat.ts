@@ -26,18 +26,19 @@ import {
 import type { ChatMessage } from "@/types/chat";
 import { createConversationId, sendChatMessage } from "@/lib/chat-api";
 import { convertMessage } from "@/lib/chat-runtime";
-import { applyAgentEvent, eventHasOutput } from "@/lib/chat-state";
+import { applyAgentEvent, eventHasOutput, finishObservedTiming } from "@/lib/chat-state";
 
 let idCounter = 0;
 const nextId = (p: string) => `${p}-${Date.now()}-${(idCounter += 1)}`;
 
-const emptyAssistant = (id: string): ChatMessage => ({
+const emptyAssistant = (id: string, startedAt: number): ChatMessage => ({
   id,
   role: "assistant",
   content: "",
   parts: [],
   statuses: [],
   runState: { type: "running" },
+  observedTiming: { startedAt },
 });
 
 const freshUser = (text: string): ChatMessage => ({
@@ -91,9 +92,10 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
     abortRef.current = controller;
     const assistantId = nextId("assistant");
     const userMessage = freshUser(request.text);
+    const startedAt = performance.now();
     setMessages((prev) => [
       ...(request.prefixWithUser ?? (request.reuseUser ? prev : [...prev, userMessage])),
-      emptyAssistant(assistantId),
+      emptyAssistant(assistantId, startedAt),
     ]);
     setRetryContext(null);
     setStreaming(true);
@@ -111,9 +113,10 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
           hadOutput = eventHasOutput(event) || hadOutput;
           // updater는 StrictMode에서 재실행될 수 있으므로 ID는 밖에서 만든다.
           const partId = nextId("part");
+          const observedAt = performance.now();
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === assistantId ? applyAgentEvent(m, event, partId) : m,
+              m.id === assistantId ? applyAgentEvent(m, event, partId, observedAt) : m,
             ),
           );
         },
@@ -151,13 +154,14 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
   }, [retryContext, runRequest]);
 
   const handleStop = useCallback(() => {
+    const observedAt = performance.now();
     abortRef.current?.abort();
     abortRef.current = null;
     setStreaming(false);
     setMessages((prev) =>
       prev.map((m) =>
         m.runState.type === "running"
-          ? { ...m, runState: { type: "cancelled" } }
+          ? { ...m, runState: { type: "cancelled" }, observedTiming: finishObservedTiming(m.observedTiming, observedAt) }
           : m,
       ),
     );
@@ -190,6 +194,10 @@ export function useAgentChat(initialMessages: ChatMessage[]): UseAgentChatResult
       if (!parentId) return;
       const idx = messages.findIndex((m) => m.id === parentId && m.role === "user");
       if (idx === -1) return;
+      const replaced = messages.slice(idx + 1);
+      if (replaced.some((m) => m.parts.length > 0) && !window.confirm(
+        `이 답변과 이후 메시지 ${Math.max(0, replaced.length - 1)}개를 새 응답으로 교체합니다. 이전 내용은 복원할 수 없습니다. 다시 실행할까요?`,
+      )) return;
       const prefix = messages.slice(0, idx);
       await runFromPrefix(prefix, messages[idx].content, anchorTurnIdBefore(messages, idx));
     },

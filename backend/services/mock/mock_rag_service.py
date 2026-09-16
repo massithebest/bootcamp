@@ -1,23 +1,11 @@
-"""Mock RAG service."""
+"""Mock adapter uses the same approved local documents; no fabricated hits."""
+from asyncio import to_thread
+from services.document_store import get_document_store
 
 
 class MockRAGService:
-    """RealRAGService 와 동일한 인터페이스를 갖는 mock 구현."""
-
     async def search(self, query: str) -> dict:
-        """Return mock knowledge search result."""
-
-        return {
-            "status": "ok",
-            "query": query,
-            "documents": [
-                {
-                    "title": "공정 매뉴얼 v1",
-                    "content": "더미 문서 내용",
-                    "score": 0.82,
-                }
-            ],
-        }
+        return await to_thread(get_document_store().search, query)
 
 
 _service = MockRAGService()

@@ -7,6 +7,9 @@
 ## 작업 시작
 
 - 먼저 [프로젝트 현황](plan/Todo.md)과 관련 상위 계획(`plan/`)을 확인한다.
+- 기존 staged·unstaged·untracked 변경은 사용자의 작업으로 간주한다. 작업 목적을
+  파악하기 전에는 되돌리거나 덮어쓰지 않고, 생성물·비밀값 여부를 확인한 뒤
+  요청 범위에 속하는 파일만 수정한다.
 - 코드나 문서를 수정할 대상 폴더에 더 가까운 `AGENTS.md`가 있으면 그 지침도
   읽고 함께 적용한다. 하위 지침은 해당 영역의 구체적인 규칙을 보완한다.
 - 백엔드·프론트엔드에 걸친 작업은 루트 계획에서 계약과 완료 조건을 먼저
@@ -24,6 +27,26 @@
 - 런타임 생산계획 Agent 지침인 `backend/agent/agent_sdk/CLAUDE.md`는 개발용
   저장소 지침과 별개다.
 
+## UI/UX 작업
+
+- UI를 설계·구현·리뷰·수정할 때는 `ui-ux-pro-max` Skill을 우선
+  활용해 접근성, 상호작용, 반응형 레이아웃과 시각적 일관성을 검토한다.
+- 프론트엔드 UI 작업 전에는 `frontend/CLAUDE.md`의 프론트 디자인
+  가이드를 함께 확인한다. Skill의 일반 권고와 충돌하면 사용자의
+  명시적 요청, 더 가까운 `AGENTS.md`, `frontend/CLAUDE.md`, 기존 제품
+  계약과 디자인 token 순으로 적용한다. Skill 결과를 근거로 확정된
+  레이아웃·타이포그래피·색·아이콘·테마·스크롤 규칙을 자동으로
+  대체하지 않는다.
+
+## 지침 파일의 역할
+
+- `AGENTS.md`는 Codex를 포함한 개발 에이전트의 저장소 작업 지침이다.
+- 같은 위치의 `CLAUDE.md`가 `@AGENTS.md`를 포함하면 Claude Code가 동일한 개발
+  지침을 재사용하기 위한 호환 진입점이다. 공통 규칙을 두 파일에 복제하지 않는다.
+- `frontend/CLAUDE.md`의 추가 본문은 프론트 디자인 제약이고,
+  `backend/agent/agent_sdk/CLAUDE.md`는 실행 중인 생산계획 Agent의 행동 지침이다.
+  두 파일을 개발 지침이나 제품 런타임 지침으로 서로 대체하지 않는다.
+
 ## 문서 흐름
 
 - `plan/Todo.md`: 프로젝트 전체 목표·범위·기능 상태와 완료한 일, 수행할 일,
@@ -39,5 +62,5 @@
 ## 기본 검증
 
 - 백엔드: `cd backend && python -m pytest -q`
-- 프론트엔드: `cd frontend && npm run build && npm run lint`
+- 프론트엔드: `cd frontend && npm test && npm run build && npm run lint`
 - 문서만 변경한 경우 링크, 파일명 규칙, `git diff --check`를 우선 검증한다.

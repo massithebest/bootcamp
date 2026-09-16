@@ -17,9 +17,10 @@ import type {
   ChatMessageRunState,
   MessagePart,
   StatusStep,
+  ObservedTiming,
 } from "@/types/chat";
 import { visualizationIdFromToolResult } from "./chart-marker";
-import { tablePayloadFromToolResult } from "./table-tool";
+import { tablePayloadFromToolResult, type StandaloneTablePayload } from "./table-tool";
 import { toolResultError } from "./tool-result";
 
 const STANDALONE_TOOL_NAMES = new Set(["prepare_table", "prepare_visualization"]);
@@ -27,8 +28,8 @@ const STANDALONE_TOOL_NAMES = new Set(["prepare_table", "prepare_visualization"]
 const MARKDOWN_TABLE_DELIMITER =
   /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/;
 
-/** 성공한 표 Tool UI와 함께 온 GFM 표만 제거해 같은 데이터를 두 번 표시하지 않는다. */
-export function removeMarkdownTables(text: string): string {
+/** Only exact, plain-cell matches are safe to deduplicate. Ambiguous Markdown stays. */
+export function removeMarkdownTables(text: string, tables: readonly StandaloneTablePayload[] = []): string {
   const lines = text.split("\n");
   const kept: string[] = [];
   let fence: { marker: string; length: number } | null = null;
@@ -49,10 +50,23 @@ export function removeMarkdownTables(text: string): string {
     }
     const nextLine = lines[index + 1];
     if (lines[index].includes("|") && nextLine && MARKDOWN_TABLE_DELIMITER.test(nextLine)) {
+      const start = index;
       index += 2;
       while (index < lines.length && lines[index].includes("|")) {
         index += 1;
       }
+      const block = lines.slice(start, index);
+      const cells = (line: string) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+      const columns = cells(block[0]);
+      const rows = block.slice(2).map(cells);
+      const matches = !block.some((line) => /[\\`*_[\]<>]/.test(line)) && tables.some((table) =>
+        rows.length > 0 && rows.length === table.rows.length &&
+        JSON.stringify(columns) === JSON.stringify(table.columns) &&
+        rows.every((row, i) => row.length === table.columns.length && row.every((cell, j) =>
+          table.rows[i][j] !== null && cell === String(table.rows[i][j]),
+        )),
+      );
+      if (!matches) kept.push(...block);
       index -= 1;
       continue;
     }
@@ -65,13 +79,25 @@ export function removeMarkdownTables(text: string): string {
 export interface AgentMessageMetadata {
   /** Tool 호출과 별개로 Backend가 공개한 사용자용 업무 진행 단계. */
   statuses: StatusStep[];
+  /** 현재 실행 Tool 직전에 공개된 안내 문구. Provider thinking은 포함하지 않는다. */
+  progressText?: string;
+  observedTiming?: ObservedTiming;
+  toolTimings?: Record<string, ObservedTiming>;
 }
 
 export function readAgentMetadata(
   custom: Record<string, unknown> | undefined,
 ): AgentMessageMetadata | undefined {
   if (!custom || !Array.isArray(custom.statuses)) return undefined;
-  return { statuses: custom.statuses as StatusStep[] };
+  const progressText = typeof custom.progressText === "string"
+    ? custom.progressText.trim()
+    : "";
+  return {
+    statuses: custom.statuses as StatusStep[],
+    observedTiming: custom.observedTiming as ObservedTiming | undefined,
+    toolTimings: custom.toolTimings as Record<string, ObservedTiming> | undefined,
+    ...(progressText ? { progressText } : {}),
+  };
 }
 
 function toAssistantStatus(runState: ChatMessageRunState): MessageStatus {
@@ -111,23 +137,48 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
   const standaloneParts = allStandaloneParts.filter((part, index) =>
     shouldShowStandalonePart(part, index, allStandaloneParts),
   );
-  // 일반 Tool 사이의 준비 문구는 숨기되, 이미 제시한 표·차트가 있는 문맥은
-  // 이후 추가 조회가 있어도 보존한다. 마지막 구간은 일반 텍스트 답변도 유지한다.
+  // 일반 Tool 사이의 준비 문구는 최종 답변에서 숨기되, 실행 중인 최신 Tool을
+  // 설명하는 공개 문구는 progressText로 유지한다. 이미 제시한 표·차트가 있는
+  // 문맥은 이후 추가 조회가 있어도 보존하고 마지막 구간은 답변으로 유지한다.
   const responseParts: MessagePart[] = [];
   let segment: MessagePart[] = [];
+  let progressText: string | undefined;
   for (const part of message.parts) {
     if (part.kind === "tool" && !STANDALONE_TOOL_NAMES.has(part.toolName)) {
-      if (segment.some((item) => item.kind === "tool")) responseParts.push(...segment);
+      if (segment.some((item) => item.kind === "tool")) {
+        responseParts.push(...segment);
+        progressText = undefined;
+      } else {
+        const candidate = segment
+          .filter((item): item is Extract<MessagePart, { kind: "text" }> => item.kind === "text")
+          .map((item) => item.text)
+          .join("")
+          .trim();
+        // 새 Tool이 시작될 때 직전 공개 문구로 교체한다. 문구가 없으면 앞선
+        // Tool의 안내를 계속 보여 주지 않는다.
+        progressText = candidate || undefined;
+      }
       segment = [];
     } else {
       segment.push(part);
     }
   }
   responseParts.push(...segment);
-  const hasSuccessfulTable = standaloneParts.some(
-    (part) =>
-      part.toolName === "prepare_table" && tablePayloadFromToolResult(part.result) !== null,
+  const hasTrailingText = segment.some(
+    (part) => part.kind === "text" && part.text.trim().length > 0,
   );
+  const latestRegularTool = toolParts.at(-1);
+  const visibleProgressText =
+    message.runState.type === "running" &&
+    latestRegularTool !== undefined &&
+    latestRegularTool.result === undefined &&
+    !hasTrailingText
+      ? progressText
+      : undefined;
+  const successfulTables = standaloneParts.flatMap((part) => {
+    const table = part.toolName === "prepare_table" ? tablePayloadFromToolResult(part.result) : null;
+    return table ? [table] : [];
+  });
   const visibleStandaloneIds = new Set(standaloneParts.map((part) => part.toolCallId));
   const contextualParts: MessagePart[] = [];
   for (const part of responseParts) {
@@ -137,7 +188,7 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
       }
       continue;
     }
-    const text = hasSuccessfulTable ? removeMarkdownTables(part.text) : part.text;
+    const text = successfulTables.length ? removeMarkdownTables(part.text, successfulTables) : part.text;
     if (text.length > 0) contextualParts.push({ ...part, text });
   }
   const visibleParts = [...toolParts, ...contextualParts];
@@ -180,6 +231,11 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
     metadata: {
       custom: {
         statuses: independentStatuses,
+        ...(message.observedTiming ? { observedTiming: message.observedTiming } : {}),
+        toolTimings: Object.fromEntries(message.parts.flatMap((part) =>
+          part.kind === "tool" && part.observedTiming ? [[part.toolCallId, part.observedTiming]] : [],
+        )),
+        ...(visibleProgressText ? { progressText: visibleProgressText } : {}),
       },
     },
   };

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AssistantMessage } from "@/components/chat/thread-messages";
 import { useAgentChat, type UseAgentChatResult } from "@/hooks/use-agent-chat";
 import type { AgentEvent, ChatMessage } from "@/types/chat";
+import "@/app/globals.css";
 
 function check(value: unknown, message: string): asserts value {
   if (!value) throw new Error(message);
@@ -14,6 +15,8 @@ function check(value: unknown, message: string): asserts value {
 export async function runChatRegressions() {
   const results: { name: string; error?: string }[] = [];
   const originalFetch = window.fetch;
+  const originalConfirm = window.confirm;
+  window.confirm = () => true;
   const encoder = new TextEncoder();
   const cases: Record<string, (h: Harness) => Promise<void>> = {
     "same tick duplicate send starts one request": async (h) => {
@@ -145,7 +148,7 @@ export async function runChatRegressions() {
       } catch (e) { results.push({ name, error: String(e) }); }
       finally { await act(async () => root.unmount()); host.remove(); }
     }
-  } finally { window.fetch = originalFetch; Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: false }); }
+  } finally { window.fetch = originalFetch; window.confirm = originalConfirm; Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: false }); }
   return results;
 }
 
@@ -210,6 +213,13 @@ export async function runExecutionUiRegressions() {
       });
     });
     check(host.textContent?.includes("요청 분석 중"), "initial progress is delayed");
+    const pending = host.querySelector<HTMLElement>('[data-slot="execution-pending"]');
+    check(pending?.classList.contains("text-ui"), "initial progress text is still too small");
+    check(pending?.classList.contains("text-ink-2"), "initial progress text is still too light");
+    check(
+      pending?.querySelector('[data-slot="execution-pending-spinner"]')?.classList.contains("top-px"),
+      "initial progress icon is not optically aligned with its label",
+    );
 
     await emit([{ type: "status", data: {
       step: "plan",
@@ -220,15 +230,29 @@ export async function runExecutionUiRegressions() {
     check(groupTrigger()?.textContent?.includes("실행 과정 진행 중"), "public status group missing");
     check(host.textContent?.includes("질의 분석"), "independent public status missing");
 
-    await emit([{ type: "tool_call", tool_name: "execute_sql", tool_call_id: "sql-1", data: {
-      step: "sql-1",
-      label: "데이터 조회",
-      status: "running",
-      args: { sql: "SELECT 1" },
-    } }]);
+    await emit([
+      { type: "text", content: "조회 범위를 확인한 뒤 WIP 데이터를 조회합니다." },
+      { type: "tool_call", tool_name: "execute_sql", tool_call_id: "sql-1", data: {
+        step: "sql-1",
+        label: "데이터 조회",
+        status: "running",
+        args: { sql: "SELECT 1" },
+      } },
+    ]);
     check(groupTrigger()?.textContent?.includes("툴 1개 실행 중"), "tool group did not use running part status");
     check(groupTrigger()?.getAttribute("aria-expanded") === "true", "running group is not open");
     check(host.textContent?.includes("질의 분석"), "public status left the execution group");
+    const progressText = host.querySelector<HTMLElement>('[data-slot="execution-progress-text"]');
+    const toolRow = host.querySelector<HTMLElement>('[data-slot="tool-call"]');
+    check(progressText?.textContent?.includes("WIP 데이터를 조회합니다"), "public pre-tool text disappeared during execution");
+    check(progressText?.nextElementSibling === toolRow, "public pre-tool text is not directly above the running tool");
+    check(!progressText?.textContent?.includes("진행 안내"), "obsolete progress heading remained");
+    check(!progressText?.classList.contains("bg-accent-weak"), "progress text still uses the blue top block");
+    const activeSpinner = groupTrigger()?.querySelector<SVGElement>('[data-slot="tool-group-trigger-loader"]');
+    check(activeSpinner?.classList.contains("execution-activity-spinner"), "continuous activity spinner class is missing");
+    check(activeSpinner?.classList.contains("animate-spin"), "activity spinner is not rotating");
+    check(activeSpinner?.classList.contains("top-px"), "activity spinner is not optically aligned with its label");
+    check(window.getComputedStyle(activeSpinner!).animationName !== "none", "activity spinner animation is not applied");
 
     await emit([
       { type: "tool_result", tool_name: "execute_sql", tool_call_id: "sql-1", data: { status: "ok", rows: [[1]] } },
@@ -237,11 +261,23 @@ export async function runExecutionUiRegressions() {
     check(current.streaming, "fixture unexpectedly stopped before final text");
     check(groupTrigger()?.textContent?.includes("응답 작성 중 · 툴 1개 사용"), "writing phase is not distinguished after tools complete");
     check(groupTrigger()?.querySelector('[data-slot="tool-group-trigger-loader"]'), "activity spinner disappeared while writing");
+    check(!host.querySelector('[data-slot="execution-progress-text"]'), "tool guidance remained after the tool completed");
     check(groupTrigger()?.getAttribute("aria-expanded") === "true", "group closed before the response completed");
+
+    await emit([{ type: "text", content: "조회 결과입니다." }]);
+    await act(async () => {
+      // MarkdownTextPrimitive의 smooth 출력 속도는 환경별로 다르므로
+      // 고정 지연 대신 본문이 완성될 때까지 짧게 polling한다.
+      const deadline = performance.now() + 2_000;
+      while (!host.textContent?.includes("조회 결과입니다.") && performance.now() < deadline) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 50));
+      }
+    });
+    check(!host.querySelector('[data-slot="execution-progress-text"]'), "stale progress text remained after the next public output");
+    check(host.textContent?.includes("조회 결과입니다."), "final response did not replace progress text");
 
     await act(async () => {
       requests[0].controller.enqueue(encoder.encode(
-        `data: ${JSON.stringify({ type: "text", content: "조회 결과입니다." })}\n\n` +
         `data: ${JSON.stringify({ type: "done" })}\n\n`,
       ));
       requests[0].controller.close();

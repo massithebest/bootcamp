@@ -105,3 +105,8 @@ def agent_provider_env() -> dict[str, str]:
         }
 
     return {}
+
+# 텍스트 지식 저장소. 생산 DB와 분리하며 TTL로 삭제하지 않는다.
+KNOWLEDGE_DB_PATH = Path(os.getenv("KNOWLEDGE_DB_PATH") or BACKEND_DIR / "data" / "knowledge.sqlite3")
+# local은 SQL의 mock/real 모드와 독립. service는 향후 사내 RAG 어댑터용.
+KNOWLEDGE_SEARCH_BACKEND = os.getenv("KNOWLEDGE_SEARCH_BACKEND", "local")

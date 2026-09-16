@@ -33,10 +33,10 @@ export function AgentPlan({ steps }: { steps: readonly PlanStep[] }) {
         {steps.map((step) => {
           const { Icon, label, color } = STATES[step.status];
           return (
-            <li key={step.id} className="flex items-start gap-2 text-2xs">
-              <Icon aria-hidden className={cn("mt-0.5 size-3.5 shrink-0", color, step.status === "running" && "motion-safe:animate-spin")} />
-              <span className="min-w-0 flex-1 text-ink-2">{step.label}{step.detail && step.detail !== step.label && <span className="ml-2 text-ink-3">{step.detail}</span>}</span>
-              <span className={color}>{label}</span>
+            <li key={step.id} className="flex items-start gap-2 text-ui">
+              <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", color, step.status === "running" && "motion-safe:animate-spin")} />
+              <span className="min-w-0 flex-1 text-ink">{step.label}{step.detail && step.detail !== step.label && <span className="ml-2 text-ink-2">{step.detail}</span>}</span>
+              <span className={cn("text-2xs", color)}>{label}</span>
             </li>
           );
         })}

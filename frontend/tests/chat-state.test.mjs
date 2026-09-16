@@ -55,6 +55,37 @@ test('independent public status is exposed through assistant metadata', () => {
   }]);
 });
 
+test('latest public pre-tool text remains only while its tool is running', () => {
+  let current = message();
+  current = applyAgentEvent(current, { type: 'text', content: 'WIP 조회 조건을 확인합니다.' }, 'plan-1');
+  current = applyAgentEvent(current, {
+    type: 'tool_call', tool_name: 'list_tables', tool_call_id: 'tables', data: { args: { keyword: 'wip' } },
+  }, 'tool-1');
+
+  let rendered = convertMessage(current);
+  assert.equal(rendered.metadata.custom.progressText, 'WIP 조회 조건을 확인합니다.');
+  assert.ok(!rendered.content.some(part => part.type === 'text'));
+
+  current = applyAgentEvent(current, {
+    type: 'tool_result', tool_name: 'list_tables', tool_call_id: 'tables', data: { status: 'ok' },
+  }, 'result-1');
+  assert.equal(convertMessage(current).metadata.custom.progressText, undefined);
+
+  current = applyAgentEvent(current, { type: 'text', content: 'WIP 테이블 구조를 확인합니다.' }, 'plan-2');
+  rendered = convertMessage(current);
+  assert.equal(rendered.metadata.custom.progressText, undefined);
+  assert.equal(rendered.content.at(-1).text, 'WIP 테이블 구조를 확인합니다.');
+
+  current = applyAgentEvent(current, {
+    type: 'tool_call', tool_name: 'describe_table', tool_call_id: 'describe', data: { args: { table: 'wip' } },
+  }, 'tool-2');
+  rendered = convertMessage(current);
+  assert.equal(rendered.metadata.custom.progressText, 'WIP 테이블 구조를 확인합니다.');
+
+  current = applyAgentEvent(current, { type: 'done' }, 'done');
+  assert.equal(convertMessage(current).metadata.custom.progressText, undefined);
+});
+
 test('repeated tool names pair parameters and results by tool_call_id', () => {
   let current = message();
   const events = [
@@ -225,6 +256,6 @@ test('later execution tools preserve earlier standalone results and their contex
 test('removing duplicate tables preserves fenced code examples', () => {
   for (const fence of ['```', '~~~~']) {
     const example = `${fence}markdown\n| column | value |\n| --- | --- |\n| A | 1 |\n${fence}`;
-    assert.equal(removeMarkdownTables(`${example}\n\n| column | value |\n| --- | --- |\n| A | 1 |`), example);
+    assert.equal(removeMarkdownTables(`${example}\n\n| column | value |\n| --- | --- |\n| A | 1 |`, [{ columns: ['column', 'value'], rows: [['A', 1]] }]), example);
   }
 });

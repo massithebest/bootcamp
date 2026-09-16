@@ -3,7 +3,9 @@ import type {
   AgentEvent, ChatMessage, StatusStep, StepStatus, ToolResult,
 } from "@/types/chat";
 
-export function applyAgentEvent(m: ChatMessage, event: AgentEvent, partId: string): ChatMessage {
+export function applyAgentEvent(m: ChatMessage, event: AgentEvent, partId: string, observedAt?: number): ChatMessage {
+  // A terminal event is final; error -> done may still supply the fork anchor.
+  if ((m.runState.type === "complete" || m.runState.type === "cancelled") && event.type !== "done") return m;
   switch (event.type) {
     case "text": {
       const delta = event.content ?? "";
@@ -28,6 +30,7 @@ export function applyAgentEvent(m: ChatMessage, event: AgentEvent, partId: strin
         toolCallId,
         toolName,
         args,
+        ...(observedAt !== undefined ? { observedTiming: { startedAt: observedAt } } : {}),
       };
       return {
         ...m,
@@ -64,7 +67,7 @@ export function applyAgentEvent(m: ChatMessage, event: AgentEvent, partId: strin
       };
       return {
         ...m,
-        parts: updateToolResult(m.parts, fallbackPart),
+        parts: updateToolResult(m.parts, fallbackPart, observedAt),
         statuses: purpose
           ? annotateStatus(m.statuses, toolCallId, toolName, purpose)
           : m.statuses,
@@ -73,6 +76,7 @@ export function applyAgentEvent(m: ChatMessage, event: AgentEvent, partId: strin
     case "error":
       return {
         ...m,
+        observedTiming: finishObservedTiming(m.observedTiming, observedAt),
         runState: {
           type: "error",
           message: event.content ?? "요청을 처리하는 중 오류가 발생했습니다.",
@@ -81,10 +85,16 @@ export function applyAgentEvent(m: ChatMessage, event: AgentEvent, partId: strin
     case "done":
       return {
         ...m,
+        observedTiming: finishObservedTiming(m.observedTiming, observedAt),
         runState: m.runState.type === "running" ? { type: "complete" } : m.runState,
         turnId: asString(event.data?.turn_id) ?? m.turnId,
       };
   }
+}
+
+export function finishObservedTiming(timing: ChatMessage["observedTiming"], now?: number) {
+  if (!timing || timing.endedAt !== undefined || now === undefined) return timing;
+  return { ...timing, endedAt: Math.max(timing.startedAt, now) };
 }
 
 export function eventHasOutput(event: AgentEvent): boolean {
@@ -165,13 +175,14 @@ function upsertToolPart(
   if (idx === -1) return [...parts, incoming];
   const next = parts.slice();
   const current = next[idx];
-  if (current.kind === "tool") next[idx] = { ...current, ...incoming };
+  if (current.kind === "tool") next[idx] = { ...current, ...incoming, observedTiming: current.observedTiming ?? incoming.observedTiming };
   return next;
 }
 
 function updateToolResult(
   parts: ChatMessage["parts"],
   fallback: Extract<ChatMessage["parts"][number], { kind: "tool" }>,
+  observedAt?: number,
 ): ChatMessage["parts"] {
   const idx = parts.findIndex(
     (part) => part.kind === "tool" && part.toolCallId === fallback.toolCallId,
@@ -179,7 +190,11 @@ function updateToolResult(
   if (idx === -1) return [...parts, fallback];
   const next = parts.slice();
   const current = next[idx];
-  if (current.kind === "tool") next[idx] = { ...current, result: fallback.result };
+  if (current.kind === "tool") next[idx] = {
+    ...current,
+    result: fallback.result,
+    observedTiming: finishObservedTiming(current.observedTiming, observedAt),
+  };
   return next;
 }
 

@@ -9,9 +9,11 @@
  * 도구 목록은 Backend `agent/sdk_tools.py` 의 `TOOL_NAMES`를 기준으로 유지한다.
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { useExecutionDisclosure } from "@/hooks/use-execution-disclosure";
+import { ObservedDuration } from "./observed-duration";
 
-import type { ToolResult } from "@/types/chat";
+import type { ObservedTiming, ToolResult } from "@/types/chat";
 import { toolResultError } from "@/lib/tool-result";
 import { ToolCall } from "@/components/assistant-ui/elements/tool-call";
 import { CatalogResult } from "./tool-results/catalog-result";
@@ -85,12 +87,14 @@ export function ToolResultCard({
   result,
   running,
   messageRunning,
+  observedTiming,
 }: {
   toolName: string;
   args: Record<string, unknown>;
   result?: ToolResult;
   running: boolean;
   messageRunning: boolean;
+  observedTiming?: ObservedTiming;
 }) {
   const { kind } = resolveKind(toolName, result);
   const data = result?.data ?? {};
@@ -100,13 +104,11 @@ export function ToolResultCard({
   const unverified = kind === "catalog" && data.verified === false;
   const title = [toolName || "tool", summary].filter(Boolean).join(" · ");
 
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!messageRunning) setOpen(false);
-  }, [messageRunning]);
+  const { rootRef, open, setOpen } = useExecutionDisclosure(messageRunning, false);
 
   return (
     <ToolCall
+      containerRef={rootRef}
       label={unverified ? `${title} · 미검증` : title}
       error={errorText}
       running={running}
@@ -115,6 +117,7 @@ export function ToolResultCard({
       onOpenChange={setOpen}
     >
       <div className="flex flex-col gap-4">
+        <ObservedDuration timing={observedTiming} running={messageRunning && !result} label="소요" />
         <DetailSection label="Parameters">
           <JsonDetail value={args} empty="파라미터가 없습니다." />
         </DetailSection>
@@ -139,7 +142,7 @@ export function ToolResultCard({
 function DetailSection({ label, children }: { label: string; children: ReactNode }) {
   return (
     <section>
-      <p className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-ink-3">{label}</p>
+      <p className="mb-1.5 text-2xs font-medium text-ink-2">{label}</p>
       {children}
     </section>
   );

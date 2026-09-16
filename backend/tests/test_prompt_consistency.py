@@ -11,7 +11,11 @@ from pathlib import Path
 import pytest
 
 from agent.agent import AGENT_SDK_CWD
-from agent.sdk_tools import TOOL_NAMES
+from agent.sdk_tools import (
+    TOOL_NAMES,
+    _prepare_table_tool,
+    _prepare_visualization_tool,
+)
 from agent.system_prompt import SYSTEM_PROMPT
 from services.knowledge_service import get_store
 
@@ -140,3 +144,26 @@ def test_table_procedure_uses_standalone_tool_ui_and_100_row_limit() -> None:
         assert "반드시" in text
         assert "도입 설명 → Tool UI → 결과 해석" in text
         assert "Result Store 데이터를 Markdown 표로 작성하지 않는다" in text
+
+
+def test_post_visualization_explanations_do_not_depend_on_screen_position() -> None:
+    claude_text = CLAUDE_MD.read_text(encoding="utf-8")
+    sql_skill = (SKILLS_DIR / "sql-analysis" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    simulation_skill = (SKILLS_DIR / "simulation" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+
+    for text in (claude_text, sql_skill, simulation_skill):
+        assert "위·아래·다음 표/차트" in text
+        assert "표에는…" in text
+        assert "차트에서는…" in text
+
+    table_description = _prepare_table_tool("scope-a").description
+    chart_description = _prepare_visualization_tool("scope-a").description
+    assert "답변 아래" not in table_description
+    assert "위/아래/다음 표" in table_description
+    assert "표에는" in table_description
+    assert "위/아래/다음 차트" in chart_description
+    assert "차트에서는" in chart_description

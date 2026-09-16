@@ -113,8 +113,8 @@ export function InteractiveDataTable({ table: payload }: { table: StandaloneTabl
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h4 className="font-medium text-ink">{payload.title ?? "조회 결과 표"}</h4>
-          <p className="mt-0.5 text-2xs text-ink-3">
+          <h3 className="font-medium text-ink">{payload.title ?? "조회 결과 표"}</h3>
+          <p className="mt-0.5 text-2xs text-ink-2">
             원본 {payload.rowCount.toLocaleString("ko-KR")}건 · 표에 {payload.displayedCount.toLocaleString("ko-KR")}건 포함
           </p>
         </div>
@@ -138,7 +138,7 @@ export function InteractiveDataTable({ table: payload }: { table: StandaloneTabl
         <table className="w-full min-w-max border-collapse font-mono text-data tabular-nums">
           <thead className="sticky top-0 z-10 bg-surface-2">
             {dataTable.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="border-b border-line-strong text-left text-ink-3">
+              <tr key={headerGroup.id} className="border-b border-line-strong text-left text-ink-2">
                 {headerGroup.headers.map((header) => {
                   const direction = header.column.getIsSorted();
                   const SortIcon = direction === "asc"
@@ -191,11 +191,11 @@ export function InteractiveDataTable({ table: payload }: { table: StandaloneTabl
           </tbody>
         </table>
         {visibleRows.length === 0 && (
-          <p className="px-3 py-8 text-center text-ui text-ink-3">검색 조건에 맞는 행이 없습니다.</p>
+          <p className="px-3 py-8 text-center text-ui text-ink-2">검색 조건에 맞는 행이 없습니다.</p>
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-2xs text-ink-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-2xs text-ink-2">
         <div className="flex items-center gap-2">
           <label htmlFor={pageSizeId}>페이지당 행</label>
           <select

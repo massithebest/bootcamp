@@ -30,7 +30,14 @@ caveats:
 aggregation_rules:
   - 설비 수량은 dataset과 stnfam grain에서 stnqty를 한 번만 합산한다
   - route_step과 조인한 뒤 stnqty를 합산하면 Step 수만큼 중복되므로 먼저 설비 grain으로 집계한다
-sample_sql: SELECT dataset, stngrp, SUM(stnqty) AS tool_qty FROM tool GROUP BY dataset, stngrp
+sample_queries:
+  - question: benchmark별 설비 수량 합계는 얼마야?
+    sql: |
+      SELECT dataset, SUM(stnqty) AS tool_qty
+      FROM tool
+      GROUP BY dataset
+      ORDER BY dataset
+    answer: 설비 수량 합계는 HVLM 1,443대, LVHM 1,313대다.
 status: verified
 owner: ""
 updated: 2026-09-15

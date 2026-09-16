@@ -30,7 +30,10 @@ def root(tmp_path: Path) -> Path:
         joins:
           - {to: part, on: [dataset, part], kind: many-to-one}
         caveats: ["JOIN에 dataset을 포함"]
-        sample_sql: SELECT * FROM wip
+        sample_queries:
+          - question: WIP 원본을 보여줘
+            sql: SELECT * FROM wip
+            answer: WIP 원본 행을 반환한다.
         status: verified
         """,
     )
@@ -104,8 +107,9 @@ def root(tmp_path: Path) -> Path:
           GROUP BY w.dataset, w.part
         sources: [wip, part]
         sample_queries:
-          - description: 데이터셋별 합계
+          - question: 데이터셋별 WIP 합계는?
             sql: SELECT dataset, SUM(cnt) FROM wip_by_part GROUP BY dataset
+            answer: 데이터셋별 WIP 건수를 반환한다.
         status: draft
         """,
     )
@@ -258,7 +262,8 @@ def test_get_recipe_full_and_verified(root: Path) -> None:
     recipe = store.get_recipe("wip_by_part")
     assert recipe["cte_name"] == "wip_by_part"
     assert recipe["sources"] == ["wip", "part"]
-    assert recipe["sample_queries"][0]["description"] == "데이터셋별 합계"
+    assert recipe["sample_queries"][0]["question"] == "데이터셋별 WIP 합계는?"
+    assert recipe["sample_queries"][0]["answer"] == "데이터셋별 WIP 건수를 반환한다."
     assert recipe["verified"] is False
 
 

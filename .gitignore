@@ -41,3 +41,6 @@ artifacts/
 # 로컬 SMT2020 원본·생성 DB 및 데이터 변환 스크립트
 /backend/datasets/
 /backend/scripts/
+
+# 사용자가 작성한 지식과 SQLite 부속 파일
+/backend/data/knowledge.sqlite3*

@@ -35,7 +35,8 @@
 | 1 | 기본 채팅·SQL·SSE `AgentEvent` | - | 완료 | 완료 | 완료 | 2026-09-08 |
 | 3 | 3-pane 워크벤치와 편집·재생성·취소·복사 | - | 완료 | 완료 | 완료 | 2026-09-14 |
 | 2 | 도메인 지식 Phase 1과 현재 조회 UI | - | 완료 | 완료 | [도메인 지식 계획](260914-domain-knowledge-plan.md) | 2026-09-14 |
-| - | 도메인 지식 Phase 2·3과 작성·관리 UI | P2 | 미착수 | 요구사항 대기 | [도메인 지식 계획](260914-domain-knowledge-plan.md) | - |
+| - | 도메인 지식 작성·관리 UI와 Phase 2 입력·집계 진단 | - | 완료 | 완료 | [지식 관리 계획](260916-knowledge-management-plan.md) | 2026-09-16 |
+| - | 도메인 지식 Phase 3 Milvus·문서 색인 | P3 | 미착수 | 후속 | [도메인 지식 계획](260914-domain-knowledge-plan.md) | - |
 | 4 | Result Store 1차 | - | 완료 | 완료 | [Result Store 계획](260915-result-store-plan.md) | 2026-09-15 |
 | 5 | 차트 시각화 v2 | - | 완료 | 완료 | [차트 계획](260915-chart-visualization-plan.md) | 2026-09-15 |
 | 7 | assistant-ui 감사 후속 개선 | - | 해당 없음 | 완료 | [프론트 실행 계획](../frontend/plan/260915-assistant-ui-audit-plan.md) | 2026-09-15 |
@@ -51,6 +52,12 @@
 | 15 | assistant-ui Tool UI 기반 대화형 표·표시 100행 | - | 완료 | 완료 | [대화형 표 계획](260916-interactive-table-tool-ui-plan.md) | 2026-09-16 |
 | 16 | TanStack Table 전환과 표·차트 문맥 순서 | - | 완료 | 완료 | [TanStack Table·메시지 순서 계획](260916-tanstack-table-message-order-plan.md) | 2026-09-16 |
 | 17 | 카탈로그 Tool 선택 인자 스키마 수정 | - | 완료 | 해당 없음 | [카탈로그 Tool 스키마 계획](260916-optional-catalog-tool-schema-plan.md) | 2026-09-16 |
+| 18 | ChatGPT형 좌측 전역 내비게이션 | - | 해당 없음 | 완료 | [사이드바 내비게이션 계획](260916-sidebar-navigation-plan.md) | 2026-09-16 |
+| 19 | 좌측 채팅 메뉴 단일화 | - | 해당 없음 | 완료 | [채팅 메뉴 단일화 계획](260916-chat-navigation-unification-plan.md) | 2026-09-16 |
+| 20 | 공개 실행 안내 가독성·지속성 | - | 해당 없음 | 완료 | [실행 안내 가독성 계획](260916-reasoning-readability-plan.md) | 2026-09-16 |
+| 21 | 지식 관리 구조화 상세 가독성 | - | 해당 없음 | 완료 | [지식 상세 가독성 계획](260916-knowledge-detail-readability-plan.md) | 2026-09-16 |
+| - | Agent Workbench UI/UX 감사 후속 개선 | - | 계약 검증 완료 | 완료 | F01~F17 범위 내 구현·검증 완료, 후속 계약 검토 보류 — [상위·파트별 계획](260916-agent-workbench-ux-audit-plan.md) | - |
+| - | 후속질문 동적 생성 | P1 | 미착수 | 미착수 | [후속질문 계획](260916-followup-suggestions-plan.md) | - |
 
 P1~P3는 미수행 항목 간 상대적 우선순위이며 숫자가 낮을수록 먼저 착수한다.
 근거는 아래 "다음 우선순위"에 정리한다. 순번·수행일자는 git 커밋 이력 기준 실제
@@ -72,6 +79,10 @@ P1~P3는 미수행 항목 간 상대적 우선순위이며 숫자가 낮을수�
 
 ## 수행해야 할 일
 
+- [x] [Agent Workbench UI/UX 감사 후속 개선](260916-agent-workbench-ux-audit-plan.md) — F01~F17 프론트 구현·백엔드 계약 회귀 완료. 서버 timing·실제 모델 설정·대화 영속 저장은 보류
+- [x] 화면 전환 확인창 제거 — 새 채팅·예시 세션은 즉시 전환, 지식 편집 보호·재생성 확인 유지. 테스트·빌드·브라우저 검증 완료 ([후속 단계](260916-agent-workbench-ux-audit-plan.md#9-후속-정책-화면-전환-확인창-제거))
+- [x] 우측 Context Inspector 너비 조절 — 포인터 드래그·키보드 조절, 반응형 상한과 Chat 최소 폭 보호 ([후속 단계](260916-agent-workbench-ux-audit-plan.md#10-후속-기능-context-inspector-너비-조절))
+- [ ] [후속질문 동적 생성](260916-followup-suggestions-plan.md) — 응답 내용 기반 2~4개 제안, 도메인 지식 힌트 참고, `done` 이벤트 확장
 - [x] [누적 미커밋 변경 통합 검토](260916-uncommitted-review-plan.md) — 결과 문맥 보존·오탐·종료 상태·접근성 수정 및 필수/브라우저 검증
 
 - [x] [assistant-ui Elements 기반 프론트엔드 전환](260916-assistant-ui-elements-plan.md) — 공식 shadcn 설치 및 Elements 카탈로그 5종 추가 적용 완료
@@ -82,13 +93,21 @@ P1~P3는 미수행 항목 간 상대적 우선순위이며 숫자가 낮을수�
 - [x] [assistant-ui Tool UI 기반 대화형 표·표시 100행](260916-interactive-table-tool-ui-plan.md)
 - [x] [TanStack Table 전환과 표·차트 문맥 순서](260916-tanstack-table-message-order-plan.md)
 - [x] [카탈로그 Tool 선택 인자 스키마 수정](260916-optional-catalog-tool-schema-plan.md)
+- [x] [ChatGPT형 좌측 전역 내비게이션](260916-sidebar-navigation-plan.md) — 좌측 메뉴로 채팅·지식 관리 전환, 대화 상태 보존
+- [x] [좌측 채팅 메뉴 단일화](260916-chat-navigation-unification-plan.md) — `새 채팅`만 유지, 최근 대화로 복귀
+- [x] [공개 실행 안내 가독성·지속성](260916-reasoning-readability-plan.md) — 요청 분석 가독성 강화, 실행 Tool 직전 안내·지속 회전 표시
+- [x] [지식 관리 구조화 상세 가독성](260916-knowledge-detail-readability-plan.md) — raw JSON을 필드·태그·컬럼·목록 UI로 정리
 - [x] [전체 시스템 근거 기반 감사 및 리팩토링](260915-full-stack-refactoring-plan.md) — 선정 P0/P1 및 소규모 P2 구현·검증 완료
 - [x] SMT2020 HVLM/LVHM 원본을 단일 SQLite DB로 변환
 - [x] 기존 합성 FGS/MP 시드와 mock을 SMT2020 SQL·입력 검증 mock으로 교체
 - [x] SMT2020 기반 Fake Runner와 프론트 예시·관통 흐름 검증
-- [ ] 도메인 지식 Phase 2: 추가 원인 시나리오와 diagnostics 보강
-- [ ] 텍스트 기반 도메인 지식 등록·검토 기능의 요구사항 확정
-- [ ] 기존 도메인 지식 조회와 활성화/비활성화 정책 및 UI 구현
+- [x] 도메인 지식 Phase 2: SMT2020 입력 관계·dataset 혼합·조인 중복 집계 diagnostics 보강
+- [ ] 실제 생산 부진 원인 시나리오와 현업 지식 검증 — 업무 데이터 확보 후
+- [x] 텍스트 지식 등록·검토·버전·활성화·공용 관리 모드 구현
+- [x] 지식 조회·관리 화면, 도구/Skills 설명, local 검색과 정확한 버전 인용 구현
+- [x] 별도 관리 활성화 환경변수 없이 기존 구조화 YAML을 항상 읽기 전용으로 표시
+- [x] table·recipe 샘플 SQL을 현재 데이터 기반 질문·SQL·답변 형식으로 통일
+- [x] 우측 패널을 도구·스킬·지식 순서와 설명이 보이는 간결한 지식 목록으로 개편
 - [ ] 도메인 지식 Phase 3: 폐쇄망용 비정형 문서 색인과 real RAG 연결
 - [x] assistant-ui 감사 계획의 6개 후속 개선 항목 구현
 - [ ] 실제 사내 DB·RAG·시뮬레이션 서비스를 `services/real`에 연결
@@ -98,9 +117,14 @@ P1~P3는 미수행 항목 간 상대적 우선순위이며 숫자가 낮을수�
 
 ## 다음 우선순위
 
-1. 도메인 지식 작성·검토 기능의 의미와 권한 확정 (P2)
-2. 추가 진단 시나리오와 현업 지식 검증 (P2)
-3. 폐쇄망 실제 DB·RAG·시뮬레이션 연결 (P3)
+1. 후속질문 동적 생성 (P1)
+2. 확장한 diagnostics와 실제 업무 정의의 현업 검토 (P2)
+3. 실제 생산 부진 원인 시나리오 보강 — 업무 데이터 확보 후 (P2)
+4. 폐쇄망 실제 DB·Milvus/RAG·시뮬레이션 연결 (P3)
+
+UI/UX 감사 F01~F17의 프론트 개선과 백엔드 계약 검증은 2026-09-16 완료했다.
+새 브라우저 회귀와 필수 테스트 결과는 [상세 계획](260916-agent-workbench-ux-audit-plan.md) 8절에 기록했다.
+서버 timing·실제 모델 설정·대화 영속 저장은 계속 보류하며 실제 스크린리더·운영 환경 검증은 남아 있다.
 
 ~~assistant-ui 감사 후속 개선~~은 2026-09-15 완료. 근거는 [프론트 실행 계획](../frontend/plan/260915-assistant-ui-audit-plan.md) 12절 실행 기록.
 
@@ -110,8 +134,7 @@ DB와 입력 정합성 mock으로 대체했다.
 
 ## 보류·결정 필요
 
-- 도메인 지식 활성화가 Agent tool 허용 범위, 검색 대상, UI 표시 중 무엇을
-  제어하는지 확정해야 한다.
+- 텍스트 지식 활성화는 모든 대화의 이후 검색 대상을 제어한다. 도구 권한과 구조화 YAML은 변경하지 않는다.
 - 실제 테이블명·컬럼·KPI 공식·단위는 현업 검증 후 `draft`에서 `verified`로
   변경해야 한다.
 - 다중 사용자 인증과 권한 연결 전까지 `pp_session_scope`는 동일 브라우저의
@@ -127,11 +150,18 @@ DB와 입력 정합성 mock으로 대체했다.
 
 ## 기능별 기준 계획
 
+- [Agent Workbench UI/UX 감사 후속 개선](260916-agent-workbench-ux-audit-plan.md)
+- [후속질문 동적 생성](260916-followup-suggestions-plan.md)
 - [도메인 지식](260914-domain-knowledge-plan.md)
+- [지식 관리 UI·local 검색](260916-knowledge-management-plan.md)
 - [Result Store](260915-result-store-plan.md)
 - [차트 시각화](260915-chart-visualization-plan.md)
 - [SMT2020 SQLite 및 Mock 전환](260915-smt2020-mock-data-plan.md)
 - [전체 시스템 리팩토링](260915-full-stack-refactoring-plan.md)
 - [Frontend UI/UX 개선(frontend-design)](260916-frontend-ui-ux-plan.md)
+- [ChatGPT형 좌측 전역 내비게이션](260916-sidebar-navigation-plan.md)
+- [좌측 채팅 메뉴 단일화](260916-chat-navigation-unification-plan.md)
+- [공개 실행 안내 가독성·지속성](260916-reasoning-readability-plan.md)
+- [지식 관리 구조화 상세 가독성](260916-knowledge-detail-readability-plan.md)
 
 - [assistant-ui Elements 전환](260916-assistant-ui-elements-plan.md)

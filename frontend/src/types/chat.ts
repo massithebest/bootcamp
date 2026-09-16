@@ -86,6 +86,12 @@ export interface ToolResult {
   content?: string | null;
 }
 
+/** Local monotonic clock observations, never server execution timestamps. */
+export interface ObservedTiming {
+  startedAt: number;
+  endedAt?: number;
+}
+
 /**
  * Assistant 응답을 도착 순서대로 담는 조각.
  * text delta 와 tool 결과가 시간순으로 섞여 들어오므로,
@@ -101,6 +107,7 @@ export type MessagePart =
       toolName: string;
       args: Record<string, unknown> | null;
       result?: ToolResult;
+      observedTiming?: ObservedTiming;
     };
 
 export type ChatRole = "user" | "assistant";
@@ -123,6 +130,7 @@ export interface ChatMessage {
   statuses: StatusStep[];
   /** 이 메시지의 실행 수명주기. 사용자 메시지는 항상 complete다. */
   runState: ChatMessageRunState;
+  observedTiming?: ObservedTiming;
   /**
    * `done` Event 의 `data.turn_id` — 이 턴이 끝난 시점의 백엔드 포크 지점.
    * assistant 메시지에만 있다. 편집/재생성이 "이 턴 직전까지" 를 계산할 때

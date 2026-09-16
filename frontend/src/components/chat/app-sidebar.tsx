@@ -1,5 +1,10 @@
 /** Base assistant-ui sidebar composition with a controlled, nonpersistent ThreadList. */
-import { PanelLeftCloseIcon, PlusIcon, SettingsIcon } from "lucide-react";
+import {
+  BookOpenIcon,
+  PanelLeftCloseIcon,
+  SettingsIcon,
+  SquarePenIcon,
+} from "lucide-react";
 import type { Session } from "@/types/workspace";
 import { CURRENT_USER } from "@/lib/dummy";
 import { ThreadList } from "@/components/assistant-ui/elements/thread-list";
@@ -8,35 +13,47 @@ import { TooltipIconButton } from "@/components/assistant-ui/elements/tooltip-ic
 const GROUP_LABEL = { today: "오늘", week: "지난 7일", earlier: "이전" };
 const GROUP_ORDER: Session["group"][] = ["today", "week", "earlier"];
 
-export function AppSidebar({ sessions, activeSessionId, onSelectSession, onNewChat, onCollapse }: {
+const itemClass = "flex min-h-9 w-full items-center gap-2.5 rounded px-2.5 py-2 text-left text-ui transition-colors";
+
+export function AppSidebar({ sessions, activeSessionId, onSelectSession, onNewChat, onCollapse, onOpenKnowledge, knowledgeActive }: {
   sessions: Session[];
   activeSessionId: string | null;
   onSelectSession: (id: string) => void;
   onNewChat: () => void;
   onCollapse: () => void;
+  onOpenKnowledge: () => void;
+  knowledgeActive: boolean;
 }) {
   return (
     <div className="flex h-full flex-col bg-surface">
-      <div className="flex h-16 shrink-0 items-center gap-2 border-b border-line px-3">
+      <div className="flex h-14 shrink-0 items-center gap-2 px-3">
         <span className="grid size-6 place-items-center rounded bg-accent text-2xs font-semibold text-accent-ink">FP</span>
         <span className="flex-1 text-ui font-semibold">P&amp;T FP agent</span>
         <TooltipIconButton tooltip="사이드바 접기" onClick={onCollapse}><PanelLeftCloseIcon /></TooltipIconButton>
       </div>
-      <div className="px-3 py-3">
-        <button type="button" onClick={onNewChat} className="flex w-full items-center gap-2 rounded border border-line-strong bg-canvas px-3 py-2 text-ui text-ink hover:border-accent hover:text-accent">
-          <PlusIcon className="size-3.5" /> 새 대화
+      <nav aria-label="주요 메뉴" className="shrink-0 space-y-0.5 px-2 pb-3">
+        <button type="button" onClick={onNewChat} className={`${itemClass} text-ink hover:bg-surface-2`}>
+          <SquarePenIcon className="size-4 shrink-0" aria-hidden />
+          새 채팅
         </button>
-      </div>
-      <p className="px-3 text-2xs text-ink-3">예시 세션 · 현재 대화만 유지됩니다</p>
-      <nav aria-label="대화 목록" className="thin-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-        {GROUP_ORDER.map((group) => {
-          const items = sessions.filter((s) => s.group === group);
-          return items.length ? <ThreadList key={group} label={GROUP_LABEL[group]}
-            threads={items.map((s) => ({ id: s.id, title: s.title, time: s.lastActivity }))}
-            activeIndex={items.findIndex((s) => s.id === activeSessionId)}
-            onActiveIndexChange={(index) => onSelectSession(items[index].id)} /> : null;
-        })}
+        <button type="button" aria-current={knowledgeActive ? "page" : undefined} onClick={onOpenKnowledge} className={`${itemClass} ${knowledgeActive ? "bg-surface-2 font-semibold text-ink" : "text-ink-2 hover:bg-surface-2"}`}>
+          <BookOpenIcon className="size-4 shrink-0" aria-hidden />
+          지식 관리
+        </button>
       </nav>
+      <div className="flex min-h-0 flex-1 flex-col border-t border-line pt-2">
+        <p className="px-4 py-1.5 text-2xs text-ink-3">최근 대화</p>
+        <p className="px-4 pb-1 text-2xs text-ink-3">예시 세션 · 현재 대화만 유지됩니다</p>
+        <nav aria-label="최근 대화" className="thin-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+          {GROUP_ORDER.map((group) => {
+            const items = sessions.filter((s) => s.group === group);
+            return items.length ? <ThreadList key={group} label={GROUP_LABEL[group]}
+              threads={items.map((s) => ({ id: s.id, title: s.title, time: s.lastActivity }))}
+              activeIndex={items.findIndex((s) => s.id === activeSessionId)}
+              onActiveIndexChange={(index) => onSelectSession(items[index].id)} /> : null;
+          })}
+        </nav>
+      </div>
       <div className="flex items-center gap-2 border-t border-line px-3 py-3">
         <span className="grid size-7 shrink-0 place-items-center rounded bg-surface-2 text-2xs text-ink-2">{CURRENT_USER.name.slice(0, 1)}</span>
         <span className="min-w-0 flex-1">

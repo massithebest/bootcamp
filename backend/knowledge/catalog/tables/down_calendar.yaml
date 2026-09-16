@@ -18,7 +18,14 @@ caveats:
   - calendar_attach.calname과 연결할 때 caltype이 down인지 함께 확인한다
 aggregation_rules:
   - MTTF/MTTR은 각각의 분포와 단위를 포함해 해석하며 서로 다른 단위를 바로 합산하지 않는다
-sample_sql: SELECT dataset, downcalname, mttf, mttfunits, mttr, mttrunits FROM down_calendar
+sample_queries:
+  - question: benchmark별 breakdown 캘린더는 몇 개야?
+    sql: |
+      SELECT dataset, COUNT(*) AS calendar_count
+      FROM down_calendar
+      GROUP BY dataset
+      ORDER BY dataset
+    answer: HVLM과 LVHM에 각각 11개의 breakdown 캘린더가 있다.
 status: verified
 owner: ""
 updated: 2026-09-15

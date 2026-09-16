@@ -16,7 +16,14 @@ caveats:
   - caltype에 따라 calname을 down_calendar.downcalname 또는 pm_calendar.pmcalname과 연결한다
 aggregation_rules:
   - 자원 연결 수는 dataset, calname, restype, resname grain에서 센다
-sample_sql: SELECT dataset, caltype, restype, COUNT(*) AS attachment_count FROM calendar_attach GROUP BY dataset, caltype, restype
+sample_queries:
+  - question: benchmark별 breakdown과 예방보전 캘린더 연결은 몇 건이야?
+    sql: |
+      SELECT dataset, caltype, restype, COUNT(*) AS attachment_count
+      FROM calendar_attach
+      GROUP BY dataset, caltype, restype
+      ORDER BY dataset, caltype, restype
+    answer: HVLM과 LVHM 모두 breakdown-stngrp 연결은 11건, PM-stnfam 연결은 292건이다.
 status: verified
 owner: ""
 updated: 2026-09-15

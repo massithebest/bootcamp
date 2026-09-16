@@ -42,7 +42,14 @@ caveats:
 aggregation_rules:
   - 공정 Step 수는 dataset과 route별 COUNT(step)으로 센다
   - 서로 다른 ptper 또는 시간 단위의 ptime을 바로 합산하지 않는다
-sample_sql: SELECT dataset, route, COUNT(step) AS step_count FROM route_step GROUP BY dataset, route
+sample_queries:
+  - question: benchmark별 Route Step은 총 몇 개야?
+    sql: |
+      SELECT dataset, COUNT(*) AS step_count
+      FROM route_step
+      GROUP BY dataset
+      ORDER BY dataset
+    answer: Route Step은 HVLM 926개, LVHM 4,013개다.
 status: verified
 owner: ""
 updated: 2026-09-15

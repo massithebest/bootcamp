@@ -25,7 +25,14 @@ caveats:
 aggregation_rules:
   - 행 수는 투입 정의 수이며 전체 생성 Lot 수와 동일하지 않다
   - pieces를 총 투입량으로 해석하려면 repeat/rpt_no/lotsperrpt 규칙을 별도로 적용해야 한다
-sample_sql: SELECT dataset, lot, part, start, due FROM orders ORDER BY dataset, due
+sample_queries:
+  - question: benchmark별 신규 투입 정의는 몇 건이야?
+    sql: |
+      SELECT dataset, COUNT(*) AS order_definition_count
+      FROM orders
+      GROUP BY dataset
+      ORDER BY dataset
+    answer: 신규 투입 정의는 HVLM 5건, LVHM 21건이다.
 status: verified
 owner: ""
 updated: 2026-09-15
