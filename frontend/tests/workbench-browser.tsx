@@ -100,10 +100,14 @@ export async function runWorkbenchRegressions() {
       await click("스킬");
       const skillsPanel = host.querySelector<HTMLElement>("#inspector-panel-skills")!;
       await waitFor(() => [...skillsPanel.querySelectorAll("button")].some(item => item.textContent?.includes("kpi-shortfall-analysis")));
+      check(getComputedStyle(skillsPanel).scrollbarGutter === "stable", "Inspector does not reserve scrollbar space");
       const skillTrigger = [...skillsPanel.querySelectorAll<HTMLButtonElement>("button")].find(item => item.textContent?.includes("kpi-shortfall-analysis"))!;
+      const skillDescription = skillsPanel.querySelector<HTMLElement>("article header p")!;
+      const descriptionWidth = skillDescription.getBoundingClientRect().width;
       check(skillTrigger.getAttribute("aria-expanded") === "false" && !skillsPanel.querySelector("ol"), "skill detail is not collapsed initially");
       await act(async () => skillTrigger.click());
       await waitFor(() => !!skillsPanel.querySelector("ol"));
+      check(skillDescription.getBoundingClientRect().width === descriptionWidth, "Inspector scrollbar changed text width");
       check(skillTrigger.getAttribute("aria-expanded") === "true", "skill dropdown did not expand");
       check(skillsPanel.querySelector("h3")?.textContent === "kpi-shortfall-analysis", "skill name hierarchy missing");
       check(skillsPanel.querySelector("h4")?.textContent === "실적 부진 원인 분석", "skill markdown title is not rendered");
@@ -181,6 +185,8 @@ export async function runWorkbenchRegressions() {
       await emit({ type: "tool_call", tool_name: "execute_sql", tool_call_id: "zero", data: { args: {} } },
         { type: "tool_result", tool_name: "execute_sql", tool_call_id: "zero", data: { status: "ok", row_count: 0, table: { columns: ["qty"], rows: [] }, sql: Array(150).fill("SELECT 1").join("\n") } }, { type: "done" });
       await act(async () => group().click());
+      const groupContent = host.querySelector<HTMLElement>('[data-slot="tool-group-content"]')!;
+      check(getComputedStyle(groupContent).animationName === "none", "completed ToolGroup still animates its layout");
       await act(async () => host.querySelector<HTMLButtonElement>('[data-slot="tool-call"] button')!.click());
       await waitFor(() => !!host.textContent?.includes("조회 결과 0건"));
       await click("실행된 SQL"); await pause();

@@ -2,15 +2,12 @@
 
 import {
   memo,
-  useCallback,
-  useRef,
   useState,
   type FC,
   type PropsWithChildren,
 } from "react";
 import { AlertCircleIcon, CheckIcon, ChevronDownIcon, LoaderIcon } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
-import { useScrollLock } from "@assistant-ui/react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -50,27 +47,20 @@ function ToolGroupRoot({
   children,
   ...props
 }: ToolGroupRootProps) {
-  const collapsibleRef = useRef<HTMLDivElement>(null);
   const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
-  const lockScroll = useScrollLock(collapsibleRef, ANIMATION_DURATION);
 
   const isControlled = controlledOpen !== undefined;
   const isOpen = isControlled ? controlledOpen : uncontrolledOpen;
 
-  const handleOpenChange = useCallback(
-    (open: boolean) => {
-      lockScroll();
-      if (!isControlled) {
-        setUncontrolledOpen(open);
-      }
-      controlledOnOpenChange?.(open);
-    },
-    [lockScroll, isControlled, controlledOnOpenChange],
-  );
+  const handleOpenChange = (open: boolean) => {
+    if (!isControlled) {
+      setUncontrolledOpen(open);
+    }
+    controlledOnOpenChange?.(open);
+  };
 
   return (
     <Collapsible
-      ref={collapsibleRef}
       data-slot="tool-group-root"
       data-variant={variant ?? "outline"}
       open={isOpen}
@@ -114,7 +104,7 @@ function ToolGroupTrigger({
       data-slot="tool-group-trigger"
       data-disclosure-trigger
       className={cn(
-        "aui-tool-group-trigger group/trigger flex origin-left items-center gap-2 text-sm transition-[color,scale] active:scale-[0.98]",
+        "aui-tool-group-trigger group/trigger flex items-center gap-2 text-sm transition-colors",
         "group-data-[variant=ghost]/tool-group-root:text-ink-2 group-data-[variant=ghost]/tool-group-root:hover:text-foreground group-data-[variant=ghost]/tool-group-root:py-1.5",
         "group-data-[variant=outline]/tool-group-root:w-full group-data-[variant=outline]/tool-group-root:px-4",
         "group-data-[variant=muted]/tool-group-root:w-full group-data-[variant=muted]/tool-group-root:px-4",
@@ -172,12 +162,7 @@ function ToolGroupContent({
       data-disclosure-content
       className={cn(
         "aui-tool-group-content relative overflow-hidden text-sm outline-none",
-        "group/collapsible-content ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:animate-none",
-        "data-closed:animate-collapsible-up",
-        "data-open:animate-collapsible-down",
-        "data-closed:fill-mode-forwards",
         "data-closed:pointer-events-none",
-        "[--tw-duration:var(--animation-duration)]",
         className,
       )}
       {...props}
@@ -188,12 +173,6 @@ function ToolGroupContent({
           "group-data-[variant=ghost]/tool-group-root:mt-1 group-data-[variant=ghost]/tool-group-root:gap-1",
           "group-data-[variant=outline]/tool-group-root:mt-3 group-data-[variant=outline]/tool-group-root:border-t group-data-[variant=outline]/tool-group-root:px-4 group-data-[variant=outline]/tool-group-root:pt-3",
           "group-data-[variant=muted]/tool-group-root:mt-3 group-data-[variant=muted]/tool-group-root:border-t group-data-[variant=muted]/tool-group-root:px-4 group-data-[variant=muted]/tool-group-root:pt-3",
-          "[&>*]:animate-in [&>*]:fade-in-0 [&>*]:blur-in-[2px] [&>*]:slide-in-from-top-1 [&>*]:animation-duration-(--animation-duration) [&>*]:ease-[cubic-bezier(0.32,0.72,0,1)]",
-          "[&>*]:motion-reduce:animate-none",
-          "[&>*:nth-child(2)]:[animation-delay:40ms]",
-          "[&>*:nth-child(3)]:[animation-delay:80ms]",
-          "[&>*:nth-child(4)]:[animation-delay:120ms]",
-          "[&>*:nth-child(n+5)]:[animation-delay:160ms]",
         )}
       >
         {children}

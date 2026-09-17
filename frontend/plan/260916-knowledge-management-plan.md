@@ -52,3 +52,11 @@ Skills 버튼 0개, raw Markdown 미노출, h3→h4→h5 위계와 도구 schema
 Workbench 브라우저 9개 통과. 실제 API 화면에서 세 항목 기본 접힘, 선택 항목만
 `aria-expanded=true`, `aria-controls` 연결, 펼침·재접힘, raw Markdown 미노출,
 가로 overflow 0px을 확인했다. 기존 bundle 크기 경고는 유지된다.
+
+## 2026-09-17 Inspector 스크롤바 공간 안정화
+
+- [x] 도구·스킬·지식 tabpanel에 `scrollbar-gutter: stable`을 적용한다.
+- [x] 가장 긴 Skill을 펼쳐 세로 스크롤바가 생겨도 상단 Skill 설명의 폭과 줄 수가
+  바뀌지 않음을 실제 브라우저에서 확인한다.
+- [x] 좁은 화면 Inspector overlay의 `absolute`·`relative` 클래스 충돌을 제거해
+  pane을 열어도 Chat 폭을 압축하지 않게 한다.

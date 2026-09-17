@@ -84,6 +84,7 @@ P1~P3는 미수행 항목 간 상대적 우선순위이며 숫자가 낮을수�
 - [x] [Agent Workbench UI/UX 감사 후속 개선](260916-agent-workbench-ux-audit-plan.md) — F01~F17 프론트 구현·백엔드 계약 회귀 완료. 서버 timing·실제 모델 설정·대화 영속 저장은 보류
 - [x] 화면 전환 확인창 제거 — 새 채팅·예시 세션은 즉시 전환, 지식 편집 보호·재생성 확인 유지. 테스트·빌드·브라우저 검증 완료 ([후속 단계](260916-agent-workbench-ux-audit-plan.md#9-후속-정책-화면-전환-확인창-제거))
 - [x] 우측 Context Inspector 너비 조절 — 포인터 드래그·키보드 조절, 반응형 상한과 Chat 최소 폭 보호 ([후속 단계](260916-agent-workbench-ux-audit-plan.md#10-후속-기능-context-inspector-너비-조절))
+- [x] 실행 과정 disclosure 레이아웃 모션 제거·Inspector 스크롤바 공간 상시 예약 — 펼침 시 중앙 흔들림과 우측 텍스트 재줄바꿈 방지
 - [ ] [후속질문 동적 생성](260916-followup-suggestions-plan.md) — 응답 내용 기반 2~4개 제안, 도메인 지식 힌트 참고, `done` 이벤트 확장
 - [x] [누적 미커밋 변경 통합 검토](260916-uncommitted-review-plan.md) — 결과 문맥 보존·오탐·종료 상태·접근성 수정 및 필수/브라우저 검증
 

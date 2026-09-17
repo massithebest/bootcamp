@@ -574,3 +574,15 @@ HTML 렌더링, 제목 위계, 여백, 23rem 데스크톱 폭은 유지한다. t
 button과 `aria-expanded`·`aria-controls`를 사용하고, 펼친 항목만 상세 API를 호출한다.
 
 근거: [지식 관리 Frontend 후속 기록](../plan/260916-knowledge-management-plan.md#skills-disclosure-복원-2026-09-16).
+
+### Disclosure·Inspector 레이아웃 안정화 (2026-09-17, 활성)
+
+완료된 실행 과정의 ToolGroup은 펼침·접힘 때 높이, blur, slide와 자식 stagger
+애니메이션을 적용하지 않는다. disclosure 내용 아래의 최종 답변과 표가 여러 프레임에
+걸쳐 이동해 중앙 채팅이 흔들리는 것처럼 보이지 않게 즉시 최종 레이아웃을 적용한다.
+상태를 알리는 chevron 회전과 접근 가능한 `aria-expanded` 계약은 유지한다.
+
+Inspector의 각 탭 스크롤 영역은 `scrollbar-gutter: stable`로 세로 스크롤바 공간을
+항상 예약한다. Skill 상세가 길어져 스크롤바가 생겨도 기존 설명의 가용 폭과 줄바꿈이
+바뀌지 않는다. 이 예약 공간은 도구·스킬·지식 탭에 동일하게 적용한다. 좁은 화면의
+Inspector는 `absolute` overlay만 적용해 중앙 Chat의 grid 폭을 소비하지 않는다.

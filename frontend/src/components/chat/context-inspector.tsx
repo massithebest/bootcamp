@@ -25,7 +25,7 @@ export function ContextInspector({ onCollapse }: { onCollapse: () => void }) {
       </div>
       <button onClick={onCollapse} aria-label="인스펙터 접기" className="rounded px-2 py-1 text-ink-2 hover:bg-surface-2">›</button>
     </div>
-    {TABS.map(t => <div key={t.id} role="tabpanel" hidden={tab !== t.id} id={`inspector-panel-${t.id}`} aria-labelledby={`inspector-tab-${t.id}`} className="thin-scroll min-h-0 flex-1 overflow-y-auto p-3">
+    {TABS.map(t => <div key={t.id} role="tabpanel" hidden={tab !== t.id} id={`inspector-panel-${t.id}`} aria-labelledby={`inspector-tab-${t.id}`} className="thin-scroll min-h-0 flex-1 overflow-y-auto p-3 [scrollbar-gutter:stable]">
       {t.id === "tools" ? <ToolsPanel /> : t.id === "skills" ? <SkillsPanel /> : <KnowledgePanel />}
     </div>)}
   </div>;

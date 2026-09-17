@@ -30,3 +30,11 @@ Fast Refresh 경고 13개), agent-browser 데스크톱·400px 화면과 실제 S
   Tool-linked status는 개별 Tool 행과 중복 표시하지 않는다.
 - [x] 초기 표시, 공개 status, Tool 실행/완료, 최종 자동 접힘, 두 단계 상세 펼침을
   실제 AssistantMessage DOM으로 검증하는 브라우저 회귀 케이스를 추가한다.
+
+## 2026-09-17 disclosure 레이아웃 안정화
+
+- [x] 완료된 실행 과정의 높이·blur·slide·stagger 애니메이션과 animation 기반
+  scroll lock을 제거해 최종 답변 영역이 여러 프레임에 걸쳐 이동하지 않게 한다.
+- [x] trigger의 `aria-expanded`, 키보드 조작과 chevron 상태 표시는 유지한다.
+- [x] 실제 브라우저에서 펼침 후 첫 프레임부터 320ms까지 위치가 고정되고
+  content `animation-name`이 `none`임을 확인한다.

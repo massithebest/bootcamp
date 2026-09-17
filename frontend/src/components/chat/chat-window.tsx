@@ -316,7 +316,7 @@ export function ChatWindow({ chat }: { chat: UseAgentChatResult }) {
         aria-label="참고 정보 인스펙터"
         onKeyDown={event => paneKeyDown(event, "inspector")}
         style={{ width: view === "chat" && inspectorOpen ? renderedInspectorWidth : 0 }}
-        className={`${inspectorOverlay ? "absolute inset-y-0 right-0 z-30 bg-surface" : ""} relative h-full overflow-hidden border-l border-line duration-200 ease-panel ${
+        className={`${inspectorOverlay ? "absolute inset-y-0 right-0 z-30 bg-surface" : "relative"} h-full overflow-hidden border-l border-line duration-200 ease-panel ${
           resizingInspector ? "transition-none" : "transition-[width]"
         } ${view === "chat" && inspectorOpen ? "" : "border-l-0"}`}
       >
