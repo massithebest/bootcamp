@@ -1,5 +1,5 @@
 /**
- * 초기 화면용 SMT2020 benchmark 예시 데이터.
+ * 초기 화면용 생산계획 benchmark 예시 데이터.
  * 수치는 원본을 변환한 SQLite 조회 및 입력 정합성 mock 결과만 사용한다.
  */
 
@@ -20,7 +20,7 @@ export const SESSIONS: Session[] = [
   { id: "s-0903", title: "Dry Etch 설비 수량", lastActivity: "3일 전", group: "week", traces: ["query"] },
   { id: "s-0904", title: "HVLM 납기 우선 Lot", lastActivity: "5일 전", group: "week", traces: ["query"] },
   { id: "s-0905", title: "제품별 공정 Step 수", lastActivity: "6일 전", group: "week", traces: ["query"] },
-  { id: "s-0906", title: "SMT2020 입력 관계 검증", lastActivity: "3주 전", group: "earlier", traces: ["simulation"] },
+  { id: "s-0906", title: "생산계획 입력 관계 검증", lastActivity: "3주 전", group: "earlier", traces: ["simulation"] },
 ];
 
 export const EXAMPLE_QUESTIONS: string[] = [
@@ -29,7 +29,7 @@ export const EXAMPLE_QUESTIONS: string[] = [
   "HVLM의 Dry Etch 설비는 Family별로 몇 대 있어?",
   "LVHM 제품별 전체 공정 Step 수를 알려줘.",
   "HVLM에서 납기가 가장 빠른 WIP와 신규 투입 Lot을 보여줘.",
-  "SMT2020 LVHM 입력 테이블의 관계를 검증해줘.",
+  "생산계획 LVHM 입력 테이블의 관계를 검증해줘.",
 ];
 
 /** 초기 로드 시 보여줄 benchmark 기반 대화. */
@@ -37,7 +37,7 @@ export const SEED_CONVERSATION: ChatMessage[] = [
   {
     id: "seed-u1",
     role: "user",
-    content: "SMT2020 LVHM에서 제품별 초기 WIP를 조회하고 입력 관계도 검증해줘.",
+    content: "생산계획 LVHM에서 제품별 초기 WIP를 조회하고 입력 관계도 검증해줘.",
     parts: [],
     statuses: [],
     runState: { type: "complete" },
@@ -51,7 +51,7 @@ export const SEED_CONVERSATION: ChatMessage[] = [
       { step: "plan", label: "질의 분석", status: "completed" },
       { step: "get_kpi", label: "초기 WIP 정의 확인", status: "completed" },
       { step: "execute_sql", label: "제품별 초기 WIP 조회", status: "completed" },
-      { step: "run_simulation", label: "SMT2020 입력 관계 검증", status: "completed" },
+      { step: "run_simulation", label: "생산계획 입력 관계 검증", status: "completed" },
       { step: "prepare_visualization", label: "제품별 WIP 차트 준비", status: "completed" },
     ],
     parts: [
@@ -104,14 +104,14 @@ export const SEED_CONVERSATION: ChatMessage[] = [
             status: "ok",
             kind: "simulation",
             type: "inline",
-            scenario: "SMT2020 LVHM 입력 검증",
+            scenario: "생산계획 LVHM 입력 검증",
             kpis: [
               { label: "Part", value: 10, unit: "개", tone: "ok" },
               { label: "Route Step", value: 4013, unit: "개", tone: "ok" },
               { label: "Tool Family", value: 106, unit: "개", tone: "ok" },
               { label: "초기 WIP", value: 2156, unit: "lot", tone: "ok" },
             ],
-            summary: "모든 핵심 입력 관계가 유효합니다. 이 결과는 실제 이산사건 시뮬레이션이 아닌 SMT2020 입력 정합성 mock입니다.",
+            summary: "모든 핵심 입력 관계가 유효합니다. 이 결과는 실제 이산사건 시뮬레이션이 아닌 생산계획 입력 정합성 mock입니다.",
             results: [
               { check: "part_to_route_step", source_rows: 10, matched_rows: 10, unmatched_rows: 0 },
               { check: "route_step_to_tool", source_rows: 4013, matched_rows: 4013, unmatched_rows: 0 },
@@ -136,7 +136,7 @@ export const SEED_CONVERSATION: ChatMessage[] = [
         id: "seed-final",
         text:
           "## 확인 결과\n\n" +
-          "SMT2020 `LVHM`의 초기 WIP는 **2,156 lot**이며 10개 Part에 분포합니다. " +
+          "생산계획 `LVHM`의 초기 WIP는 **2,156 lot**이며 10개 Part에 분포합니다. " +
           "입력 검증 Mock에서 Part→Route, Route Step→Tool, WIP/Order→Part와 현재 Step 관계의 미연결 건수는 모두 0건입니다.\n\n" +
           "이 결과는 입력 데이터의 구조와 관계를 확인한 것이며 실제 생산 완료량이나 병목을 예측한 이산사건 시뮬레이션 결과는 아닙니다.",
       },

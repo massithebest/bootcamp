@@ -38,7 +38,7 @@ test('citations display exact version and source without inventing relevance', (
 test('structured knowledge renders consistent labels, chips, columns, and empty values without raw JSON', () => {
   const html = renderToStaticMarkup(createElement(StructuredDetail, { data: {
     time_column: null,
-    tags: ['SMT2020', '설비'],
+    tags: ['생산계획', '설비'],
     columns: [{ name: 'dataset', type: 'varchar', desc: 'benchmark 구분', ref: null }],
     caveats: ['dataset을 먼저 확정한다'],
     query_rules: ['날짜 미지정 시 work_dt = CURRENT_DATE를 적용한다'],
