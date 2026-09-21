@@ -1,8 +1,8 @@
 # Production Planning Agent
 
 제조 생산계획 데이터를 자연어로 조회·분석·시뮬레이션하는 폐쇄망용
-Agent 애플리케이션이다. 현재 개발·검증 기준 데이터는 SMT2020 HVLM/LVHM이며,
-운영 데이터 쓰기 없이 조회 전용 SQL과 입력 정합성 simulation을 제공한다.
+Agent 애플리케이션이다. 개발용 mock 회귀에는 선택적으로 SMT2020 HVLM/LVHM을
+사용하며, 폐쇄망 운영은 별도 지식과 real service만 사용한다.
 
 ## 주요 기능
 
@@ -44,21 +44,21 @@ python -m pip install -r requirements-dev.txt
 cp .env.example .env
 ```
 
-SMT2020 원본, 생성 DB와 `scripts/build_smt2020_db.py`는 폐쇄망 반입용 로컬
-자산으로 Git에 포함되지 않는다. 해당 자산을 전달받은 환경에서만 다음 명령으로
-DB를 생성한다.
+SMT2020 원본, 생성 DB와 `scripts/build_smt2020_db.py`는 Git과 폐쇄망 반입
+대상에서 제외되는 개발용 mock 자산이다. 해당 자산이 있는 개발 환경에서만 다음
+명령으로 DB를 생성한다.
 
 ```bash
 python -m scripts.build_smt2020_db
 ```
 
-Claude/provider 없이 UI와 이벤트 흐름을 확인하려면 Fake Runner로 실행한다.
-
 ```bash
-SERVICE_MODE=mock PLANNING_AGENT_FAKE=1 uvicorn main:app --reload --port 8100
+SERVICE_MODE=mock uvicorn main:app --reload --port 8100
 ```
 
-실제 Agent SDK 실행은 [Backend 안내](backend/README.md)와
+`/api/chat`은 항상 실제 Claude Agent SDK 경로를 사용한다. 채팅을 확인하려면
+`.env`에 `LLM_PROVIDER`와 인증값을 설정한다. 지식·시각화 API와 `pytest`는
+provider 없이 동작한다. 자세한 실행 방법은 [Backend 안내](backend/README.md)와
 [폐쇄망 배포 가이드](backend/docs/CLOSED_NETWORK_SETUP.md)를 따른다.
 
 ### Frontend
@@ -85,6 +85,9 @@ npm test
 npm run build
 npm run lint
 ```
+
+SMT2020 자산이 없으면 관련 테스트만 자동으로 skip된다. 폐쇄망의 real 전용 검증
+절차는 [폐쇄망 배포 가이드](backend/docs/CLOSED_NETWORK_SETUP.md)를 따른다.
 
 브라우저 자동화 산출물인 `.playwright-mcp/`와 `artifacts/`는 Git에서 제외한다.
 
