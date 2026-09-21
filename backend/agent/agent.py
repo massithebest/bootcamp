@@ -8,7 +8,6 @@ from pathlib import Path
 from claude_agent_sdk import ClaudeAgentOptions, query
 
 from agent.event_adapter import AgentEventAdapter
-from agent.fake_runner import run_fake_agent
 from agent.sdk_tools import TOOL_NAMES, build_planning_mcp_server
 from agent.session_store import (
     bind_session_id,
@@ -18,7 +17,7 @@ from agent.session_store import (
 )
 from agent.system_prompt import SYSTEM_PROMPT
 from api.schemas import AgentEvent
-from core.config import AGENT_MODEL, CLAUDE_CLI_PATH, agent_provider_env, use_fake_runner
+from core.config import AGENT_MODEL, CLAUDE_CLI_PATH, agent_provider_env
 from tools.table_tool import prepare_table
 
 
@@ -205,11 +204,6 @@ async def run_agent(
         - SSE serialization must not be handled in this layer.
         - Internal chain-of-thought must never be exposed.
     """
-
-    if use_fake_runner():
-        async for event in run_fake_agent(message, conversation_id, access_scope):
-            yield event
-        return
 
     turn_id = str(uuid.uuid4())
     resume_session_id, resume_session_at, warning = _resolve_resume(

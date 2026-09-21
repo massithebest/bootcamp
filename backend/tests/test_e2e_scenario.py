@@ -39,8 +39,6 @@ def agent_run(tmp_path_factory):
     original = config.SMT2020_DB_PATH
     config.SMT2020_DB_PATH = db_path
 
-    monkeypatched_fake = os.environ.pop("PLANNING_AGENT_FAKE", None)
-
     async def collect():
         from agent.agent import run_agent
 
@@ -50,8 +48,6 @@ def agent_run(tmp_path_factory):
         events = asyncio.run(collect())
     finally:
         config.SMT2020_DB_PATH = original
-        if monkeypatched_fake is not None:
-            os.environ["PLANNING_AGENT_FAKE"] = monkeypatched_fake
 
     tool_calls = [e.tool_name for e in events if e.type == "tool_call"]
     answer = "".join(e.content or "" for e in events if e.type == "text")

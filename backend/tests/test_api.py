@@ -2,8 +2,19 @@
 
 import json
 
+import pytest
+from claude_agent_sdk import (
+    AssistantMessage,
+    ResultMessage,
+    TextBlock,
+    ToolResultBlock,
+    ToolUseBlock,
+    UserMessage,
+)
 from fastapi.testclient import TestClient
 
+import agent.agent as agent_module
+from agent import session_store
 from api.schemas import AgentEvent
 from main import app
 from services import result_store, visualization_store
@@ -24,6 +35,29 @@ def _parse_sse(body: str) -> list[dict]:
     ]
 
 
+@pytest.fixture(autouse=True)
+def clear_agent_sessions():
+    session_store.clear()
+    yield
+    session_store.clear()
+
+
+def _install_sdk_stream(monkeypatch, messages: list[object], session_id: str) -> None:
+    async def fake_query(**_):
+        for message in messages:
+            yield message
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id=session_id,
+        )
+
+    monkeypatch.setattr(agent_module, "query", fake_query)
+
+
 def test_health_check() -> None:
     response = client.get("/health")
 
@@ -31,16 +65,51 @@ def test_health_check() -> None:
     assert response.json() == {"status": "ok"}
 
 
-def test_chat_endpoint_streams_agent_events(monkeypatch) -> None:
-    """Fake Runner 기준으로 전체 이벤트 계약을 검증한다."""
+def test_chat_endpoint_streams_sdk_agent_events(monkeypatch) -> None:
+    """실제 run_agent와 adapter가 SDK 이벤트를 SSE 계약으로 변환한다."""
 
-    monkeypatch.setenv("PLANNING_AGENT_FAKE", "1")
+    _install_sdk_stream(
+        monkeypatch,
+        [
+            AssistantMessage(
+                content=[
+                    TextBlock(text="조회 결과를 확인합니다."),
+                    ToolUseBlock(
+                        id="sql-1",
+                        name="mcp__planning__execute_sql",
+                        input={"sql": "SELECT 1 AS qty", "purpose": "계약 검증"},
+                    ),
+                ],
+                model="fixture",
+            ),
+            UserMessage(
+                content=[
+                    ToolResultBlock(
+                        tool_use_id="sql-1",
+                        content=json.dumps(
+                            {
+                                "status": "ok",
+                                "kind": "database",
+                                "row_count": 1,
+                                "table": {"columns": ["qty"], "rows": [[1]]},
+                            }
+                        ),
+                    )
+                ]
+            ),
+            AssistantMessage(
+                content=[TextBlock(text="조회 결과는 1건입니다.")],
+                model="fixture",
+            ),
+        ],
+        session_id="api-stream-session",
+    )
 
     response = client.post(
         "/api/chat",
         json={
-            "message": "9월에 A라인에서 1000개 생산 가능한가?",
-            "conversation_id": "conv-1",
+            "message": "조회 결과를 알려줘",
+            "conversation_id": "api-stream-conversation",
         },
     )
 
@@ -53,79 +122,31 @@ def test_chat_endpoint_streams_agent_events(monkeypatch) -> None:
     assert types[-1] == "done"
     assert {"text", "status", "tool_call", "tool_result"} <= set(types)
 
-    tool_calls = [e["tool_name"] for e in events if e["type"] == "tool_call"]
-    assert tool_calls == [
-        "get_kpi",
-        "execute_sql",
-        "run_simulation",
-        "prepare_table",
-        "prepare_visualization",
-    ]
-    tool_call_ids = [e["tool_call_id"] for e in events if e["type"] == "tool_call"]
-    assert len(tool_call_ids) == len(set(tool_call_ids)) == 5
-    assert all(e["data"].get("args") is not None for e in events if e["type"] == "tool_call")
-    assert {
-        e["tool_call_id"] for e in events if e["type"] == "tool_result"
-    } == set(tool_call_ids)
-
-    table_call_index = next(
-        index
-        for index, event in enumerate(events)
-        if event["type"] == "tool_call" and event.get("tool_name") == "prepare_table"
+    tool_call = next(e for e in events if e["type"] == "tool_call")
+    tool_result = next(e for e in events if e["type"] == "tool_result")
+    assert tool_call["tool_name"] == tool_result["tool_name"] == "execute_sql"
+    assert tool_call["tool_call_id"] == tool_result["tool_call_id"] == "sql-1"
+    assert tool_call["data"]["args"]["purpose"] == "계약 검증"
+    assert tool_result["data"]["kind"] == "database"
+    assert tool_result["data"]["row_count"] == 1
+    answer = "".join(
+        event.get("content") or "" for event in events if event["type"] == "text"
     )
-    chart_call_index = next(
-        index
-        for index, event in enumerate(events)
-        if event["type"] == "tool_call"
-        and event.get("tool_name") == "prepare_visualization"
-    )
-    text_indexes = [
-        index for index, event in enumerate(events) if event["type"] == "text"
-    ]
-    assert any(index < table_call_index for index in text_indexes)
-    assert any(table_call_index < index < chart_call_index for index in text_indexes)
-    assert any(chart_call_index < index for index in text_indexes)
-
-    # 프론트가 catalog / database 두 kind 를 모두 받아본다.
-    kinds = [
-        e["data"].get("kind")
-        for e in events
-        if e["type"] == "tool_result" and isinstance(e.get("data"), dict)
-    ]
-    assert kinds[:2] == ["catalog", "database"]
-
-    prepared = next(
-        event["data"]
-        for event in events
-        if event.get("tool_name") == "prepare_visualization"
-        and event["type"] == "tool_result"
-    )
-    assert prepared["status"] == "ok"
-    visualization_id = prepared["visualization_id"]
-    answer = "".join(event.get("content") or "" for event in events if event["type"] == "text")
-    assert visualization_id not in answer
-    assert "```chart" not in answer
-    assert client.get(f"/api/visualizations/{visualization_id}").status_code == 200
-
-    prepared_table = next(
-        event["data"]
-        for event in events
-        if event.get("tool_name") == "prepare_table"
-        and event["type"] == "tool_result"
-    )
-    assert prepared_table["status"] == "ok"
-    assert prepared_table["displayed_count"] <= 100
-    assert prepared_table["columns"] == ["part", "lot_count", "piece_count"]
+    assert answer == "조회 결과를 확인합니다.조회 결과는 1건입니다."
 
 
 def test_chat_endpoint_done_event_carries_turn_id(monkeypatch) -> None:
     """편집/재생성이 다음 요청의 `fork_from_turn_id` 로 돌려보낼 값."""
 
-    monkeypatch.setenv("PLANNING_AGENT_FAKE", "1")
+    _install_sdk_stream(
+        monkeypatch,
+        [AssistantMessage(content=[TextBlock(text="완료")], model="fixture")],
+        session_id="api-done-session",
+    )
 
     response = client.post(
         "/api/chat",
-        json={"message": "hi", "conversation_id": "conv-1"},
+        json={"message": "hi", "conversation_id": "api-done-conversation"},
     )
 
     events = _parse_sse(response.text)

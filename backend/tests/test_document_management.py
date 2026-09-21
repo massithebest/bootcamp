@@ -118,16 +118,15 @@ def test_catalog_matches_sdk_wire_and_structured_readonly(store):
     assert client.get("/api/knowledge/skills/sql-analysis").json()["content"]
 
 
-def test_fake_search_cites_published_version(store):
-    from agent.fake_runner import run_fake_agent
+def test_mock_search_returns_published_version(store):
+    from services.mock import mock_rag_service
+
     doc = publish(store)
-    async def collect():
-        return [e async for e in run_fake_agent("리드타임 정책 알려줘")]
-    events = asyncio.run(collect())
-    result = next(e.data for e in events if e.type == "tool_result")
+
+    result = asyncio.run(mock_rag_service.search("리드타임 정책 알려줘"))
+
     assert result["documents"][0]["document_id"] == doc["id"]
-    assert "v1" in "".join(e.content or "" for e in events)
-    assert events[-1].type == "done"
+    assert result["documents"][0]["version"] == 1
 
 
 def test_sqlite_backup_preserves_published_revision(store, tmp_path):

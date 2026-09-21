@@ -31,7 +31,6 @@ ERROR = {"status": "error", "message": "조회 조건을 확인하세요."}
 @pytest.fixture
 def sdk_fixture(monkeypatch):
     session_store.clear()
-    monkeypatch.setenv("PLANNING_AGENT_FAKE", "0")
 
     def install(messages, failed=False):
         async def fake_query(**_):

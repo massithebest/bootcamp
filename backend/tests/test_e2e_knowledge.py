@@ -13,7 +13,6 @@ pytestmark = pytest.mark.e2e
 def test_real_agent_searches_and_cites_published_document(tmp_path, monkeypatch):
     if not config.CLAUDE_CLI_PATH or not (os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENROUTER_API_KEY")):
         pytest.skip("CLI/provider credentials are not configured")
-    monkeypatch.delenv("PLANNING_AGENT_FAKE", raising=False)
     monkeypatch.setattr(config, "KNOWLEDGE_DB_PATH", tmp_path / "knowledge.sqlite3")
     monkeypatch.setattr(config, "KNOWLEDGE_SEARCH_BACKEND", "local")
     store = DocumentStore(config.KNOWLEDGE_DB_PATH)
