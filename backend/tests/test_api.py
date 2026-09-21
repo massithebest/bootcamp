@@ -209,7 +209,7 @@ def test_chat_endpoint_issues_and_reuses_http_only_scope_cookie(monkeypatch) -> 
         yield AgentEvent(type="done", data={"turn_id": "new-turn"})
 
     monkeypatch.setattr("api.routes_chat.run_agent", fake_run_agent)
-    scoped_client = TestClient(app)
+    scoped_client = TestClient(app, base_url="https://testserver")
     first = scoped_client.post("/api/chat", json={"message": "첫 요청"})
     second = scoped_client.post("/api/chat", json={"message": "다음 요청"})
 

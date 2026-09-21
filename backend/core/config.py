@@ -17,21 +17,47 @@ except ModuleNotFoundError:  # pragma: no cover
 
 
 # ---- 애플리케이션 ----
-ENV = os.getenv("ENV", "dev")
+ENV = os.getenv("ENV", "").strip().lower() or "dev"
 
-SERVICE_MODE = os.getenv("SERVICE_MODE", "mock")
-
+SERVICE_MODE = os.getenv("SERVICE_MODE", "").strip().lower() or "mock"
 
 #: backend/ 디렉터리. 아래 경로 상수의 기준점.
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 #: 도메인 지식 YAML(카탈로그·KPI·시뮬레이션·용어집·시나리오) 루트.
-KNOWLEDGE_DIR = Path(os.getenv("KNOWLEDGE_DIR") or BACKEND_DIR / "knowledge")
+DEFAULT_KNOWLEDGE_DIR = BACKEND_DIR / "knowledge"
+_CONFIGURED_KNOWLEDGE_DIR = os.getenv("KNOWLEDGE_DIR", "").strip()
+KNOWLEDGE_DIR = Path(_CONFIGURED_KNOWLEDGE_DIR or DEFAULT_KNOWLEDGE_DIR)
 
-#: SMT2020 SQLite 경로. `python -m scripts.build_smt2020_db` 산출물이다.
+#: 개발용 mock에서만 사용하는 SMT2020 SQLite 경로.
+#: 폐쇄망 운영(`ENV=prod`)은 real service만 사용하므로 이 값을 참조하지 않는다.
 SMT2020_DB_PATH = Path(
     os.getenv("SMT2020_DB_PATH") or BACKEND_DIR / "datasets" / "smt2020.db"
 )
+
+
+def validate_runtime_configuration() -> None:
+    """Fail fast when service or production knowledge isolation is unsafe."""
+
+    if SERVICE_MODE not in {"mock", "real"}:
+        raise RuntimeError("SERVICE_MODE must be either 'mock' or 'real'.")
+
+    if ENV != "prod":
+        return
+
+    if SERVICE_MODE != "real":
+        raise RuntimeError("ENV=prod requires SERVICE_MODE=real.")
+    if not _CONFIGURED_KNOWLEDGE_DIR:
+        raise RuntimeError("ENV=prod requires an explicit KNOWLEDGE_DIR.")
+    if not KNOWLEDGE_DIR.is_dir():
+        raise RuntimeError("ENV=prod requires KNOWLEDGE_DIR to be an existing directory.")
+    if KNOWLEDGE_DIR.resolve() == DEFAULT_KNOWLEDGE_DIR.resolve():
+        raise RuntimeError(
+            "ENV=prod cannot use the bundled SMT2020 development knowledge directory."
+        )
+
+
+validate_runtime_configuration()
 
 #: 조회 결과(parquet) 저장 디렉터리. git 추적 대상이 아니다.
 RESULT_STORE_DIR = Path(
