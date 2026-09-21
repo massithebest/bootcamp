@@ -21,11 +21,11 @@ def test_real_agent_searches_and_cites_published_document(tmp_path, monkeypatch)
     store.transition(doc["id"], "activate", doc["revision"], version=1, actor="테스트")
     from agent.agent import run_agent
     async def collect():
-        return [event async for event in run_agent("search_knowledge로 ZETA 검증 정책을 찾아 확인 코드와 문서 제목, 출처, 버전을 알려줘.")]
+        return [event async for event in run_agent("search_documents로 ZETA 검증 정책을 찾아 확인 코드와 문서 제목, 출처, 버전을 알려줘.")]
     events = asyncio.run(asyncio.wait_for(collect(), timeout=150))
     errors = [e for e in events if e.type == "error"]
     assert not errors, "Agent returned a public error"
-    results = [e.data for e in events if e.type == "tool_result" and e.tool_name == "search_knowledge"]
+    results = [e.data for e in events if e.type == "tool_result" and e.tool_name == "search_documents"]
     assert results and any(d.get("document_id") == doc["id"] and d.get("version") == 1 for r in results for d in r.get("documents", []))
     answer = "".join(e.content or "" for e in events)
     assert "CHECK-742" in answer and "ZETA" in answer

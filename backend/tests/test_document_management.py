@@ -10,7 +10,7 @@ from services.document_store import DocumentStore, KnowledgeError
 from services.knowledge_service import get_store
 from agent.sdk_tools import TOOL_NAMES, build_planning_mcp_server
 from mcp_types import PaginatedRequestParams
-from tools.rag_tool import search_knowledge
+from tools.rag_tool import search_documents
 
 FIELDS = dict(title="리드타임 정책", content="승인된 리드타임은 작업 시작부터 완료까지의 시간입니다.", category="정책", tags=["리드타임"], owner="담당자", source="검토 회의")
 
@@ -77,7 +77,7 @@ def test_korean_search_empty_normalization_and_filters(store):
     store.save({**FIELDS, "title": "초안만", "content": "기밀초안"})
     assert store.search("기밀초안")["documents"] == []
     assert "score" not in store.search("리드타임")["documents"][0]
-    assert asyncio.run(search_knowledge("리드타임"))["kind"] == "knowledge"
+    assert asyncio.run(search_documents("리드타임"))["kind"] == "knowledge"
 
 
 def test_management_api_validation_history_and_safe_errors(store, monkeypatch):

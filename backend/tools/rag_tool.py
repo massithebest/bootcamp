@@ -5,7 +5,7 @@ from services import rag_service
 from services.document_store import get_document_store, KnowledgeError
 
 
-async def search_knowledge(query: str) -> dict:
+async def search_documents(query: str) -> dict:
     try:
         if config.KNOWLEDGE_SEARCH_BACKEND == "local":
             return await to_thread(get_document_store().search, query)

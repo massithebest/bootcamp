@@ -5,7 +5,7 @@
 `tool_call` / `tool_result` 이벤트로 프론트에 관측되게 한다.
 
 결과의 `kind` 는 `"catalog"` 다 — `"knowledge"` 는 프론트가 이미 RAG
-(`search_knowledge`) 결과 렌더링에 쓰고 있어 충돌한다.
+(`search_documents`) 결과 렌더링에 쓰고 있어 충돌한다.
 """
 
 from services.knowledge_service import get_store

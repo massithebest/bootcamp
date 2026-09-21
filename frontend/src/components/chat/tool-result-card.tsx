@@ -1,7 +1,7 @@
 /**
  * Agent 도구 실행 결과. 종류에 따라 표현이 달라진다:
  *   execute_sql                   → 표 + 실행 SQL
- *   search_knowledge              → 출처 · 관련도 인용
+ *   search_documents              → 출처 · 관련도 인용
  *   list_simulation/run_simulation → 핵심 수치 + 병목/제약 요약
  *   list_tables/describe_table/list_kpis/get_kpi → 참조한 지식 (기본 접힘)
  *
@@ -27,7 +27,7 @@ type Kind = "database" | "knowledge" | "simulation" | "catalog" | "generic";
 
 const TOOL_META: Record<string, { label: string; kind: Kind }> = {
   execute_sql: { label: "데이터 조회", kind: "database" },
-  search_knowledge: { label: "공정 문서 검색", kind: "knowledge" },
+  search_documents: { label: "공정 문서 검색", kind: "knowledge" },
   list_simulation: { label: "시뮬레이션 목록", kind: "simulation" },
   run_simulation: { label: "시뮬레이션 실행", kind: "simulation" },
   list_tables: { label: "테이블 목록", kind: "catalog" },

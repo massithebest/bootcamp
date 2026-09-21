@@ -20,7 +20,7 @@ from tools.knowledge_tool import (
     list_recipes,
     list_tables,
 )
-from tools.rag_tool import search_knowledge
+from tools.rag_tool import search_documents
 from tools.result_tool import get_result_page, get_result_summary
 from tools.simulation_tool import list_simulation, run_simulation
 from tools.sql_tool import execute_sql
@@ -70,12 +70,12 @@ def _execute_sql_tool(access_scope: str | None):
 
 
 @tool(
-    "search_knowledge",
+    "search_documents",
     "공정 매뉴얼·업무 용어·생산계획 정책 등 비정형 도메인 지식을 검색한다.",
     {"query": str},
 )
-async def _search_knowledge(args: dict[str, Any]) -> dict[str, Any]:
-    return _ok(await search_knowledge(query=args["query"]))
+async def _search_documents(args: dict[str, Any]) -> dict[str, Any]:
+    return _ok(await search_documents(query=args["query"]))
 
 
 @tool(
@@ -274,7 +274,7 @@ def _prepare_visualization_tool(access_scope: str | None):
 def planning_tools(access_scope: str | None = None):
     """Single source for SDK registration, allowed names and UI discovery."""
     return [
-        _execute_sql_tool(access_scope), _search_knowledge, _list_simulation,
+        _execute_sql_tool(access_scope), _search_documents, _list_simulation,
         _run_simulation_tool(access_scope), _list_tables, _describe_table,
         _list_kpis, _get_kpi, _list_recipes, _get_recipe,
         _get_result_summary_tool(access_scope), _get_result_page_tool(access_scope),
@@ -298,7 +298,7 @@ async def tool_catalog() -> list[dict]:
     result = await server._request_handlers["tools/list"].handler(None, PaginatedRequestParams())
     output = {
         "execute_sql": "조회 행·컬럼 또는 대용량 결과 참조",
-        "search_knowledge": "검색 문서 발췌·출처·검토 버전",
+        "search_documents": "검색 문서 발췌·출처·검토 버전",
         "list_simulation": "시뮬레이션 종류·입력·출력 정의",
         "run_simulation": "시뮬레이션 결과와 검증 상태",
         "list_tables": "테이블 이름·설명 목록", "describe_table": "컬럼·조인·조회·집계 규칙",

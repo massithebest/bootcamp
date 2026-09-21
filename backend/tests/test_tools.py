@@ -18,7 +18,7 @@ from tools.knowledge_tool import (
     list_recipes,
     list_tables,
 )
-from tools.rag_tool import search_knowledge
+from tools.rag_tool import search_documents
 from tools.result_tool import get_result_page, get_result_summary
 from tools.simulation_tool import list_simulation, run_simulation
 from tools.sql_tool import execute_sql
@@ -28,7 +28,7 @@ from tools.visualization_tool import prepare_visualization
 
 ALL_TOOLS = (
     execute_sql,
-    search_knowledge,
+    search_documents,
     list_simulation,
     run_simulation,
     list_tables,
@@ -83,8 +83,8 @@ def test_execute_sql_returns_database_kind(seeded_db) -> None:
 
 
 @pytest.mark.mock_service
-def test_search_knowledge_returns_dict() -> None:
-    result = asyncio.run(search_knowledge("리드타임 정의"))
+def test_search_documents_returns_dict() -> None:
+    result = asyncio.run(search_documents("리드타임 정의"))
     assert isinstance(result, dict)
 
 
