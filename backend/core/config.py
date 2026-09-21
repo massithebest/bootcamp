@@ -60,14 +60,14 @@ CORS_ALLOW_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
         "CORS_ALLOW_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000",
+        "http://localhost:3100,http://127.0.0.1:3100",
     ).split(",")
     if origin.strip()
 ]
 
 #: 결과·시각화 접근 범위를 구분하는 불투명 브라우저 세션 쿠키 이름.
 #: 인증 principal이 아니다 — "같은 브라우저가 만든 결과인지" 구분용
-#: (plan/260915-chart-visualization-plan.md).
+#: (`plan/Todo.md`의 결과·시각화 안정 계약).
 SESSION_SCOPE_COOKIE_NAME = "pp_session_scope"
 
 #: 쿠키의 Secure 속성. 로컬 개발(HTTP)에서는 꺼야 브라우저가 쿠키를 저장한다.

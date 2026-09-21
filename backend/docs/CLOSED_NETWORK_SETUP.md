@@ -46,7 +46,7 @@ Part 1을 마쳐 `SERVICE_MODE=mock`으로 서버가 정상 기동하는 것을 
 
 ### Python 의존성 확인
 
-- `requirements-dev.txt`가 포함하는 각 패키지가 **사내에서 사용 가능한 이름/버전인지
+- `requirements.txt`가 포함하는 각 패키지가 **사내에서 사용 가능한 이름/버전인지
   Nexus에 등록되어 있는지 사전 확인**한다. 특히 아래는 원래 pntfp 환경
   기준으로 들어간 항목이라 폐쇄망 사내 표준과 다를 수 있다. 다르면 실제
   이식 시(Part 2) 맞춰 교체한다:
@@ -68,7 +68,7 @@ Windows PowerShell에서 `backend` 폴더로 이동한 뒤 Python 3.11 기반 `.
 cd backend
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements-dev.txt
+python -m pip install -r requirements.txt
 ```
 
 사내 Nexus가 pip 기본 인덱스로 설정되어 있지 않다면 보안 담당자가 제공한
@@ -77,7 +77,7 @@ python -m pip install -r requirements-dev.txt
 ```powershell
 python -m pip install `
   --index-url "https://<사내-Nexus-주소>/repository/<PyPI-저장소>/simple" `
-  -r requirements-dev.txt
+  -r requirements.txt
 ```
 
 - 설치가 실패하면 Python 3.11용 패키지와 전이 의존성이 Nexus에 모두
@@ -114,14 +114,14 @@ python -m scripts.build_smt2020_db
 첫 번째 PowerShell 창에서 서버를 기동한다.
 
 ```powershell
-python -m uvicorn main:app --port 8000
+python -m uvicorn main:app --port 8100
 ```
 
 두 번째 PowerShell 창에서 헬스체크를 실행해 `{"status":"ok"}` 응답을
 확인한다.
 
 ```powershell
-curl.exe http://localhost:8000/health
+curl.exe http://localhost:8100/health
 ```
 
 먼저 `SERVICE_MODE=mock`, `PLANNING_AGENT_FAKE=1`로 Claude 호출 없이 이벤트
@@ -131,13 +131,13 @@ curl.exe http://localhost:8000/health
 
 ```powershell
 $env:PLANNING_AGENT_FAKE = "1"
-python -m uvicorn main:app --port 8000
+python -m uvicorn main:app --port 8100
 ```
 
 두 번째 창에서 채팅 API를 호출한다.
 
 ```powershell
-curl.exe -N -X POST localhost:8000/api/chat `
+curl.exe -N -X POST localhost:8100/api/chat `
   -H 'content-type: application/json' `
   -d '{"message":"LVHM 제품별 초기 WIP를 표와 차트로 보여줘","conversation_id":"c1"}'
 ```
@@ -151,7 +151,7 @@ SSE의 SQL·표·차트 Tool 결과가 모두 `status: "ok"`인지 확인한다.
 
 ```powershell
 $env:PLANNING_AGENT_FAKE = "0"
-python -m uvicorn main:app --port 8000
+python -m uvicorn main:app --port 8100
 ```
 
 검증을 마친 다음에야 Part 2(`SERVICE_MODE=real` 전환, pntfp 로직 이식)로
@@ -452,10 +452,10 @@ python -m pytest -q `
 ```powershell
 cd backend
 .\.venv\Scripts\Activate.ps1
-python -m uvicorn main:app --port 8000
+python -m uvicorn main:app --port 8100
 ```
 
-7. 다른 PowerShell 창에서 `curl.exe http://localhost:8000/health`를 호출해
+7. 다른 PowerShell 창에서 `curl.exe http://localhost:8100/health`를 호출해
    `{"status":"ok"}`를 확인한다.
 8. 실제 채팅으로 다음 3가지 질의를 각각
    테스트해서 real 서비스가 정상 호출되는지 확인:

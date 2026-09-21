@@ -16,7 +16,7 @@ import type { AgentEvent, ChatRequestBody } from "@/types/chat";
 import { SseParser, parseAgentEvent } from "./chat-sse";
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8100";
 
 export interface SendChatMessageOptions {
   message: string;
