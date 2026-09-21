@@ -189,7 +189,7 @@ assistant-ui Reasoning disclosure에는 Backend `status` 이벤트의 공개 업
 
 실 응답은 `include_partial_messages`로 받은 `text_delta`를 기존 AgentEvent `text`로
 즉시 전달한다. `message_start`의 provider message id가 같은 최종 누적 TextBlock은 adapter가 생략해
-중복을 막는다. 공개 AgentEvent와 FastAPI SSE 형식은 바뀌지 않으며 fake runner와
+중복을 막는다. 공개 AgentEvent와 FastAPI SSE 형식은 바뀌지 않으며
 frontend external-store 계약도 동일하다.
 
 근거: [계획 이력 요약](../plan/Todo.md),
@@ -393,7 +393,7 @@ thread 전환 API는 여전히 active development로 표시되며, 더 안정적
 연결하고 `Items` children renderer, `data-active`·`aria-current`, 기본 키보드 탐색과
 `sharedFocusGroup` 메뉴를 함께 사용한다.
 
-고정 SMT2020 시작 질문은 `AuiConfig`의 `Suggestions(EXAMPLE_QUESTIONS)`로 등록하고,
+고정 시작 질문(`lib/dummy.ts`의 개발용 예시)은 `AuiConfig`의 `Suggestions(EXAMPLE_QUESTIONS)`로 등록하고,
 `ThreadPrimitive.Suggestions` iterator 안에서 `SuggestionPrimitive.Trigger`와
 `Title`을 렌더링한다. 클릭 즉시 실행하는 제품 동작은 `send`로 유지한다. 이로써
 정적 제안의 데이터 소유권과 화면 반복·trigger 동작이 공식 scope 경계를 따른다.

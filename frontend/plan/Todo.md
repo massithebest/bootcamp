@@ -60,6 +60,7 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 - `prepare_visualization` 성공 결과의 `visualization_id`로
   `/api/visualizations/{id}`를 조회한다.
 - 지식 API는 Tool·Skill·구조화 entry와 버전형 text document를 제공한다.
+- 문서 검색 Tool 이름은 `search_documents`이며 결과 `kind`는 `knowledge`다.
 - 브라우저는 credential cookie를 포함하고 내부 path·scope를 표시하지 않는다.
 - malformed·oversized·알 수 없는 payload는 안전한 오류 UI로 전환한다.
 
@@ -95,6 +96,8 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 - SSE 채팅, 3-pane Workbench, Tool 결과 카드와 편집·재생성·취소·복사를
   구현했다.
 - 구조화 지식·Skill 조회와 Context Inspector를 연결했다.
+- 구조화 지식 상세 응답에서 simulation도 선택 필드 `aggregation_rules`, `visualization_hints`를
+  가질 수 있다. 기존 상세 렌더러가 필드 이름별 라벨("집계 규칙", "시각화 안내")로 표시한다.
 
 ### 2026-09-15 — assistant-ui 안정화와 결과·차트
 
@@ -104,7 +107,7 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
   회귀 테스트로 고정했다.
 - Result Store 대용량 요약과 검증된 bar/line 차트, loading·retry·fallback을
   구현했다.
-- SMT2020 기반 예시 질문·정적 콘텐츠와 fake 관통 흐름을 정리했다.
+- SMT2020 기반 예시 질문·정적 콘텐츠와 관통 흐름 검증을 정리했다.
 
 ### 2026-09-16~18 — Elements, Tool UI와 UX 감사
 
