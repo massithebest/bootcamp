@@ -11,7 +11,7 @@ import os
 
 import pytest
 
-pytestmark = pytest.mark.e2e
+pytestmark = [pytest.mark.e2e, pytest.mark.smt2020, pytest.mark.mock_service]
 
 
 QUERY = "SMT2020 LVHM에서 제품별 초기 WIP를 조회하고 simulation 입력 관계도 검증해줘."
@@ -23,18 +23,18 @@ def _require_api_key() -> None:
 
 
 @pytest.fixture(scope="module")
-def agent_run(tmp_path_factory):
+def agent_run(tmp_path_factory, smt2020_assets):
     """시드 DB 를 만들고 에이전트를 한 번 돌려 이벤트를 모은다."""
 
     _require_api_key()
 
     import asyncio
 
-    from scripts.build_smt2020_db import DEFAULT_SOURCE_ROOT, main as build_smt2020_db
     from core import config
 
-    db_path = build_smt2020_db(
-        DEFAULT_SOURCE_ROOT, tmp_path_factory.mktemp("e2e") / "smt2020.db"
+    db_path = smt2020_assets.main(
+        smt2020_assets.DEFAULT_SOURCE_ROOT,
+        tmp_path_factory.mktemp("e2e") / "smt2020.db",
     )
     original = config.SMT2020_DB_PATH
     config.SMT2020_DB_PATH = db_path

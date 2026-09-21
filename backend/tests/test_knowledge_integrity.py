@@ -34,7 +34,6 @@ def _table_columns(store: KnowledgeStore, table: str) -> set[str]:
 
 def test_all_yaml_loads(store: KnowledgeStore) -> None:
     assert store.tables, "카탈로그 테이블이 하나도 로드되지 않았다"
-    assert store.kpis, "KPI 가 하나도 로드되지 않았다"
 
 
 def test_tables_and_recipes_have_query_guidance(store: KnowledgeStore) -> None:

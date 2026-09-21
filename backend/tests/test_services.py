@@ -5,15 +5,19 @@ import re
 
 import pytest
 
-from scripts.build_smt2020_db import DEFAULT_SOURCE_ROOT, main as build_smt2020_db
 from services import result_store
 from services.mock import mock_rag_service, mock_simulation_service, mock_sql_service
 from services.result_store import LocalParquetResultStore
 
 
+pytestmark = pytest.mark.mock_service
+
+
 @pytest.fixture()
-def smt_db(tmp_path, monkeypatch):
-    db_path = build_smt2020_db(DEFAULT_SOURCE_ROOT, tmp_path / "smt2020.db")
+def smt_db(tmp_path, monkeypatch, smt2020_assets):
+    db_path = smt2020_assets.main(
+        smt2020_assets.DEFAULT_SOURCE_ROOT, tmp_path / "smt2020.db"
+    )
     monkeypatch.setattr("core.config.SMT2020_DB_PATH", db_path)
     monkeypatch.setattr(result_store, "_store", LocalParquetResultStore(tmp_path / "results"))
     return db_path

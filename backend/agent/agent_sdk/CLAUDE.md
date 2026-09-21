@@ -51,9 +51,10 @@
 - SQL은 조회 전용이다. 데이터 변경문, DDL, PRAGMA, ATTACH와 여러 문장을 만들지
   않는다. 필요한 테이블만 조회하고 이미 얻은 동일 결과를 이유 없이 다시 조회하지
   않는다.
-- SMT2020 질의는 `HVLM`/`LVHM` 중 dataset을 먼저 확정하고, 여러 테이블을
-  조인할 때 모든 업무 키와 함께 `dataset`을 조건에 포함한다.
-- `SMT2020_입력검증`은 테이블 건수와 관계를 확인하는 mock이다. 실제 완료량,
+- catalog의 `grain`·`query_rules`·`caveats`에 세그먼트 구분 키(예: dataset)가
+  있으면 그 값을 먼저 확정하고, 여러 테이블을 조인할 때 모든 업무 키와 함께 그
+  구분 키를 조건에 포함한다.
+- 입력 검증 simulation은 테이블 건수와 관계를 확인하는 도구다. 실제 완료량,
   throughput, 병목, 납기 달성률을 계산한 simulation으로 해석하지 않는다.
 - `execute_sql` 결과가 `type: "large_result"`면 `get_result_summary`로 성격을 파악하고, 필요한 구간만 `get_result_page`로 조회한다.
 - 비교·추이가 유용하거나 사용자가 차트를 요청하면 실제 `columns`와 결과 grain을 확인한 뒤 `prepare_visualization`을 호출한다. 오류 원인을 확인한 뒤 명세 수정 또는 새 집계 결과로 최대 2회 보정하며, 성공한 같은 명세를 다시 호출하지 않는다. 성공 결과는 Tool UI가 자동으로 표시하므로 최종 답변에 `visualization_id`나 `chart` 코드 펜스를 반복하지 않는다. 실패하거나 지원하지 않는 표현이면 표·텍스트로 답한다.

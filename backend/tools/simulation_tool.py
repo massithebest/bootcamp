@@ -20,7 +20,7 @@ async def run_simulation(
     """Run a simulation identified by `simulation_type` with `params`.
 
     Example:
-        simulation_type="SMT2020_입력검증", params={"dataset": "LVHM"}
+        simulation_type="<simulation_type>", params={"<param>": "<value>"}
 
     Args:
         access_scope: 요청 브라우저 세션의 불투명 scope. 모델에게 노출하지

@@ -391,3 +391,37 @@ def test_invalid_recipe_guide_reports_filename(root: Path, guide: str) -> None:
 
     with pytest.raises(ValueError, match="invalid.yaml"):
         KnowledgeStore.load(root)
+def test_scenario_accepts_arbitrary_dataset_identifier(root: Path) -> None:
+    _write(
+        root / "scenarios/plant_snapshot_validation.yaml",
+        """
+        scenario_id: plant_snapshot_validation
+        name: 공장 스냅샷 검증
+        description: 임의 운영 fixture 식별자를 사용하는 시나리오
+        dataset: plant_a_2026q3_snapshot
+        question: 공장 A 스냅샷의 입력 관계를 검증해줘
+        steps:
+          - action: recipe
+            ref: wip_by_part
+            params: {dataset: plant_a_2026q3_snapshot}
+            expectation: 제품별 집계가 조회된다
+          - action: simulation
+            ref: SMT2020_입력검증
+            params: {dataset: plant_a_2026q3_snapshot}
+            expectation: 입력 관계 검사가 완료된다
+        expected:
+          table_counts: {part: 3}
+          unmatched_rows: {wip_to_part: 0}
+        status: draft
+        """,
+    )
+
+    store = KnowledgeStore.load(root)
+
+    scenario = store.get_scenario("plant_snapshot_validation")
+    assert scenario["dataset"] == "plant_a_2026q3_snapshot"
+    assert [row["scenario_id"] for row in store.list_scenarios("2026q3")] == [
+        "plant_snapshot_validation"
+    ]
+
+

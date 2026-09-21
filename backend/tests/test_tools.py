@@ -6,7 +6,6 @@ import inspect
 import pytest
 
 from agent.sdk_tools import TOOL_NAMES
-from scripts.build_smt2020_db import DEFAULT_SOURCE_ROOT, main as build_smt2020_db
 from services import result_store
 from services.result_store import LocalParquetResultStore
 from services import visualization_store
@@ -46,8 +45,10 @@ ALL_TOOLS = (
 
 
 @pytest.fixture()
-def seeded_db(tmp_path, monkeypatch):
-    db_path = build_smt2020_db(DEFAULT_SOURCE_ROOT, tmp_path / "smt2020.db")
+def seeded_db(tmp_path, monkeypatch, smt2020_assets):
+    db_path = smt2020_assets.main(
+        smt2020_assets.DEFAULT_SOURCE_ROOT, tmp_path / "smt2020.db"
+    )
     monkeypatch.setattr("core.config.SMT2020_DB_PATH", db_path)
     monkeypatch.setattr(
         result_store, "_store", LocalParquetResultStore(tmp_path / "results")
@@ -81,11 +82,13 @@ def test_execute_sql_returns_database_kind(seeded_db) -> None:
     assert result["table"]["columns"] == ["part"]
 
 
+@pytest.mark.mock_service
 def test_search_knowledge_returns_dict() -> None:
     result = asyncio.run(search_knowledge("리드타임 정의"))
     assert isinstance(result, dict)
 
 
+@pytest.mark.mock_service
 def test_list_simulation_returns_dict() -> None:
     result = asyncio.run(list_simulation())
     assert isinstance(result, dict)
@@ -103,6 +106,7 @@ def test_run_simulation_returns_dict(seeded_db) -> None:
     assert result["status"] == "ok"
 
 
+@pytest.mark.usefixtures("bundled_knowledge")
 @pytest.mark.parametrize(
     ("call", "catalog_type"),
     [
@@ -123,6 +127,7 @@ def test_knowledge_tools_use_catalog_kind(call, catalog_type: str) -> None:
     assert result["catalog_type"] == catalog_type
 
 
+@pytest.mark.usefixtures("bundled_knowledge")
 def test_list_tables_keyword_filters() -> None:
     result = asyncio.run(list_tables(keyword="재공"))
 
@@ -143,6 +148,7 @@ def test_get_kpi_unknown_is_error() -> None:
     assert "list_kpis" in result["message"]
 
 
+@pytest.mark.usefixtures("bundled_knowledge")
 def test_get_kpi_exposes_diagnostics() -> None:
     result = asyncio.run(get_kpi("initial_wip"))
 

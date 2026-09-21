@@ -5,20 +5,24 @@ import sqlite3
 
 import pytest
 
-from core.config import KNOWLEDGE_DIR
-from scripts.build_smt2020_db import DEFAULT_SOURCE_ROOT, main
+from core.config import DEFAULT_KNOWLEDGE_DIR
 from services.knowledge_service import KnowledgeStore
 from tools.knowledge_tool import describe_table, get_kpi
+
+pytestmark = pytest.mark.usefixtures("bundled_knowledge")
 
 
 @pytest.fixture(scope="module")
 def store() -> KnowledgeStore:
-    return KnowledgeStore.load(KNOWLEDGE_DIR)
+    return KnowledgeStore.load(DEFAULT_KNOWLEDGE_DIR)
 
 
 @pytest.fixture(scope="module")
-def db(tmp_path_factory):
-    return main(DEFAULT_SOURCE_ROOT, tmp_path_factory.mktemp("aggregation") / "smt.db")
+def db(tmp_path_factory, smt2020_assets):
+    return smt2020_assets.main(
+        smt2020_assets.DEFAULT_SOURCE_ROOT,
+        tmp_path_factory.mktemp("aggregation") / "smt.db",
+    )
 
 
 def test_catalog_exposes_aggregation_guidance(store: KnowledgeStore) -> None:
@@ -37,6 +41,8 @@ def test_initial_wip_kpi_contract(store: KnowledgeStore) -> None:
     }
 
 
+@pytest.mark.smt2020
+@pytest.mark.mock_service
 def test_initial_wip_sql_matches_source(db, store: KnowledgeStore) -> None:
     sql = store.kpis["initial_wip"].sql_template.replace(":dataset", "?")
     with sqlite3.connect(db) as conn:
@@ -44,6 +50,8 @@ def test_initial_wip_sql_matches_source(db, store: KnowledgeStore) -> None:
     assert rows == [("HVLM", "part_3", 1432, 35800), ("HVLM", "part_4", 823, 20575)]
 
 
+@pytest.mark.smt2020
+@pytest.mark.mock_service
 def test_dataset_key_prevents_cross_join_inflation(db) -> None:
     with sqlite3.connect(db) as conn:
         safe = conn.execute(

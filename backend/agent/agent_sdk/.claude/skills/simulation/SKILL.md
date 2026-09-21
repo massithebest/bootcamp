@@ -1,6 +1,6 @@
 ---
 name: simulation
-description: 생산계획 Agent 전용. 등록된 시뮬레이션 또는 SMT2020 입력 검증 mock을 선택·실행·해석할 때 사용.
+description: 생산계획 Agent 전용. 등록된 시뮬레이션 또는 입력 검증 도구를 선택·실행·해석할 때 사용.
 ---
 
 # 시뮬레이션 절차
@@ -17,5 +17,5 @@ description: 생산계획 Agent 전용. 등록된 시뮬레이션 또는 SMT2020
 
 - 시뮬레이션 결과와 SQL 결과가 어긋나면 어느 쪽이 맞는지 단정하지 말고 둘 다 제시한다.
 - 시뮬레이션은 조회 수단이다. 결과를 근거로 원인을 단정하려면 `kpi-shortfall-analysis` 절차의 가설 검증 안에서 쓴다.
-- `SMT2020_입력검증`은 입력 table count와 JOIN 관계만 확인한다. 이 결과에서 실제
+- 입력 검증 simulation은 입력 table count와 JOIN 관계만 확인한다. 이 결과에서 실제
   완료량, throughput, 병목, 가동률 또는 납기 달성 여부를 추론하지 않는다.

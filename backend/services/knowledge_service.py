@@ -142,7 +142,7 @@ class ScenarioStep(BaseModel):
 
 
 class ScenarioExpected(BaseModel):
-    """고정 benchmark에서 바뀌면 안 되는 최소 기대값."""
+    """고정 검증 데이터에서 바뀌면 안 되는 최소 기대값."""
 
     table_counts: dict[str, int] = {}
     unmatched_rows: dict[str, int] = {}
@@ -154,7 +154,7 @@ class KnowledgeScenario(KnowledgeMeta):
     scenario_id: str
     name: str
     description: str
-    dataset: Literal["HVLM", "LVHM"]
+    dataset: str
     question: str
     steps: list[ScenarioStep]
     expected: ScenarioExpected

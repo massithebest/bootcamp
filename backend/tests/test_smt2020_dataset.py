@@ -8,10 +8,12 @@ from pathlib import Path
 import pytest
 
 from core.config import KNOWLEDGE_DIR
-from scripts.build_smt2020_db import DEFAULT_SOURCE_ROOT, main
 from services.knowledge_service import KnowledgeStore
 from services.mock.mock_simulation_service import _input_validation
 from services.sql_guard import check_sql
+
+
+pytestmark = [pytest.mark.smt2020, pytest.mark.mock_service]
 
 
 EXPECTED_COUNTS = {
@@ -25,8 +27,11 @@ EXPECTED_COUNTS = {
 
 
 @pytest.fixture(scope="module")
-def db(tmp_path_factory) -> Path:
-    return main(DEFAULT_SOURCE_ROOT, tmp_path_factory.mktemp("smt") / "smt2020.db")
+def db(tmp_path_factory, smt2020_assets) -> Path:
+    return smt2020_assets.main(
+        smt2020_assets.DEFAULT_SOURCE_ROOT,
+        tmp_path_factory.mktemp("smt") / "smt2020.db",
+    )
 
 
 def test_tables_and_counts(db: Path) -> None:
@@ -175,28 +180,34 @@ def test_scenario_expectations_match_generated_database(
         }
 
 
-def test_repeated_build_is_deterministic(tmp_path: Path) -> None:
+def test_repeated_build_is_deterministic(tmp_path: Path, smt2020_assets) -> None:
     target = tmp_path / "smt2020.db"
-    main(DEFAULT_SOURCE_ROOT, target)
+    smt2020_assets.main(smt2020_assets.DEFAULT_SOURCE_ROOT, target)
     with sqlite3.connect(target) as conn:
         first = conn.execute("SELECT dataset, part, route FROM part ORDER BY 1,2").fetchall()
-    main(DEFAULT_SOURCE_ROOT, target)
+    smt2020_assets.main(smt2020_assets.DEFAULT_SOURCE_ROOT, target)
     with sqlite3.connect(target) as conn:
         second = conn.execute("SELECT dataset, part, route FROM part ORDER BY 1,2").fetchall()
     assert first == second
 
 
-def test_failed_rebuild_keeps_previous_database(tmp_path: Path) -> None:
+def test_failed_rebuild_keeps_previous_database(tmp_path: Path, smt2020_assets) -> None:
     target = tmp_path / "smt2020.db"
-    main(DEFAULT_SOURCE_ROOT, target)
+    smt2020_assets.main(smt2020_assets.DEFAULT_SOURCE_ROOT, target)
     before = target.read_bytes()
     broken = tmp_path / "datasets"
-    shutil.copytree(DEFAULT_SOURCE_ROOT / "SMT2020_HVLM", broken / "SMT2020_HVLM")
-    shutil.copytree(DEFAULT_SOURCE_ROOT / "SMT2020_LVHM", broken / "SMT2020_LVHM")
+    shutil.copytree(
+        smt2020_assets.DEFAULT_SOURCE_ROOT / "SMT2020_HVLM",
+        broken / "SMT2020_HVLM",
+    )
+    shutil.copytree(
+        smt2020_assets.DEFAULT_SOURCE_ROOT / "SMT2020_LVHM",
+        broken / "SMT2020_LVHM",
+    )
     part = broken / "SMT2020_HVLM" / "part.txt"
     rows = list(csv.reader(part.open(encoding="utf-8"), delimiter="\t"))
     rows[0][0] = "BROKEN"
     part.write_text("\n".join("\t".join(row) for row in rows) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="헤더"):
-        main(broken, target)
+        smt2020_assets.main(broken, target)
     assert target.read_bytes() == before

@@ -281,6 +281,7 @@ def test_knowledge_skills_endpoint() -> None:
     assert all(skill["description"] for skill in skills)
 
 
+@pytest.mark.usefixtures("bundled_knowledge")
 def test_knowledge_catalog_endpoint() -> None:
     response = client.get("/api/knowledge/catalog")
 
@@ -303,6 +304,7 @@ def test_knowledge_catalog_endpoint() -> None:
     assert set(tables[0]) == {"table", "description", "grain", "tags", "verified"}
 
 
+@pytest.mark.usefixtures("bundled_knowledge")
 def test_knowledge_kpis_endpoint() -> None:
     response = client.get("/api/knowledge/kpis")
 

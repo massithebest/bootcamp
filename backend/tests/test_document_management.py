@@ -97,6 +97,7 @@ def test_management_api_validation_history_and_safe_errors(store, monkeypatch):
     assert str(store.path.parent) not in response.text
 
 
+@pytest.mark.usefixtures("bundled_knowledge")
 def test_catalog_matches_sdk_wire_and_structured_readonly(store):
     client = TestClient(app)
     rows = client.get("/api/knowledge/tools").json()

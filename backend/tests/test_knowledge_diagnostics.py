@@ -1,6 +1,11 @@
 """Deliberately broken tiny fixtures; benchmark input files are never modified."""
 import sqlite3
+
+import pytest
+
 from services.knowledge_service import get_store
+
+pytestmark = pytest.mark.usefixtures("bundled_knowledge")
 
 
 def test_diagnostics_find_missing_links_and_aggregation_hazards():
