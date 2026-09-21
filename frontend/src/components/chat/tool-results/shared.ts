@@ -40,7 +40,7 @@ export function toneOf(v: unknown): ResultTone {
 }
 
 /**
- * `execute_sql`/`run_simulation` 결과가 대용량(100행 초과, plan/260915-result-store-plan.md)이라
+ * `execute_sql`/`run_simulation` 결과가 대용량(100행 초과)이라
  * 원본 행 대신 `sample_rows`/`summary` 요약만 실려 왔는지 판별한다.
  * `database-result.tsx`/`simulation-result.tsx` 양쪽에서 같은 판별 로직을 쓴다.
  */

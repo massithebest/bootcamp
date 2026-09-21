@@ -1,8 +1,19 @@
 # Frontend 작업 지침
 
 Vite 7, React 18, strict TypeScript 기반의 라우터 없는 SPA다. 코드 변경 전
-상위 `../AGENTS.md`, [프론트 결정 기록](docs/decisions.md)과 관련 상위 계획을
-확인한다.
+`plan/Todo.md`, [프론트 결정 기록](docs/decisions.md)과 대상 폴더의 더
+가까운 `AGENTS.md`를 확인한다. 이 workspace는 Backend나 루트 계획
+문서를 읽을 수 있다고 가정하지 않는다.
+
+## 작업과 계획
+
+- 기존 staged·unstaged·untracked 변경은 사용자 작업으로 간주하고 요청 범위
+  밖 파일을 되돌리거나 덮어쓰지 않는다.
+- 작은 계획은 `plan/Todo.md`에 직접 작성하고, 큰 작업만 `plan/`에
+  날짜형 파일로 만든다. 필요한 외부 API 계약은 문서 안에 자체적으로
+  적고 준비되지 않은 값을 추측하지 않는다.
+- 폐쇄망 환경을 기준으로 하며 외부 CDN·font·runtime API, 비밀값·사내
+  URL을 코드·로그·문서에 추가하지 않는다.
 
 ## 구조와 상태 소유권
 
@@ -26,7 +37,7 @@ Vite 7, React 18, strict TypeScript 기반의 라우터 없는 SPA다. 코드 �
   함께 확인한다. 문서: <https://www.assistant-ui.com/llms-full.txt>
 - 앱 루트의 `AssistantRuntimeProvider`, 전체 화면 `Thread`,
   `useExternalStoreRuntime` 조합을 유지한다. `useChatRuntime`과 AI SDK transport로
-  전환하려면 별도 상위 계획과 Backend streaming 계약 변경이 필요하다.
+  전환하려면 별도 Frontend 계획과 streaming 기대 계약 변경이 필요하다.
 - floating `AssistantModal`은 현재 제품 구조가 아니며 3-pane에 중복 채팅 UI를
   추가하지 않는다.
 - 공통 UI는 공식 Elements를 우선 사용하고 도메인 기능은 슬롯으로 확장한다.

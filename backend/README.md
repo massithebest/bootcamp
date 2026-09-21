@@ -6,14 +6,19 @@ simulation·결과 저장·표·시각화 Tool을 제공한다. route는 요청 
 
 ## 설치
 
-Python 3.11과 Conda 환경을 기준으로 한다.
+Python 3.11의 표준 `venv` 환경을 기준으로 한다.
 
 ```bash
-conda env create -f environment.yml
-conda activate production-planning
-pip install -r requirements-dev.txt
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
 cp .env.example .env
 ```
+
+Windows PowerShell에서는 `py -3.11 -m venv .venv`와
+`.\.venv\Scripts\Activate.ps1`을 사용한다. 폐쇄망 실행 환경은
+[폐쇄망 배포 가이드](docs/CLOSED_NETWORK_SETUP.md)에 따라 개발 도구를 제외한
+`requirements.txt`를 설치한다.
 
 주요 환경변수는 다음과 같다.
 
@@ -43,8 +48,8 @@ python -m scripts.build_smt2020_db
 Frontend와 고정 이벤트 흐름을 빠르게 확인하는 기본 개발 모드:
 
 ```bash
-SERVICE_MODE=mock PLANNING_AGENT_FAKE=1 uvicorn main:app --reload --port 8000
-curl http://localhost:8000/health
+SERVICE_MODE=mock PLANNING_AGENT_FAKE=1 uvicorn main:app --reload --port 8100
+curl http://localhost:8100/health
 ```
 
 실제 Claude Agent SDK 경로는 `PLANNING_AGENT_FAKE=0`으로 두고 `.env`에 provider와
@@ -91,5 +96,4 @@ python -m pytest -m e2e  # 실제 CLI/provider 인증이 있는 환경에서만 
 - [Backend 작업 지침](AGENTS.md)
 - [폐쇄망 배포 및 실서비스 이식](docs/CLOSED_NETWORK_SETUP.md)
 - [도메인 지식·테이블·CTE 관리](docs/domain-knowledge-management.md)
-- [Backend 실행 계획](plan/)
-- [전체 기능 계획](../plan/)
+- [Backend 계획과 완료 이력](plan/Todo.md)

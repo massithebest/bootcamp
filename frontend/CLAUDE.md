@@ -5,7 +5,7 @@
 2026-09-16 `frontend-design` Skill 기반 UI/UX 개선(3-pane 워크벤치)에서 확정한
 규칙과 최종 token 기준. 2026-09-16 assistant-ui Elements 전환으로 공통 UI
 구현 경로를 갱신했으며 아래 token과 정보 위계는 유지한다. 구현 근거와 검증 결과는
-[frontend-ui-ux-plan](plan/260916-frontend-ui-ux-plan.md)을 따른다.
+[Frontend 계획과 완료 이력](plan/Todo.md)을 따른다.
 
 ## 제품 UX 원칙
 

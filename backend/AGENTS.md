@@ -1,8 +1,18 @@
 # Backend 작업 지침
 
 Python 3.11 FastAPI 서비스다. `main.py`가 앱을 만들고 `/api/chat`은 Claude Agent
-SDK 이벤트를 SSE로 전달한다. 코드 변경 전 상위 `../AGENTS.md`와 관련
-`../plan/` 문서를 함께 확인한다.
+SDK 이벤트를 SSE로 전달한다. 코드 변경 전 `plan/Todo.md`와 대상
+폴더의 더 가까운 `AGENTS.md`를 확인한다. 이 workspace는 Frontend나
+루트 계획 문서를 읽을 수 있다고 가정하지 않는다.
+
+## 작업과 계획
+
+- 기존 staged·unstaged·untracked 변경은 사용자 작업으로 간주하고 요청 범위
+  밖 파일을 되돌리거나 덮어쓰지 않는다.
+- 작은 계획은 `plan/Todo.md`에 직접 작성하고, 큰 작업만 `plan/`에
+  날짜형 파일로 만든다. 외부 소비자 계약은 문서 안에 자체적으로 적는다.
+- 폐쇄망 환경을 기준으로 하며 외부 CDN·런타임 API, 비밀값·사내 URL을
+  코드·로그·문서에 추가하지 않는다.
 
 ## 계층과 계약
 
@@ -75,15 +85,20 @@ SDK 이벤트를 SSE로 전달한다. 코드 변경 전 상위 `../AGENTS.md`와
 `backend/`에서 실행한다.
 
 ```bash
-conda env create -f environment.yml
-conda activate production-planning
-pip install -r requirements-dev.txt
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
 cp .env.example .env
 python -m scripts.build_smt2020_db
-PLANNING_AGENT_FAKE=1 uvicorn main:app --reload --port 8000
+PLANNING_AGENT_FAKE=1 python -m uvicorn main:app --reload --port 8100
 python -m pytest -q
 python -m pytest -m e2e
 ```
+
+Windows PowerShell에서는 `py -3.11 -m venv .venv`로 만들고
+`.\.venv\Scripts\Activate.ps1`로 활성화한다. 에이전트의 테스트 도구까지 필요한
+개발 환경이므로 여기서는 `requirements-dev.txt`를 설치하며, 폐쇄망 실행 환경은
+`docs/CLOSED_NETWORK_SETUP.md`에 따라 `requirements.txt`만 설치한다.
 
 - 기본 테스트는 mock 서비스와 fake runner를 우선한다. E2E는 실제 CLI/provider
   인증이 필요한 동작에만 사용한다.

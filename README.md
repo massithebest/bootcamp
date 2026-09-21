@@ -27,20 +27,20 @@ Backend (FastAPI + Claude Agent SDK)
 
 - `backend/`: FastAPI, Agent SDK adapter, Tool, 지식·결과 service와 테스트
 - `frontend/`: Vite SPA, assistant-ui 기반 채팅·지식 관리 UI와 테스트
-- `plan/`: 전체 요구사항, 기능 상태와 백엔드·프론트엔드 공통 계약
-- `backend/plan`, `frontend/plan`: 파트별 실행 계획과 검증 기록
+- `backend/plan`: Backend 현재 계약·다음 작업·완료 이력
+- `frontend/plan`: Frontend 기대 API·다음 작업·완료 이력
 
 ## 빠른 실행
 
 ### Backend
 
-Python 3.11과 Conda 환경을 기준으로 한다.
+Python 3.11의 표준 `venv` 환경을 기준으로 한다.
 
 ```bash
 cd backend
-conda env create -f environment.yml
-conda activate production-planning
-pip install -r requirements-dev.txt
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
 cp .env.example .env
 ```
 
@@ -55,7 +55,7 @@ python -m scripts.build_smt2020_db
 Claude/provider 없이 UI와 이벤트 흐름을 확인하려면 Fake Runner로 실행한다.
 
 ```bash
-SERVICE_MODE=mock PLANNING_AGENT_FAKE=1 uvicorn main:app --reload --port 8000
+SERVICE_MODE=mock PLANNING_AGENT_FAKE=1 uvicorn main:app --reload --port 8100
 ```
 
 실제 Agent SDK 실행은 [Backend 안내](backend/README.md)와
@@ -70,8 +70,8 @@ cp .env.example .env.local
 npm run dev
 ```
 
-기본 주소는 Backend `http://localhost:8000`, Frontend
-`http://localhost:3000`이다. 비밀값은 `backend/.env`와
+기본 주소는 Backend `http://localhost:8100`, Frontend
+`http://localhost:3100`이다. 비밀값은 `backend/.env`와
 `frontend/.env.local`에만 두며 커밋하지 않는다.
 
 ## 검증
@@ -90,12 +90,12 @@ npm run lint
 
 ## 문서
 
-- [프로젝트 현황과 다음 작업](plan/Todo.md)
-- [전체 요구사항과 기능별 계획](plan/)
+- [Backend 계획과 이력](backend/plan/Todo.md)
+- [Frontend 계획과 이력](frontend/plan/Todo.md)
 - [Backend 실행·운영](backend/README.md)
 - [Frontend 실행·검증](frontend/README.md)
 - [도메인 지식 관리](backend/docs/domain-knowledge-management.md)
 - [개발 Agent 작업 지침](AGENTS.md)
 
 현재 실제 사내 DB·RAG·simulation 연결, 대화 영속 저장과 동적 후속질문은 후속
-범위다. 세부 상태는 `plan/Todo.md`를 기준으로 한다.
+범위다. 세부 상태는 각 workspace의 `plan/Todo.md`를 기준으로 한다.

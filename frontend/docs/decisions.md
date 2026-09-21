@@ -1,7 +1,7 @@
 # Frontend 기술 결정 기록
 
 이 문서는 지속적으로 유효한 결정과 대체된 결정의 이유만 보존한다. 구현 Task와
-검증 이력은 `frontend/plan`에 둔다.
+검증 이력은 `plan/Todo.md`에 요약한다.
 
 ## 결정 요약
 
@@ -50,7 +50,7 @@ AI SDK streaming protocol은 사용하지 않는다. 이유는 Backend SSE 계�
 
 Frontend는 router 없는 Vite SPA다. `src/app` 이름은 CSS와 asset 경로 호환을 위해
 남은 디렉터리일 뿐 Next.js App Router가 아니다. Browser가 FastAPI를 직접 호출하고
-dev·preview 포트는 CORS 계약과 맞춘 3000으로 고정한다.
+dev·preview 포트는 CORS 계약과 맞춘 3100으로 고정한다.
 
 ## assistant-ui
 
@@ -61,7 +61,7 @@ assistant-ui는 thread, viewport, composer, message, action bar와 Markdown rend
 - 어시스턴트 메시지는 text와 tool의 도착 순서를 보존하는 `MessagePart[]`다.
 - status/progress는 메시지 metadata에 연결한다.
 - edit와 regenerate는 Backend의 `turn_id`/`fork_from_turn_id` 계약을 사용한다.
-- Runtime이나 transport를 바꾸려면 공유 계약을 포함한 새 상위 계획이 필요하다.
+- Runtime이나 transport를 바꾸려면 기대 streaming 계약을 포함한 새 Frontend 계획이 필요하다.
 - External Store adapter는 실제로 지원하는 capability만 노출한다. 선형 대화만
   유지하는 동안 `setMessages`(branch switch/delete)는 제거했다.
 - 메시지 종료 상태는 공식 `MessageStatus`(`complete`/`incomplete(cancelled,error)`)로
@@ -97,10 +97,10 @@ AGENTS.md에 일반 패턴과 현재 적용 예외를 함께 기록했다. 공�
 근거: [Thread](https://www.assistant-ui.com/elements/thread),
 [ToolCall](https://www.assistant-ui.com/elements/tool-call),
 [AgentPlan](https://www.assistant-ui.com/elements/agent-plan),
-[상위 계획](../../plan/260916-assistant-ui-elements-plan.md).
+[계획 이력 요약](../plan/Todo.md).
 
 감사 결과와 후속 작업은
-[assistant-ui 감사 계획](../plan/260915-assistant-ui-audit-plan.md)에 둔다.
+[계획 이력 요약](../plan/Todo.md)에 둔다.
 
 ### 요청 종료와 재시도 경계 (2026-09-15, 활성)
 
@@ -111,7 +111,7 @@ SSE envelope 검증은 `lib/chat-sse.ts`, 순수 메시지 전이는 `lib/chat-s
 일치하는 요청만 메시지·retry·running 상태를 갱신할 수 있다.
 
 이 결정은 기존 External Store와 공개 AgentEvent 계약을 보완한다. 구현·회귀
-근거는 [전체 시스템 실행 계획](../plan/260915-full-stack-refactoring-plan.md)에 둔다.
+근거는 [계획 이력 요약](../plan/Todo.md)에 둔다.
 
 ## 차트 v2 marker
 
@@ -123,8 +123,7 @@ SSE envelope 검증은 `lib/chat-sse.ts`, 순수 메시지 전이는 `lib/chat-s
 수치를 집계·정렬·피벗하지 않으며 Backend가 검증한 payload를 렌더링한다. 네트워크
 재시도는 같은 조회만 반복하고 Agent tool을 자동으로 다시 실행하지 않는다.
 
-공유 요구사항과 완료 조건은
-[차트 시각화 계획](../../plan/260915-chart-visualization-plan.md)을 따른다.
+현재 기대 계약과 완료 이력은 [Frontend 계획](../plan/Todo.md)을 따른다.
 
 ## 폐쇄망 공통 결정
 
@@ -193,7 +192,7 @@ assistant-ui Reasoning disclosure에는 Backend `status` 이벤트의 공개 업
 중복을 막는다. 공개 AgentEvent와 FastAPI SSE 형식은 바뀌지 않으며 fake runner와
 frontend external-store 계약도 동일하다.
 
-근거: [공통 계획](../../plan/260916-assistant-ui-streaming-plan.md),
+근거: [계획 이력 요약](../plan/Todo.md),
 [assistant-ui Reasoning](https://www.assistant-ui.com/elements/reasoning),
 [Claude streaming messages](https://platform.claude.com/docs/en/build-with-claude/streaming).
 
@@ -209,7 +208,7 @@ Composer 왼쪽 아래에는 첨부, 모델 `GLM-5.3-Flash`, 추론 강도 `Low`
 준비 중인 비활성 UI다. 사용자가 실제로 설정이 적용된 것으로 오해하지 않도록
 접근 가능한 이름에 준비 중 상태를 포함한다.
 
-근거: [공통 계획](../../plan/260916-result-limit-composer-controls-plan.md).
+근거: [계획 이력 요약](../plan/Todo.md).
 
 위 결정의 조회 1,000행과 Composer 제어는 유지한다. 표 표시 10행 정책만 아래
 대화형 표 결정의 100행 정책으로 대체됐다.
@@ -245,7 +244,7 @@ Tool 실행 단계는 assistant-ui가 계산한 그룹 `part.status`를 따른�
 자동으로 접고, 다시 펼치면 공개 단계 → Tool 목록 → Parameters/Result 순으로
 확인할 수 있다.
 
-근거: [공통 계획](../../plan/260916-nested-tool-reasoning-plan.md).
+근거: [계획 이력 요약](../plan/Todo.md).
 
 ### 검증된 차트 Tool UI (2026-09-16, 활성)
 
@@ -263,7 +262,7 @@ FastAPI SSE, `useExternalStoreRuntime`, Result Store와 시각화 API 계약은 
 않았다. Generative UI, AI SDK transport, 프론트 실행 Tool과 새 패키지도 추가하지
 않았다.
 
-근거: [공통 계획](../../plan/260916-assistant-ui-tool-ui-plan.md),
+근거: [계획 이력 요약](../plan/Todo.md),
 [assistant-ui Tool UI](https://www.assistant-ui.com/docs/tools/tool-ui).
 
 ### 대화형 표 Tool UI와 표시 100행 (2026-09-16, 활성)
@@ -286,7 +285,7 @@ TTL과 선택 컬럼을 검증하고 앞쪽 최대 100행을 반환한다. 모�
 답변 아래에 둔다. 성공한 표 Tool UI와 같은 응답의 GFM 표 블록만 제거해 데이터가
 두 번 표시되지 않게 한다.
 
-근거: [공통 계획](../../plan/260916-interactive-table-tool-ui-plan.md),
+근거: [계획 이력 요약](../plan/Todo.md),
 [assistant-ui Tool UI](https://www.assistant-ui.com/docs/tools/tool-ui).
 
 ### assistant-ui Primitives Overview·Composer 점검 (2026-09-16, 활성)
@@ -444,7 +443,7 @@ thinking block은 계속 폐기하며, 향후 공개 reasoning part 계약을 �
 중복 Markdown 표 제거는 코드 펜스를 건드리지 않는다. 결과 없이 끝난 Tool은
 완료로 추정하지 않고 미완료로 표시한다.
 
-근거: [메시지 순서 계획](../../plan/260916-tanstack-table-message-order-plan.md).
+근거: [계획 이력 요약](../plan/Todo.md).
 
 ### 공개 실행 안내의 가독성과 수명 (2026-09-16, 활성)
 
@@ -460,7 +459,7 @@ Tool 결과 또는 다음 공개 텍스트가 도착하거나 메시지가 종�
 이는 Backend adapter를 통과한 공개 문구에만 적용한다. Claude SDK의
 thinking/signature/tool input delta는 계속 폐기하며 reasoning UI로 변환하지 않는다.
 
-근거: [공개 실행 안내 가독성 계획](../../plan/260916-reasoning-readability-plan.md).
+근거: [계획 이력 요약](../plan/Todo.md).
 
 ### 지식 관리와 조회 패널 (2026-09-16, 활성)
 
@@ -484,9 +483,7 @@ thinking/signature/tool input delta는 계속 폐기하며 reasoning UI로 변�
 실패해도 편집 내용을 보존한다. 변경 후 목록·패널을 갱신하되 열린 편집본을 자동으로
 덮어쓰지 않는다. 동시 변경은 서버 revision 충돌 후 수동 새로고침으로 해결한다.
 
-근거: [지식 관리 계약](../../plan/260916-knowledge-management-plan.md),
-[사이드바 내비게이션 계획](../../plan/260916-sidebar-navigation-plan.md),
-[채팅 메뉴 단일화 계획](../../plan/260916-chat-navigation-unification-plan.md).
+근거: [계획 이력 요약](../plan/Todo.md).
 
 ### 지식 관리 구조화 상세 표현 (2026-09-16, 활성)
 
@@ -500,7 +497,7 @@ thinking/signature/tool input delta는 계속 폐기하며 reasoning UI로 변�
 좌측 지식 목록은 유형과 상태를 같은 행에 두고 제목·요약을 아래로 정렬한다.
 현재 선택은 색상만이 아니라 accent 좌측 룰과 `aria-current`로 함께 표현한다.
 
-근거: [지식 상세 가독성 계획](../../plan/260916-knowledge-detail-readability-plan.md).
+근거: [계획 이력 요약](../plan/Todo.md).
 
 ### Agent Workbench 감사 후속 정책 (2026-09-16, 활성)
 
@@ -534,7 +531,7 @@ thinking/signature/tool input delta는 계속 폐기하며 reasoning UI로 변�
 별도 계약 검토로 보류한다. 실제 스크린리더·모바일 가상 키보드·대규모 대화 성능은
 브라우저 DOM/키보드·fixture 통과와 구분해 운영 인수에서 확인한다.
 
-근거: [감사 후속 구현·검증 기록](../../plan/260916-agent-workbench-ux-audit-plan.md),
+근거: [계획 이력 요약](../plan/Todo.md),
 [assistant-ui ActionBar](https://www.assistant-ui.com/docs/primitives/action-bar),
 [assistant-ui Message timing](https://www.assistant-ui.com/docs/guides/message-timing).
 
@@ -546,7 +543,7 @@ thinking/signature/tool input delta는 계속 폐기하며 reasoning UI로 변�
 변경 보호·답변 재생성 확인은 제거 대상이 아니다. 저장 API나 로컬 persistence는 추가하지 않는다.
 일반적인 확인창 권고보다 명시적인 사용자 요청을 우선하며 반복 전환을 막지 않는다.
 
-근거: [감사 계획 후속 단계](../../plan/260916-agent-workbench-ux-audit-plan.md#9-후속-정책-화면-전환-확인창-제거).
+근거: [계획 이력 요약](../plan/Todo.md).
 
 ### Inspector 도구·Skills 가독성 (2026-09-16, 활성)
 
@@ -564,7 +561,7 @@ Skills 탭은 각 절차를 다시 펼치는 버튼을 제거하고 등록된 �
 명시해 정적 Skill 본문에도 같은 GFM 파서를 재사용한다. 신규 디자인 라이브러리나
 Backend payload는 추가하지 않는다.
 
-근거: [지식 관리 Frontend 후속 기록](../plan/260916-knowledge-management-plan.md#inspector-가독성-후속-2026-09-16).
+근거: [계획 이력 요약](../plan/Todo.md).
 
 ### Skills disclosure 복원 (2026-09-16, 활성)
 
@@ -573,7 +570,7 @@ Backend payload는 추가하지 않는다.
 HTML 렌더링, 제목 위계, 여백, 23rem 데스크톱 폭은 유지한다. trigger는 네이티브
 button과 `aria-expanded`·`aria-controls`를 사용하고, 펼친 항목만 상세 API를 호출한다.
 
-근거: [지식 관리 Frontend 후속 기록](../plan/260916-knowledge-management-plan.md#skills-disclosure-복원-2026-09-16).
+근거: [계획 이력 요약](../plan/Todo.md).
 
 ### Disclosure·Inspector 레이아웃 안정화 (2026-09-17, 활성)
 

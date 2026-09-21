@@ -71,7 +71,7 @@ export function SimulationResult({ data }: { data: Record<string, unknown> }) {
         <p className="text-ui leading-relaxed text-ink-2">{displayProductName(summary)}</p>
       )}
 
-      {/* 배열형 simulation 결과가 대용량(100행 초과, plan/260915-result-store-plan.md)이면
+      {/* 배열형 simulation 결과가 대용량(100행 초과)이면
           `results` 는 sample_rows 로 축소되어 있다 — 표 대신 요약 카드로 렌더한다. */}
       {large ? (
         <ResultSummaryCard data={data} />

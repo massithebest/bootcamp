@@ -77,7 +77,7 @@ npm run build
 npm run preview
 ```
 
-- `dist/`가 3000 포트에서 열리고 외부 font·asset 요청이 없어야 한다.
+- `dist/`가 3100 포트에서 열리고 외부 font·asset 요청이 없어야 한다.
 - `.env.local`의 `VITE_API_BASE_URL`이 폐쇄망 Backend를 가리켜야 한다.
 - chat SSE, 취소, retry, 편집·재생성, tool card와 standalone 차트 Tool UI 및
   과거 chart marker 조회를 확인한다.
@@ -96,8 +96,9 @@ npm run preview
 - native package가 준비 환경과 폐쇄망의 OS·CPU에 맞지 않으면 설치 또는 build가
   실패하므로 `node_modules` 복사보다 사내 registry를 통한 재설치를 우선한다.
 
-관련 아키텍처 결정은 [Frontend 기술 결정 기록](decisions.md), Backend와 Agent SDK
-반입은 [Backend 폐쇄망 가이드](../../backend/docs/CLOSED_NETWORK_SETUP.md)를 따른다.
+관련 아키텍처 결정은 [Frontend 기술 결정 기록](decisions.md)을 따른다.
+API 서버와 Agent SDK의 반입·운영은 Frontend workspace 범위가 아니며,
+운영자가 제공한 배포 절차와 확정된 API 주소만 사용한다.
 
 ## 2026-09-16 Elements 반입
 

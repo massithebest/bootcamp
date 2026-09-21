@@ -32,7 +32,7 @@ MIT 고지는 [../LICENSE](../LICENSE)에 포함한다. 파일은 복사 후 프
 
 공식 Base UI variant: https://r.assistant-ui.com/styles/base-nova/tooltip-icon-button.json
 
-전체 설계와 적용 예외는 [전환 계획](../../../../../plan/260916-assistant-ui-elements-plan.md),
+전체 설계와 적용 예외는 [계획 이력 요약](../../../../plan/Todo.md),
 [기술 결정](../../../../docs/decisions.md)을 참고한다.
 
 
