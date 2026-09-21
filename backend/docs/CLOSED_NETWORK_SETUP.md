@@ -6,15 +6,16 @@ pntfp의 실제 서비스 로직(SQL/RAG/Simulation)을 이식하기까지**의 
 설치하는 환경을 전제로 한다.
 
 ```text
-Part 1. 폐쇄망 인프라 구축        Part 2. pntfp 서비스 로직 이식
+Part 1. 폐쇄망 인프라 구축        Part 2. pntfp 서비스 로직 이식·검증
   소스 코드 반입 → .venv 구성        services/real/* 스텁을 실제 로직으로 교체
-  → Nexus 의존성 설치 → .env 구성     (SERVICE_MODE=mock → real)
-  → mock 기동 검증
+  → Nexus 의존성 설치               → 운영 지식 반입 → prod/real 설정
+                                      → 공통 테스트 → real 관통 검증
 ```
 
-Part 1을 마쳐 `SERVICE_MODE=mock`으로 서버가 정상 기동하는 것을 확인한
-뒤에 Part 2로 넘어간다. Part 2는 Claude Code에게 이 문서 경로를 알려주고
-"이 가이드를 보고 이식해줘"라고 지시하는 방식으로 실행하면 된다.
+SMT2020 원본·생성 DB·변환 스크립트는 개발용 mock 자산이며 폐쇄망에 반입하지
+않는다. 폐쇄망 서버는 `ENV=prod`, `SERVICE_MODE=real`, 별도 운영
+`KNOWLEDGE_DIR`이 모두 준비된 뒤에만 기동한다. Part 2는 Claude Code에게 이 문서
+경로를 알려주고 "이 가이드를 보고 이식해줘"라고 지시하는 방식으로 실행하면 된다.
 
 ---
 
@@ -27,8 +28,7 @@ Part 1을 마쳐 `SERVICE_MODE=mock`으로 서버가 정상 기동하는 것을 
 1. 소스 코드 확보                  →  2. 소스 코드 반입
                                       3. .venv 생성 및 활성화
                                       4. 사내 Nexus에서 의존성 설치
-                                      5. .env 구성
-                                      6. 서버 기동 + 헬스체크
+                                      5. real 서비스·운영 지식 반입 준비
 ```
 
 폐쇄망 PC는 인터넷 PyPI 대신 기존 사내 Nexus를 사용한다. 별도의 wheel 번들을
@@ -43,6 +43,8 @@ Part 1을 마쳐 `SERVICE_MODE=mock`으로 서버가 정상 기동하는 것을 
   히스토리가 필요하면 `.git` 폴더까지 통째로 옮긴다.
 - `.venv`, `__pycache__` 등 로컬 환경과 캐시는 제외한다. 가상환경은 폐쇄망
   PC에서 다시 만든다.
+- `backend/datasets/`, `backend/scripts/`와 생성된 `smt2020.db`는 개발용
+  SMT2020 자산이므로 반입물에서 제외한다.
 
 ### Python 의존성 확인
 
@@ -85,77 +87,38 @@ python -m pip install `
 - PowerShell 실행 정책으로 활성화 스크립트를 실행할 수 없으면 사내 보안
   정책에 맞는 실행 정책을 적용하거나 `.venv\Scripts\python.exe`를 직접 사용한다.
 
-## 1-4. `.env` 구성
+## 1-4. 운영 설정 준비
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-최소한 아래를 채워야 서버가 정상 기동한다:
+실제 값은 Part 2의 real 서비스 이식과 운영 지식 반입을 마친 뒤 채운다. 서버를
+먼저 mock으로 기동하지 않는다. 최소 운영 계약은 다음과 같다.
 
-| 키                                                | 값                                                | 비고                                                                                                                                                    |
-| ------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SERVICE_MODE`                                  | `mock` (최초 검증) → `real` (Part 2 완료 후) | Part 2 참고                                                                                                                                             |
-| `LLM_PROVIDER`                                  | `anthropic` 또는 `openrouter`                 | 사내 LLM 반입 정책에 따름                                                                                                                               |
-| `ANTHROPIC_API_KEY` 또는 `OPENROUTER_API_KEY` | 사내 발급 값                                      | 폐쇄망에서 실제 외부 API 호출이 안 되면 사내 LLM 게이트웨이 주소로 대체 필요 — 이 경우 `core/config.py`의 `agent_provider_env()` 수정이 별도로 필요 |
+| 키 | 값 | 비고 |
+| --- | --- | --- |
+| `ENV` | `prod` | 폐쇄망 운영 모드 |
+| `SERVICE_MODE` | `real` | `prod`에서 다른 값은 시작 오류 |
+| `KNOWLEDGE_DIR` | 운영 YAML의 별도 절대경로 | bundled SMT2020 지식 경로는 허용하지 않음 |
+| `LLM_PROVIDER` | 사내 지원 provider | 사내 LLM 반입 정책에 따름 |
+| provider 인증값 | 사내 발급 값 | 코드·문서·로그에 기록하지 않음 |
+| `KNOWLEDGE_DB_PATH` | 영속 볼륨의 SQLite 경로 | 텍스트 지식 저장소. 비우면 `backend/data/knowledge.sqlite3` |
+| `KNOWLEDGE_SEARCH_BACKEND` | `local`(기본) 또는 `service` | `service`는 사내 RAG 어댑터(`services/real/rag_service.py`) 구현 후에만 사용 |
+| `CORS_ALLOW_ORIGINS` | 실제 Frontend Origin | 기본값은 localhost 개발 Origin |
 
 `real` 서비스 관련 환경변수(DB/Milvus/Simulation API 접속 정보)는
-`SERVICE_MODE=real` 전환 시점에 Part 2 §2-3을 따라 추가한다.
+Part 2 §2-3을 따라 추가한다. `SMT2020_DB_PATH`는 설정하지 않는다.
 
-## 1-5. 기동 및 검증
+## 1-5. 기동 전 확인
 
-Mock 조회에 필요한 SQLite DB는 Git에 포함되지 않는다. 반입한
-`datasets/SMT2020_HVLM`, `datasets/SMT2020_LVHM` 원본 TSV로 먼저 생성한다.
-
-```powershell
-python -m scripts.build_smt2020_db
-```
-
-첫 번째 PowerShell 창에서 서버를 기동한다.
-
-```powershell
-python -m uvicorn main:app --port 8100
-```
-
-두 번째 PowerShell 창에서 헬스체크를 실행해 `{"status":"ok"}` 응답을
-확인한다.
-
-```powershell
-curl.exe http://localhost:8100/health
-```
-
-먼저 `SERVICE_MODE=mock`, `PLANNING_AGENT_FAKE=1`로 Claude 호출 없이 이벤트
-흐름만 검증한다 (`backend/README.md` "Agent 실행 모드" 참고):
-
-첫 번째 창에서 기존 서버를 종료한 뒤 fake 모드로 다시 기동한다.
-
-```powershell
-$env:PLANNING_AGENT_FAKE = "1"
-python -m uvicorn main:app --port 8100
-```
-
-두 번째 창에서 채팅 API를 호출한다.
-
-```powershell
-curl.exe -N -X POST localhost:8100/api/chat `
-  -H 'content-type: application/json' `
-  -d '{"message":"LVHM 제품별 초기 WIP를 표와 차트로 보여줘","conversation_id":"c1"}'
-```
-
-SSE의 SQL·표·차트 Tool 결과가 모두 `status: "ok"`인지 확인한다.
-헬스체크와 HTTP 200만으로 DB 준비가 검증되지는 않는다.
-
-이게 통과하면 `PLANNING_AGENT_FAKE=0`으로 바꿔 실제 Claude Agent SDK
-실행과 API 키를 검증한다. 첫 번째 창에서 서버를 종료하고 아래와 같이 다시
-기동한다.
-
-```powershell
-$env:PLANNING_AGENT_FAKE = "0"
-python -m uvicorn main:app --port 8100
-```
-
-검증을 마친 다음에야 Part 2(`SERVICE_MODE=real` 전환, pntfp 로직 이식)로
-넘어간다.
+- [ ] SMT2020 원본, 생성 DB와 변환 스크립트가 반입물에 없는지 확인
+- [ ] `requirements.txt` 설치가 완료됐는지 확인
+- [ ] real 서비스 원본과 운영 지식이 승인된 별도 경로에 준비됐는지 확인
+- [ ] 텍스트 지식 SQLite(`KNOWLEDGE_DB_PATH`)가 백업되는 영속 볼륨을 가리키는지 확인.
+  `services/document_store.py`는 앱 import 경로에 포함되므로 코드는 반드시 반입하고,
+  DB는 비어 있어도 첫 접근 때 스키마를 만든다
+- [ ] Part 2 완료 전에는 백엔드를 기동하지 않음
 
 ## 1-6. 자주 막히는 지점 체크리스트
 
@@ -165,9 +128,10 @@ python -m uvicorn main:app --port 8100
   `OPENROUTER_API_KEY`가 폐쇄망에서 실제로 도달 가능한 엔드포인트를
   가리키는지 확인 (사내 LLM 게이트웨이 사용 시 `agent_provider_env()`
   커스터마이징 필요할 수 있음)
-- [ ] `SERVICE_MODE=real`로 바꿨더니 `NotImplementedError` →
-  Part 2의 이식 작업이 아직 안 끝난 것 — mock으로 되돌려 프론트/에이전트
-  흐름부터 격리 확인
+- [ ] real Tool 호출에서 `NotImplementedError` → Part 2의 이식 작업이 아직
+  끝나지 않은 것. mock으로 우회하지 말고 해당 real adapter 구현을 완료
+- [ ] 시작 시 `ENV=prod requires ...` 오류 → `SERVICE_MODE=real`과 별도 운영
+  `KNOWLEDGE_DIR` 설정 및 디렉터리 존재 여부 확인
 - [ ] 프론트 연동 시 CORS 오류 → `backend/core/config.py`의
   `CORS_ALLOW_ORIGINS`에 폐쇄망 프론트 도메인 추가
 
@@ -177,8 +141,8 @@ python -m uvicorn main:app --port 8100
 
 이식에 필요한 파일을 `backend/pntfp/`에 임시로 반입한 뒤, 파일명을 기준으로
 현재 프로젝트의 대상 파일에 병합한다. `backend/pntfp/`에는 하위 폴더를 만들지
-않고 모든 파일을 한 단계에 둔다. **Part 1을 마쳐 폐쇄망 PC에서
-`SERVICE_MODE=mock`으로 서버가 정상 기동하는 상태를 전제**로 한다.
+않고 모든 파일을 한 단계에 둔다. **Part 1의 환경 구성과 반입 검토가 끝났으며,
+아직 서버를 기동하지 않은 상태**를 전제로 한다.
 
 Claude Code에게 이 문서 경로를 알려주고 "이 가이드를 보고 이식해줘"라고
 지시하면 된다.
@@ -236,7 +200,7 @@ import 관계와 사용처를 확인한 뒤 대상과 필요성을 먼저 결정
 | `sumulation_api_client.py` | `backend/services/real/simulation_api_client.py` | 파일명을 바로잡아 새 보조 모듈로 추가하고 실제 Simulation API 호출을 맡긴다. |
 | `simulation_service.py` | `backend/services/real/simulation_service.py` | 기존 simulation registry, 입력 검증, `access_scope`와 반환 계약을 유지하면서 구현을 병합한다. |
 | `sql_service.py` | `backend/services/real/sql_service.py` | Text-to-SQL 생성은 옮기지 않고, Agent가 전달한 SQL의 읽기 전용 실행 구현만 병합한다. |
-| `sql_prompts.py` | 기본적으로 직접 복사하지 않음 | 기존 Text-to-SQL 프롬프트에서 테이블·조인·KPI·업무 규칙을 추출해 `backend/knowledge/`에 반영한다. 런타임 SQL 생성 프롬프트로 연결하지 않는다. |
+| `sql_prompts.py` | 기본적으로 직접 복사하지 않음 | 기존 Text-to-SQL 프롬프트에서 테이블·조인·KPI·업무 규칙을 추출해 별도 운영 `KNOWLEDGE_DIR`에 반영한다. 런타임 SQL 생성 프롬프트로 연결하지 않는다. |
 
 `backend/services/mock/`, `backend/tools/`, `backend/agent/agent.py`는 반입 파일로
 교체하지 않는다. 호출 계약을 맞추는 데 꼭 필요한 변경이 있으면 호출자와 테스트를
@@ -255,8 +219,8 @@ import 관계와 사용처를 확인한 뒤 대상과 필요성을 먼저 결정
    병합한다.
 5. `system_prompt.py`와 `CLAUDE.md`의 real service 지침을 현재 Agent Tool 계약에
    맞춰 병합한다.
-6. 서비스와 기존 SQL 프롬프트에서 확인한 도메인 정보를 `knowledge/` YAML에
-   반영한다.
+6. 서비스와 기존 SQL 프롬프트에서 확인한 도메인 정보를 별도 운영
+   `KNOWLEDGE_DIR`의 YAML에 반영한다.
 7. 신규 import에 필요한 패키지만 `backend/requirements.txt`에 추가하고 사내
    Nexus에 해당 버전과 전이 의존성이 있는지 확인한다.
 8. 계약 테스트와 전체 백엔드 테스트를 실행한 뒤 `SERVICE_MODE=real` 관통 검증을
@@ -321,7 +285,7 @@ class RealSQLService:
 ```
 
 - SQL은 Agent SDK가 `list_tables`, `describe_table`, KPI와 recipe 등
-  `knowledge/`의 정보를 조회해 직접 생성한다. real SQL service는 자연어 질문을
+  운영 `KNOWLEDGE_DIR`의 정보를 조회해 직접 생성한다. real SQL service는 자연어 질문을
   받아 SQL을 생성하지 않고, 전달받은 SQL을 실행하는 역할만 한다.
 - 반입 `sql_service.py`와 `sql_prompts.py`에 남아 있는 기존 Text-to-SQL 호출,
   LLM prompt 조합과 `generate_and_query(question)` 경로는 이식하지 않는다.
@@ -368,11 +332,11 @@ class RealSimulationService:
 ```
 
 - `simulation_api_client.py`를 통해 실제 Simulation API를 호출하도록 이식한다.
-- 시뮬레이션 종류는 `knowledge/simulations/*.yaml`과
+- 시뮬레이션 종류는 운영 `KNOWLEDGE_DIR/simulations/*.yaml`과
   `services/simulation_registry.py`를 기준으로
   `run_simulation(simulation_type, params)` 하나의 진입점에서 분기 처리한다.
-- 현재 mock의 `SMT2020_입력검증`은 실제 DES가 아니라 입력 관계 검증이다.
-  폐쇄망의 실제 simulation 종류는 동일한 YAML registry에 추가한다.
+- 현재 mock의 `SMT2020_입력검증`은 개발 전용이며 실제 DES가 아니다.
+  폐쇄망의 실제 simulation 종류는 운영 YAML registry에 별도로 정의한다.
 - `run_simulation` 내부에서 `simulation_type`/필수 파라미터 검증은
   이미 `validate_simulation_request()`가 처리하므로 중복 검증하지 않는다.
 - 반환 dict 구조는 대응하는 `mock_simulation_service.py`의 Result Store와
@@ -382,7 +346,7 @@ class RealSimulationService:
   `list_simulation()` / `run_simulation(simulation_type, params, *,
   access_scope=None)` 모듈 함수 래퍼를 그대로 유지한다.
 
-## 2-5. 서비스 기준 `knowledge/` 갱신
+## 2-5. 서비스 기준 운영 지식 갱신
 
 Agent가 SQL을 올바르게 생성하려면 실제 DB와 서비스에 맞는 구조화 지식이 먼저
 갱신되어야 한다. 반입 코드를 실행 가능하게 만드는 것만으로 이식을 완료한 것으로
@@ -390,18 +354,19 @@ Agent가 SQL을 올바르게 생성하려면 실제 DB와 서비스에 맞는 �
 
 | 확인할 반입 파일 | 추출할 정보 | 반영 위치 |
 | --- | --- | --- |
-| `common_sql_client.py`, `sql_service.py`, `sql_prompts.py` | 실제 테이블·컬럼·타입·코드값·PK 성격·시간 컬럼·허용 join·grain·주의사항 | `knowledge/catalog/tables/*.yaml`, `knowledge/catalog/joins.yaml` |
-| `sql_prompts.py`, `sql_service.py` | KPI 정의·공식·단위·기준·집계 규칙과 재사용 가능한 SQL/CTE | `knowledge/kpi/*.yaml`, `knowledge/recipes/*.yaml` |
-| SQL/RAG 코드와 prompt의 업무 용어 | 용어, 동의어, 관련 KPI·테이블 | `knowledge/glossary.yaml` |
-| `simulation_service.py`, `simulation_api_client.py` | simulation type, 별칭, 사용 시점, 필수 파라미터, 출력 스키마, 선후 관계 | `knowledge/simulations/*.yaml` |
-| 서비스의 대표 업무 흐름 | 검증 질문, recipe/simulation 순서와 기대 결과 | 필요 시 `knowledge/scenarios/*.yaml` |
+| `common_sql_client.py`, `sql_service.py`, `sql_prompts.py` | 실제 테이블·컬럼·타입·코드값·PK 성격·시간 컬럼·허용 join·grain·주의사항 | 운영 `KNOWLEDGE_DIR/catalog/` |
+| `sql_prompts.py`, `sql_service.py` | KPI 정의·공식·단위·기준·집계 규칙과 재사용 가능한 SQL/CTE | 운영 `KNOWLEDGE_DIR/kpi/`, `recipes/` |
+| SQL/RAG 코드와 prompt의 업무 용어 | 용어, 동의어, 관련 KPI·테이블 | 운영 `KNOWLEDGE_DIR/glossary.yaml` |
+| `simulation_service.py`, `simulation_api_client.py` | simulation type, 별칭, 사용 시점, 필수 파라미터, 출력 스키마, 선후 관계 | 운영 `KNOWLEDGE_DIR/simulations/` |
+| 서비스의 대표 업무 흐름 | 검증 질문, recipe/simulation 순서와 기대 결과 | 운영 `KNOWLEDGE_DIR/scenarios/` |
 
 갱신할 때 다음 원칙을 지킨다.
 
-- 현재 실제 서비스와 일치하지 않는 SMT2020 전용 정의는 real 질의에 섞이지 않게
-  수정·분리한다. 기존 mock 검증에 필요한 정의를 무조건 삭제하지 않는다.
+- bundled SMT2020 정의는 개발용 mock 회귀를 위해 그대로 두되 운영
+  `KNOWLEDGE_DIR`에 복사하지 않는다.
 - SQL 프롬프트에 있던 스키마 설명과 업무 규칙을 런타임 prompt에 중복해서
-  유지하지 않는다. 구조화 가능한 내용은 `knowledge/` YAML을 단일 기준으로 삼는다.
+  유지하지 않는다. 구조화 가능한 내용은 운영 `KNOWLEDGE_DIR`의 YAML을 단일
+  기준으로 삼는다.
 - SQL 실행 허용 테이블은 catalog에서 결정되므로, 실제 조회 대상 테이블을 빠짐없이
   등록하고 쓰기 대상·시스템 테이블은 등록하지 않는다.
 - join cardinality, 원천 grain, 집계 전후 단위, NULL 처리와 시간 기준을 실제
@@ -425,29 +390,31 @@ Agent가 SQL을 올바르게 생성하려면 실제 DB와 서비스에 맞는 �
    확인한다.
 2. `backend/.env`에 `LLM_PROVIDER=local`, private LLM 및 real service에 필요한
    환경변수가 모두 채워졌는지 확인한다.
-3. `SERVICE_MODE=mock`, `PLANNING_AGENT_FAKE=1`에서 기존 회귀 테스트를 먼저
-   실행한다.
+3. `ENV=prod`, `SERVICE_MODE=real`, 별도 운영 `KNOWLEDGE_DIR`을 설정한다.
+   SMT2020 관련 변수는 설정하지 않는다.
+4. 테스트를 실행할 폐쇄망 이식 환경에는 `requirements-dev.txt`를 설치하고,
+   SMT2020·mock service·외부 provider E2E를 제외한 공통 계약 테스트를 실행한다.
 
 ```powershell
 cd backend
 .\.venv\Scripts\Activate.ps1
-python -m pytest -q
+python -m pip install -r requirements-dev.txt
+python -m pytest -q -m "not smt2020 and not smt2020_bundle and not mock_service and not e2e"
 ```
 
-4. knowledge 구조와 참조 무결성을 별도로 확인한다.
+5. 운영 knowledge 구조와 참조 무결성을 별도로 확인한다. 테스트가 특정
+   SMT2020 이름이나 기대값을 전제하면 운영 지식용 계약 테스트로 교체한다.
 
 ```powershell
 python -m pytest -q `
   tests/test_knowledge.py `
   tests/test_knowledge_integrity.py `
-  tests/test_aggregation_guidance.py `
   tests/test_prompt_consistency.py
 ```
 
-5. mock/real 서비스가 같은 공개 함수를 제공하는지 확인하고, real service에는
+6. mock/real 서비스가 같은 공개 함수를 제공하는지 확인하고, real service에는
    실제 인프라를 호출하지 않는 단위 테스트 또는 client mock 테스트를 추가한다.
-6. `backend/.env`에서 `SERVICE_MODE=real`, `PLANNING_AGENT_FAKE=0`으로 변경하고
-   백엔드를 기동한다.
+7. 백엔드를 기동한다.
 
 ```powershell
 cd backend
@@ -455,18 +422,19 @@ cd backend
 python -m uvicorn main:app --port 8100
 ```
 
-7. 다른 PowerShell 창에서 `curl.exe http://localhost:8100/health`를 호출해
+8. 다른 PowerShell 창에서 `curl.exe http://localhost:8100/health`를 호출해
    `{"status":"ok"}`를 확인한다.
-8. 실제 채팅으로 다음 3가지 질의를 각각
+9. 실제 채팅으로 다음 3가지 질의를 각각
    테스트해서 real 서비스가 정상 호출되는지 확인:
    - SQL 조회가 필요한 질문 (예: 생산 실적 조회)
    - RAG 검색이 필요한 질문 (예: 공정 매뉴얼 질의)
    - Simulation이 필요한 질문 (등록된 실제 simulation type 사용)
-9. SQL 검증에서는 Agent가 `knowledge/`를 먼저 조회해 SQL을 생성했는지,
+10. SQL 검증에서는 Agent가 운영 지식을 먼저 조회해 SQL을 생성했는지,
    `sql_service`가 SQL 생성 없이 읽기 전용 실행과 Result Store 저장만 했는지
    확인한다.
-10. 문제 발생 시 `SERVICE_MODE=mock`으로 되돌려 프론트/에이전트 흐름
-   자체는 정상인지 먼저 격리해서 확인한다.
+11. 문제 발생 시 mock으로 우회하지 않는다. SQL·RAG·simulation 중 실패한 real
+   adapter를 로그와 client mock 테스트로 격리하고 수정한 뒤 같은 관통 검증을
+   다시 실행한다.
 
 ## 2-7. 커밋 시 주의사항
 

@@ -68,6 +68,8 @@ Backend가 소유하는 범위는 다음과 같다.
 - `query_rules`, `aggregation_rules`, `visualization_hints`의 역할을 섞지 않는다.
 - table/recipe `sample_queries`는 `question`, `sql`만 허용한다.
 - SQL은 항상 조회 전용이며 mock과 real 구현의 함수 시그니처·반환 형태를 맞춘다.
+- `ENV=prod`는 `SERVICE_MODE=real`과 bundled SMT2020 지식이 아닌 명시적인
+  운영 `KNOWLEDGE_DIR`을 요구한다. 조건이 맞지 않으면 시작 단계에서 실패한다.
 
 ## 다음 작업
 
@@ -75,20 +77,11 @@ Backend가 소유하는 범위는 다음과 같다.
 
 ### P1
 
-- [ ] **SMT2020 외부 테스트 데이터셋 의존성 정리**: Git에 없는 원본·생성 DB·변환
-  도구와 테스트 fixture의 경계를 문서화하고, 폐쇄망에서 재현 가능한 검증 경로를
-  확정한다.
 - [ ] **후속질문 동적 생성**: 성공한 `done`에 2~4개 제안을 선택적으로 추가한다.
-  모델 출력 파싱 실패 시 빈 배열로 안전하게 종료하고 Fake/real 계약을 동일하게
-  유지한다.
+  모델 출력 파싱 실패 시 빈 배열로 안전하게 종료한다.
 
 ### P2
 
-- [ ] 도메인 지식 관리 문서를 SMT2020 전용 설명에서 데이터셋 비종속 YAML 작성
-  원칙 중심으로 일반화한다.
-- [ ] 구조화 YAML과 향후 RAG가 함께 쓰는 `knowledge` 명칭을 정리한다. YAML의
-  `domain` 전환 또는 RAG Tool의 `search_documents` 전환 중 하나를 호환성 범위와
-  함께 결정한다.
 - [ ] 실제 업무 데이터로 생산 부진 원인 scenario와 KPI·join·집계 정의를 현업
   검토하고 verified 상태를 갱신한다.
 - [ ] 서버 처리 시간 공개 필요성, 측정 의미와 비용을 검토한다. 클라이언트 관측
@@ -107,7 +100,8 @@ Backend가 소유하는 범위는 다음과 같다.
 ### 2026-09-08~14 — 기본 Agent와 도메인 지식
 
 - FastAPI `/api/chat`, Claude Agent SDK adapter와 SSE `AgentEvent`를 구현했다.
-- session/fork/cancel/error lifecycle과 Fake Runner를 마련했다.
+- session/fork/cancel/error lifecycle과 임시 Fake Runner를 마련했다(2026-09-21
+  제거, 아래 참고).
 - table·KPI·recipe·scenario·simulation·glossary 모델, 지식 Tool과 SQL 가드를
   구현했다. CTE, YAML `on` 파싱과 등록 table 검증 예외를 보강했다.
 
@@ -138,12 +132,44 @@ Backend가 소유하는 범위는 다음과 같다.
   로그에 노출되지 않도록 했다.
 - 상세 날짜형 계획을 이 문서로 통합하고 Backend workspace 독립 계획 체계로
   전환했다.
+- SMT2020 원본·생성 DB·변환 도구를 개발용 mock 회귀 자산으로 한정했다. 자산이
+  없는 환경에서는 관련 테스트만 skip하며, 폐쇄망은 prod/real/별도 운영 지식을
+  fail-fast 계약으로 강제한다.
+- 도메인 지식 관리 문서의 테이블·KPI·recipe·scenario 작성 원칙과 예시를
+  SMT2020 고유 값(HVLM/LVHM, wip 등) 대신 `segment_key` 같은 데이터셋 비종속
+  placeholder로 바꿨다. SMT2020 관련 설명은 "개발용 SMT2020 데이터와 검증",
+  "SMT2020 진단 범위" 절에만 남겼다.
+- 번들 SMT2020 지식의 고정 값을 단정하는 테스트를 `smt2020_bundle` 마커와
+  `bundled_knowledge` fixture로 분리했다. 운영 지식 디렉터리를 붙이거나 `knowledge/`
+  내용을 교체해도 마커 제외 프로필이 통과한다. 일반 정합성 테스트의 "KPI 1건 이상"
+  기대는 제거했다.
+- `knowledge` 명칭 충돌은 RAG Tool을 `search_knowledge`에서 `search_documents`로
+  바꿔 해소했다. 호환성 범위는 Tool 이름(Agent 지시문·Skill 표·SDK 등록·이벤트의
+  `tool_name`)뿐이며, 결과 `kind: "knowledge"`, `/api/knowledge/*`, 환경변수,
+  `knowledge/` YAML 경로는 유지한다. 옛 Tool 이름의 별칭은 두지 않는다.
+- Fake Runner와 `PLANNING_AGENT_FAKE`를 제거했다. `/api/chat`은 항상 Claude Agent
+  SDK 경로를 사용하며 테스트는 SDK `query`나 `run_agent`를 대체해 이벤트 계약을
+  검증한다. 지식·시각화 API와 `pytest`는 provider 없이 동작한다.
+- 문서 전체를 코드와 대조해 Fake Runner 실행 안내를 제거하고, 폐쇄망 최소 설정에
+  `KNOWLEDGE_DB_PATH`·`KNOWLEDGE_SEARCH_BACKEND`·`CORS_ALLOW_ORIGINS`와 텍스트 지식
+  SQLite 영속화 확인 항목을 추가했다.
+- `active: false` 구조화 지식이 Agent 경로에서 실행·노출되지 않게 했다.
+  `validate_simulation_request`가 비활성 simulation을 거부하고, 활성 항목의 join
+  대상·`recipe_refs`·diagnostics·`follows`·용어집 `related_*` 참조 중 비활성
+  항목은 조회 결과에서 제외한다. 관리 화면 목록은 비활성도 그대로 보여준다.
+  원천 `sources`에 비활성 table이 있는 KPI·recipe도 목록에서 제외하고 상세 조회는
+  원인을 담은 오류를 반환한다(관리 화면은 파생 상태를 표시하지 않음).
+- Simulation YAML에 선택 필드 `aggregation_rules`, `visualization_hints`를 추가했다
+  (생략 시 빈 목록). `list_simulation`·`/api/knowledge/entries` 상세 응답에 포함된다.
 
 ## 검증 기준과 알려진 한계
 
 - 기본 검증: `source .venv/bin/activate && python -m pytest -q`.
-- 2026-09-21 통합 직전 기준: **269 passed, 6 deselected**, Starlette TestClient의
-  upstream deprecation warning 1건.
+- 2026-09-21 기준 전체 개발 검증: **285 passed, 6 deselected**. SMT2020 자산을
+  제외한 clean 복사본은 **244 passed, 41 skipped, 6 deselected**다. 마커 제외
+  프로필(`not smt2020 and not smt2020_bundle and not mock_service and not e2e`)은
+  **223 passed, 68 deselected**다.
+- 세 검증 모두 Starlette TestClient의 upstream deprecation warning 1건만 남는다.
 - E2E는 실제 CLI/provider 인증이 있는 환경에서만 `python -m pytest -m e2e`로
   실행한다.
 - 실제 provider 성공 응답, 실제 업무 데이터 정의와 폐쇄망 인프라 연결은 검증되지

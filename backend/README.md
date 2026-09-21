@@ -22,20 +22,29 @@ Windows PowerShell에서는 `py -3.11 -m venv .venv`와
 
 주요 환경변수는 다음과 같다.
 
-- `SERVICE_MODE=mock|real`: SQL·RAG·simulation service 선택
-- `PLANNING_AGENT_FAKE=1`: Claude 호출 없이 고정 이벤트 흐름 실행
+- `ENV=dev|prod`: `prod`에서는 real service와 별도 운영 지식 경로를 강제
+- `SERVICE_MODE=mock|real`: SQL·RAG·simulation service 선택. `prod`는 `real`만 허용
 - `LLM_PROVIDER`, `AGENT_MODEL`, provider key: 실제 Agent SDK 설정
-- `KNOWLEDGE_DIR`, `KNOWLEDGE_DB_PATH`: 구조화 YAML과 텍스트 지식 위치
+- `KNOWLEDGE_DIR`, `KNOWLEDGE_DB_PATH`: 구조화 YAML과 텍스트 지식 SQLite 위치
+- `KNOWLEDGE_SEARCH_BACKEND=local|service`: `search_documents`가 로컬 SQLite 또는 사내 RAG 어댑터를 쓸지 선택
 - `RESULT_STORE_DIR`, `VISUALIZATION_STORE_DIR`: 조회 결과와 차트 명세 위치
 - `CORS_ALLOW_ORIGINS`: 쿠키를 허용할 명시적 Frontend origin 목록
 
 실제 값과 비밀값은 `.env`에만 두고 `.env.example`에는 넣지 않는다.
 
-## SMT2020 로컬 자산
+## 로컬 개발 자산
+
+`datasets/`, `data/`, `scripts/`는 Git과 폐쇄망 반입 대상이 아니다.
+`scripts/seed_local_documents.py`는 `datasets/rag_docs/**/*.md`를 텍스트 지식
+저장소에 등록·검토·활성화하는 개발용 스크립트이며 반입 자산이 아니다.
+폐쇄망의 텍스트 지식은 문서 관리 API로 등록한다.
+
+### SMT2020
 
 Mock SQL과 입력 검증 simulation은 HVLM/LVHM을 합친 SQLite DB를 사용한다.
-원본 dataset, 생성 DB와 변환용 `scripts/build_smt2020_db.py`는 Git 제외 대상이며
-폐쇄망 환경에 별도로 반입한다. 자산이 준비된 경우에만 다음을 실행한다.
+원본 dataset, 생성 DB와 변환용 `scripts/build_smt2020_db.py`는 Git과 폐쇄망
+반입 대상에서 제외되는 개발 전용 자산이다. 자산이 준비된 개발 환경에서만 다음을
+실행한다.
 
 ```bash
 python -m scripts.build_smt2020_db
@@ -45,21 +54,26 @@ python -m scripts.build_smt2020_db
 
 ## 실행 모드
 
-Frontend와 고정 이벤트 흐름을 빠르게 확인하는 기본 개발 모드:
+기본 개발 모드:
 
 ```bash
-SERVICE_MODE=mock PLANNING_AGENT_FAKE=1 uvicorn main:app --reload --port 8100
+SERVICE_MODE=mock uvicorn main:app --reload --port 8100
 curl http://localhost:8100/health
 ```
 
-실제 Claude Agent SDK 경로는 `PLANNING_AGENT_FAKE=0`으로 두고 `.env`에 provider와
-CLI 설정을 구성한다. `services/real`은 폐쇄망 사내 DB·RAG·simulation 구현으로
+`/api/chat`은 항상 실제 Claude Agent SDK를 호출하므로 `.env`에 provider와 CLI
+설정이 필요하다. 지식·시각화 API와 `pytest`는 provider 없이 동작하며, 테스트는
+SDK `query`를 대체해 Agent 이벤트 흐름을 검증한다. `services/real`은 폐쇄망 사내 DB·RAG·simulation 구현으로
 교체하는 경계이며 mock과 함수 시그니처·반환 형태를 유지해야 한다.
+
+폐쇄망 운영은 `ENV=prod`, `SERVICE_MODE=real`과 별도 `KNOWLEDGE_DIR`을 모두
+요구한다. 조건을 충족하지 않으면 서버는 시작 단계에서 실패한다.
 
 ## API 진입점
 
 - `POST /api/chat`: SSE 채팅과 Tool 실행 이벤트
-- `GET /api/knowledge/tools|skills|entries`: Tool·Skill·구조화 지식 탐색
+- `GET /api/knowledge/tools|skills|entries|catalog|kpis`: Tool·Skill·구조화 지식 탐색
+  (`catalog`·`kpis`는 활성 table·KPI 요약)
 - `/api/knowledge/documents`: 텍스트 지식 등록·버전·검토·활성화 관리
 - `GET /api/visualizations/{visualization_id}`: 검증된 bar/line 차트 데이터
 - `GET /health`: 상태 확인
@@ -88,8 +102,16 @@ python -m pytest -q
 python -m pytest -m e2e  # 실제 CLI/provider 인증이 있는 환경에서만 실행
 ```
 
-기본 테스트는 mock service와 Fake Runner를 사용한다. E2E가 아닌 기본 테스트가
-외부 provider나 인터넷에 의존하도록 만들지 않는다.
+SMT2020 자산이 없으면 `smt2020` 테스트만 자동 skip된다. 번들 지식 YAML의 고정 값
+(`wip`, `initial_wip` 등)을 단정하는 테스트는 `smt2020_bundle` 마커가 붙고
+`bundled_knowledge` fixture로 `KNOWLEDGE_DIR`과 무관하게 번들 YAML을 읽는다.
+폐쇄망에서 real 구현과 공통 계약만 검증할 때는 다음 프로필을 사용한다.
+
+```bash
+python -m pytest -q -m "not smt2020 and not smt2020_bundle and not mock_service and not e2e"
+```
+
+E2E가 아닌 공통 테스트가 외부 provider나 인터넷에 의존하도록 만들지 않는다.
 
 ## 참고
 

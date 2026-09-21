@@ -89,8 +89,9 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-dev.txt
 cp .env.example .env
+# 선택: 로컬 SMT2020 개발 자산이 있을 때만 실행
 python -m scripts.build_smt2020_db
-PLANNING_AGENT_FAKE=1 python -m uvicorn main:app --reload --port 8100
+python -m uvicorn main:app --reload --port 8100
 python -m pytest -q
 python -m pytest -m e2e
 ```
@@ -100,9 +101,12 @@ Windows PowerShell에서는 `py -3.11 -m venv .venv`로 만들고
 개발 환경이므로 여기서는 `requirements-dev.txt`를 설치하며, 폐쇄망 실행 환경은
 `docs/CLOSED_NETWORK_SETUP.md`에 따라 `requirements.txt`만 설치한다.
 
-- 기본 테스트는 mock 서비스와 fake runner를 우선한다. E2E는 실제 CLI/provider
-  인증이 필요한 동작에만 사용한다.
-- 새 tool은 wrapper, 런타임 지침, prompt 정합성 테스트, fake runner와
+- SMT2020은 개발용 mock 회귀 자산이며 폐쇄망에 반입하지 않는다. 자산이 없으면
+  관련 테스트만 skip하고, 폐쇄망에서는 `ENV=prod`, `SERVICE_MODE=real`, 별도
+  `KNOWLEDGE_DIR`을 사용한다.
+- 기본 테스트는 mock 서비스와 SDK `query` 대체를 우선한다. E2E는 실제
+  CLI/provider 인증이 필요한 동작에만 사용한다.
+- 새 tool은 wrapper, 런타임 지침, prompt 정합성 테스트와
   프론트 renderer/toolkit 필요 여부를 함께 갱신한다. 입력 기본값과 선택 필드는
   업무 함수 시그니처와 MCP 광고 JSON Schema에서 같은 의미여야 한다.
 - 현재 별도 linter, formatter와 coverage 기준은 없다. 설정 없이 필수라고

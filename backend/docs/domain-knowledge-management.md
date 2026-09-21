@@ -4,6 +4,13 @@
 폐쇄망에서 같은 방식으로 관리하기 위한 운영 기준이다. 단계별 제품 범위와 상태는
 [Backend 계획과 이력](../plan/Todo.md)을 따른다.
 
+작성 원칙과 예시는 특정 데이터셋에 종속되지 않는다. 실제 업무 테이블에는 여러
+독립 세그먼트(예: 사업부, 라인, benchmark 데이터셋)가 섞여 있을 수 있으므로
+아래 예시는 세그먼트 구분 키를 `segment_key`처럼 일반 이름으로 표기한다. 개발
+환경에서 원칙을 검증하는 데 쓰는 SMT2020 fixture는 [개발용 SMT2020 데이터와
+검증](#개발용-smt2020-데이터와-검증) 절에서만 다루며, 그 절 밖에서는 SMT2020
+고유 값을 예시로 복사하지 않는다.
+
 ## 지식의 단일 기준
 
 | 지식 | 저장 위치 | 용도 |
@@ -33,8 +40,14 @@ source: ""
 updated: 2026-09-15
 ```
 
-- `active: true`인 항목만 Agent의 지식 조회와 SQL 허용 테이블에 반영된다.
-  `false`인 항목도 관리 화면에서는 검색 제외 상태로 조회할 수 있다.
+- `active: true`인 항목만 Agent의 지식 조회, SQL 허용 테이블과 simulation 실행에
+  반영된다. `false`인 항목도 관리 화면에서는 검색 제외 상태로 조회할 수 있다.
+- 활성 항목이 참조하는 join 대상 table, `recipe_refs`, diagnostics 참조,
+  `follows`, 용어집의 `related_*`가 `active: false`이면 Agent 조회 결과에서
+  해당 참조만 제외한다. 등록되지 않은 참조는 숨기지 않고 정합성 테스트가 잡는다.
+- KPI·recipe의 `sources` 중 하나라도 `active: false`인 table이면 그 KPI·recipe도
+  목록에서 제외하고 상세 조회는 비활성 원천 table 이름을 알리는 오류를 반환한다.
+  KPI는 `sources`만 기준으로 하며 `recipe_refs`의 recipe가 비활성이어도 사용할 수 있다.
 - 필드를 생략한 기존 YAML은 하위 호환을 위해 `active: true`로 처리한다.
 - YAML은 시작 시 메모리에 로드되므로 값을 바꾼 뒤 Backend를 재시작한다.
 - `draft`는 구조 검증만 통과했거나 업무 담당자가 확인하지 않은 상태다.
@@ -50,33 +63,33 @@ updated: 2026-09-15
 `visualization_hints`를 기록한다.
 
 ```yaml
-table: wip
-description: SMT2020 초기 재공 Lot
-grain: [dataset, lot]
-time_column: due
+table: <table_name>
+description: <원본 한 행이 나타내는 업무 개념>
+grain: [<segment_key>, <row_key>]
+time_column: <time_column>
 columns:
-  - name: part
+  - name: <column>
     type: varchar
-    desc: Part ID
+    desc: <컬럼 설명>
 joins:
-  - to: part
-    on: [dataset, part]
+  - to: <다른_table>
+    on: [<segment_key>, <join_key>]
     kind: many-to-one
 query_rules:
-  - 특정 benchmark 질문은 dataset을 필수로 제한한다.
+  - 특정 세그먼트를 지정한 질문은 <segment_key>를 필수로 제한한다.
 aggregation_rules:
-  - Lot 수는 COUNT(*), piece 수는 SUM(pieces)로 구분한다.
+  - <건수 측정값>은 COUNT(*), <수량 측정값>은 SUM(<컬럼>)로 구분한다.
 visualization_hints:
-  - Part별 Lot 수 비교에는 bar 차트가 적합하다.
+  - <차원>별 <측정값> 비교에는 bar 차트가 적합하다.
 caveats:
-  - HVLM/LVHM을 조인할 때 dataset을 반드시 포함한다.
+  - 세그먼트 간 조인 시 <segment_key>를 반드시 포함한다.
 sample_queries:
-  - question: benchmark별 초기 WIP Lot은 몇 개야?
+  - question: 세그먼트별 <측정값>은 몇 개야?
     sql: |
-      SELECT dataset, COUNT(*) AS lot_count
-      FROM wip
-      GROUP BY dataset
-      ORDER BY dataset
+      SELECT <segment_key>, COUNT(*) AS <alias>
+      FROM <table_name>
+      GROUP BY <segment_key>
+      ORDER BY <segment_key>
 ```
 
 작성할 때 다음을 반드시 확인한다.
@@ -104,8 +117,9 @@ query_rules:
 `query_rules`는 필터·기준일·정렬·조인 전제, `aggregation_rules`는 grain·집계
 함수·중복·재집계 규칙으로 역할을 구분한다.
 
-실제 스키마가 바뀌면 catalog YAML, `scripts/build_smt2020_db.py`와 관련 정합성
-테스트를 같은 변경에서 갱신한다. 생성된 `datasets/smt2020.db`를 직접 수정하지 않는다.
+실제 스키마가 바뀌면 catalog YAML과 관련 정합성 테스트를 같은 변경에서
+갱신한다. 스키마를 원본에서 생성하는 변환 스크립트가 있다면 함께 갱신하고,
+생성된 DB 파일은 스크립트 밖에서 직접 수정하지 않는다.
 
 ## KPI 작성
 
@@ -128,40 +142,41 @@ KPI는 표시 이름과 동의어, 업무 정의, 공식, 원천 테이블, 기�
 | `diagnostics` | 이상 원인을 확인할 SQL·simulation 가설과 참조 대상 |
 
 파일명은 `<kpi_id>.yaml`로 맞춘다. 새 KPI는 구조와 SQL을 테스트했더라도 현업
-정의·단위·판정 기준을 검토하기 전까지 `draft`로 둔다. SMT2020에 적용된 실제
-예시는 [initial_wip.yaml](../knowledge/kpi/initial_wip.yaml)을 참고한다.
+정의·단위·판정 기준을 검토하기 전까지 `draft`로 둔다. 개발용 SMT2020 fixture에
+적용한 참고 예시는 [개발용 SMT2020 데이터와 검증](#개발용-smt2020-데이터와-검증)
+절의 [initial_wip.yaml](../knowledge/kpi/initial_wip.yaml)에 있다.
 
 다음은 필수 필드와 연결 방식을 보여주는 작성 예다. 실제 KPI를 추가할 때는
 예시의 이름과 값을 복사하지 말고 대상 catalog와 업무 정의에 맞춰 작성한다.
 
 ```yaml
-kpi_id: example_lot_count
-name: 예제 Lot 수
-aliases: [Lot 건수, 재공 건수]
-definition: 선택한 dataset의 기준 시점에 존재하는 Lot을 Part별로 집계한다.
-formula: lot_count = COUNT(*)
-sources: [wip]
-grain: [dataset, part]
-baseline: wip 원본의 simulation 시작 시점 스냅샷
+kpi_id: example_kpi
+name: 예제 지표
+aliases: [예제 건수]
+definition: 선택한 <segment_key>의 기준 시점에 존재하는 <측정 대상>을 <차원>별로 집계한다.
+formula: <alias> = COUNT(*)
+sources: [<table_name>]
+grain: [<segment_key>, <차원>]
+baseline: <table_name> 원본의 <기준 시점> 스냅샷
 shortfall_rule: 현황 지표이므로 정상·부진을 판정하지 않는다
 sql_template: |
-  SELECT dataset, part, COUNT(*) AS lot_count
-  FROM wip
-  WHERE dataset = :dataset
-  GROUP BY dataset, part
-  ORDER BY part
+  SELECT <segment_key>, <차원>, COUNT(*) AS <alias>
+  FROM <table_name>
+  WHERE <segment_key> = :segment
+  GROUP BY <segment_key>, <차원>
+  ORDER BY <차원>
 aggregation_rules:
-  - dataset을 먼저 확정하고 HVLM/LVHM을 섞지 않는다
-  - Lot 수는 COUNT(*), piece 수는 SUM(pieces)로 구분한다
-  - route_step과 조인하기 전에 dataset과 part grain으로 먼저 집계한다
-recipe_refs: [initial_wip_by_part]
+  - <segment_key>를 먼저 확정하고 서로 다른 세그먼트를 섞지 않는다
+  - <건수 측정값>은 COUNT(*), <수량 측정값>은 SUM(<컬럼>)로 구분한다
+  - <상위 table>과 조인하기 전에 <segment_key>와 <차원> grain으로 먼저 집계한다
+recipe_refs: [example_recipe]
 diagnostics:
-  - hypothesis: WIP의 Part와 현재 Step이 master 및 Route에 연결된다
+  - hypothesis: <table_name>의 <키>가 <참조 table>에 연결된다
     how: simulation
-    ref: SMT2020_입력검증
+    ref: <simulation_type>
 status: draft
 owner: ""
-source: SMT2020 WIP.txt와 KPI 정의 검토 기록
+source: <검토 문서나 회의명>
 updated: 2026-09-15
 ```
 
@@ -170,8 +185,8 @@ updated: 2026-09-15
 - `definition`만 읽어도 무엇을, 언제, 어떤 단위로 측정하는지 알 수 있어야 한다.
   `formula`는 같은 내용을 SQL 집계식 수준으로 좁혀 적는다.
 - `grain`은 `sql_template`의 `GROUP BY` 및 출력 식별 컬럼과 일치해야 한다.
-  예를 들어 `[dataset, part]` KPI에서 `dataset`을 빼면 HVLM/LVHM의 같은 Part ID가
-  한 행으로 합쳐질 수 있다.
+  예를 들어 `[segment_key, part]` KPI에서 `segment_key`를 빼면 서로 다른
+  세그먼트의 같은 식별자가 한 행으로 합쳐질 수 있다.
 - Lot, piece, wafer, hour처럼 단위가 다른 측정값은 하나의 합계로 섞지 않는다.
   표시용 이름이 비슷해도 각각 별도 출력 alias와 단위를 사용한다.
 - 비율 KPI는 행별 비율의 평균으로 다시 계산하지 않는다. 합산 가능한 분자와
@@ -231,7 +246,7 @@ updated: 2026-09-15
    `recipe_refs`와 `aggregation_rules`를 작성한다.
 5. diagnostics의 모든 참조가 실제 table, recipe 또는 simulation에 존재하는지
    확인한다.
-6. HVLM/LVHM 각각에서 SQL을 실행해 NULL, 0건, dataset 혼합과 합계 차이를
+6. 고정된 각 세그먼트에서 SQL을 실행해 NULL, 0건, 세그먼트 혼합과 합계 차이를
    점검한다.
 7. 기술 검증 후에도 현업 승인 전에는 `draft`, 승인 근거가 있을 때만
    `verified`로 변경한다.
@@ -249,6 +264,21 @@ python -m pytest -q \
 정합성 테스트는 KPI source, SQL이 참조하는 table, `recipe_refs`, diagnostics와
 catalog 컬럼 참조가 실제 항목을 가리키는지 검사한다. 새 KPI에는 경계값과 NULL,
 분모 0, 중복 JOIN을 재현하는 테스트를 필요에 따라 추가한다.
+
+## Simulation 작성
+
+Simulation YAML은 `type`, `name`, `aliases`, `when_to_use`, `params`,
+`output_schema`, `follows`에 더해 결과를 해석하는 두 규칙을 가질 수 있다.
+두 필드는 생략하면 빈 목록이다.
+
+| 필드 | 의미 |
+| --- | --- |
+| `aggregation_rules` | 결과의 집계 단위, 합산해도 되는 값과 안 되는 값, 세그먼트 혼합 금지 |
+| `visualization_hints` | 결과를 bar/line/표 중 무엇으로 보일지에 대한 권고 |
+
+table·recipe와 같이 `aggregation_rules`는 집계 의미, `visualization_hints`는
+표현 권고로 구분한다. 실행 절차와 파라미터 제약은 `when_to_use`와 `params`에 둔다.
+참고 예시는 [SMT2020_입력검증.yaml](../knowledge/simulations/SMT2020_입력검증.yaml)이다.
 
 ## Recipe와 CTE 작성
 
@@ -268,10 +298,10 @@ Recipe YAML은 다음 필드로 질문을 실행 가능한 결과 계약에 연�
 
 파일명은 `<recipe_id>.yaml`로 맞추고 `recipe_id`와 `cte_name`에는 SQL 식별자로
 안전한 소문자 `snake_case`를 사용한다. 새 파일은 담당자 검토 전까지 `draft`로
-시작한다. 실제 예시는
+시작한다. 개발용 SMT2020 fixture에 적용한 참고 예시는
 [initial_wip_by_part.yaml](../knowledge/recipes/initial_wip_by_part.yaml)과
-[part_route_tool_summary.yaml](../knowledge/recipes/part_route_tool_summary.yaml)을
-참고한다.
+[part_route_tool_summary.yaml](../knowledge/recipes/part_route_tool_summary.yaml)에
+있다.
 
 다음은 필수 계약을 보여주는 최소 작성 예다. 값과 컬럼은 복사하지 말고 대상
 catalog의 실제 grain과 타입에 맞춰 바꾼다.
@@ -300,10 +330,10 @@ aggregation_rules:
 visualization_hints:
   - 키별 row_count 비교에는 bar 차트를 고려한다
 sample_queries:
-  - question: LVHM의 키별 건수는 얼마야?
+  - question: 특정 세그먼트의 키별 건수는 얼마야?
     sql: |
       SELECT * FROM example_by_key
-      WHERE dataset = 'LVHM'
+      WHERE dataset = '<segment_value>'
       ORDER BY business_key
 status: draft
 owner: ""
@@ -320,7 +350,7 @@ WITH example_by_key AS (
 )
 SELECT *
 FROM example_by_key
-WHERE dataset = 'LVHM';
+WHERE dataset = '<segment_value>';
 ```
 
 작성 시 SQL 계약은 다음과 같다.
@@ -330,13 +360,14 @@ WHERE dataset = 'LVHM';
 - `cte_sql`과 `sample_queries[].sql`은 읽기 전용 `SELECT`만 사용한다.
 - `sources`에는 CTE의 `FROM`/`JOIN`에 나타나는 실제 catalog table을 모두 적는다.
   CTE 자신의 이름은 `sources`에 넣지 않는다.
-- 모든 JOIN은 catalog의 cardinality와 키를 따르고 SMT2020 교차 테이블 JOIN에는
-  `dataset`을 포함한다.
+- 모든 JOIN은 catalog의 cardinality와 키를 따르고, 세그먼트 구분이 있는
+  도메인에서는 교차 테이블 JOIN에 `segment_key`를 포함한다.
 - `output_grain`의 모든 이름은 `output_columns`에 있어야 하며 출력 alias와 철자가
   같아야 한다. 수량은 `measure`, 식별 차원은 `category`, 시각은 `time`이다.
 - recipe는 문자열 템플릿 엔진이 아니다. `:dataset` 같은 placeholder를 썼다면
   호출자가 실행 전에 허용 값을 명시적으로 치환해야 한다. 가능한 경우 CTE는
-  dataset별로 집계하고 바깥 SELECT에서 `WHERE dataset = 'LVHM'`처럼 필터한다.
+  세그먼트별로 집계하고 바깥 SELECT에서 `WHERE <segment_key> = '<segment_value>'`처럼
+  필터한다.
 - `query_rules`의 기본 날짜·필터·정렬은 사용자가 다른 조건을 명시하지 않은 경우
   바깥 SELECT를 포함한 최종 SQL에 적용한다.
 - 이미 집계된 CTE를 다시 합칠 때는 `aggregation_rules`에 재집계 함수와 보존할
@@ -372,45 +403,46 @@ tool은 없다. 향후 runtime tool로 공개하려면 tool payload와 프론트
 | --- | --- |
 | `scenario_id` | 파일명과 같은 소문자 `snake_case` 식별자 |
 | `name`, `description` | 사람이 이해할 이름과 검증 목적 |
-| `dataset` | 실행 대상 `HVLM` 또는 `LVHM` |
-| `question` | Fake/E2E에서 사용할 수 있는 대표 자연어 질문 |
+| `dataset` | 실행 대상 고정 데이터셋·세그먼트 식별자 |
+| `question` | E2E에서 사용할 수 있는 대표 자연어 질문 |
 | `steps` | 순서대로 참조할 `recipe` 또는 `simulation`, 입력과 기대 설명 |
 | `expected.table_counts` | 고정 원본에서 반드시 일치해야 하는 테이블별 행 수 |
 | `expected.unmatched_rows` | 입력 관계 검사별 허용 미연결 행 수 |
 
-실제 작성 샘플은
+개발용 SMT2020 fixture에 적용한 참고 샘플은
 [hvlm_input_integrity.yaml](../knowledge/scenarios/hvlm_input_integrity.yaml)과
 [lvhm_input_integrity.yaml](../knowledge/scenarios/lvhm_input_integrity.yaml)에 있다.
 최소 형태는 다음과 같다.
 
 ```yaml
-scenario_id: lvhm_example_validation
-name: LVHM 예제 검증
+scenario_id: example_validation
+name: 예제 검증
 description: 집계 recipe와 입력 검증 simulation을 관통한다.
-dataset: LVHM
-question: LVHM의 제품별 현황과 입력 관계를 확인해줘.
+dataset: <segment_value>
+question: <segment_value>의 제품별 현황과 입력 관계를 확인해줘.
 steps:
   - action: recipe
     ref: example_by_key
-    params: {dataset: LVHM}
+    params: {dataset: <segment_value>}
     expectation: 기대한 업무 키 수와 합계가 조회된다.
   - action: simulation
-    ref: SMT2020_입력검증
-    params: {dataset: LVHM}
+    ref: <simulation_type>
+    params: {dataset: <segment_value>}
     expectation: 핵심 관계의 unmatched_rows가 모두 0이다.
 expected:
-  table_counts: {part: 10, wip: 2156}
-  unmatched_rows: {wip_to_part: 0}
+  table_counts: {<table_a>: 10, <table_b>: 2156}
+  unmatched_rows: {<check_name>: 0}
 status: draft
 owner: ""
-source: SMT2020 LVHM 원본과 생성 SQLite 확인
+source: <원본 및 생성 DB 확인 근거>
 updated: 2026-09-15
 ```
 
 Scenario를 추가할 때는 다음 순서로 작성한다.
 
-1. 대상 dataset을 하나로 고정하고 SQLite에서 기준 row count와 관계 검사를 직접
-   실행한다. HVLM/LVHM 식별자가 겹치므로 기대값을 합쳐 적지 않는다.
+1. 대상 데이터셋·세그먼트를 하나로 고정하고 실제 DB에서 기준 row count와 관계
+   검사를 직접 실행한다. 여러 세그먼트에서 식별자가 겹칠 수 있으므로 기대값을
+   합쳐 적지 않는다.
 2. `steps[].ref`가 실제 `knowledge/recipes/*.yaml`의 `recipe_id` 또는
    `knowledge/simulations/*.yaml`의 `type`을 가리키는지 확인한다.
 3. `params.dataset`과 최상위 `dataset`을 일치시키고 expectation에는 숫자를
@@ -425,15 +457,15 @@ Recipe와 Scenario를 함께 검증하는 기본 명령은 다음과 같다.
 
 ```bash
 cd backend
-python -m scripts.build_smt2020_db
 python -m pytest -q \
   tests/test_knowledge.py \
-  tests/test_knowledge_integrity.py \
-  tests/test_smt2020_dataset.py
+  tests/test_knowledge_integrity.py
 ```
 
 테스트는 YAML schema, recipe 참조, CTE의 catalog table 사용, 모든 sample query의
-실행 가능 여부, scenario의 table count와 입력 관계 기대값을 확인한다.
+실행 가능 여부, scenario의 table count와 입력 관계 기대값을 확인한다. 개발용
+SMT2020 fixture를 사용하는 경우의 데이터셋 정합성 검증은 [개발용 SMT2020
+데이터와 검증](#개발용-smt2020-데이터와-검증) 절을 따른다.
 
 ## Agent 주입 경계
 
@@ -443,17 +475,18 @@ python -m pytest -q \
 - 지식 tool: list는 요약, describe/get은 상세를 반환한다.
 - RAG: 출처가 있는 비정형 산문만 검색한다.
 
-`agent/sdk_tools.py::TOOL_NAMES`, 런타임 CLAUDE의 tool 표, Skill의 tool 이름과
-fake runner가 어긋나지 않게 prompt 정합성 테스트를 유지한다. Agent가 SQL을
+`agent/sdk_tools.py::TOOL_NAMES`, 런타임 CLAUDE의 tool 표, Skill의 tool 이름이
+어긋나지 않게 prompt 정합성 테스트를 유지한다. Agent가 SQL을
 작성하기 전 `describe_table`을 호출하고 `query_rules`의 기본 조건을 반영하며,
 `draft` 지식을 사용한 계산은 답변에 미검증 기준임을 표시한다.
 
-## SMT2020 데이터와 검증
+## 개발용 SMT2020 데이터와 검증
 
 `scripts/build_smt2020_db.py`는 `datasets/SMT2020_HVLM`과
 `datasets/SMT2020_LVHM`의 tab 구분 원본을 하나의 SQLite로 변환한다. 모든
 테이블에 `dataset`을 추가하며 SQL 서비스와 입력 검증 mock은 같은 DB를 사용한다.
 원본은 수정하지 않고 생성 DB는 완성 후 원자적으로 교체한다.
+이 자산과 bundled YAML은 개발용 mock 회귀에만 사용하며 폐쇄망에는 반입하지 않는다.
 
 ```bash
 cd backend
@@ -467,8 +500,9 @@ join 및 입력 관계 unmatched 건수를 포함한다.
 
 ## 폐쇄망 반입과 운영
 
-- YAML, Skill과 검증 테스트는 애플리케이션 소스와 같은 commit으로 반입한다.
-- 반입 전에 인터넷 연결 없이 SQLite 변환과 기본 pytest를 실행해 지식 로딩을 확인한다.
+- 운영 YAML과 Skill은 애플리케이션 소스와 함께 검토해 반입한다. bundled SMT2020
+  YAML은 운영 `KNOWLEDGE_DIR`로 사용하지 않는다.
+- 반입 후에는 SMT2020 없이 공통 계약 테스트와 real service 관통 검증을 실행한다.
 - 비정형 문서 원본은 승인된 반입 절차를 따르고 문서별 owner, source와 갱신일을
   보존한다.
 - Milvus와 임베딩 모델은 Phase 3 착수 전에 사내 제공 버전, wheel·이미지,
