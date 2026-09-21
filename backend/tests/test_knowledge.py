@@ -80,6 +80,8 @@ def root(tmp_path: Path) -> Path:
           dataset: {required: true, description: 데이터셋, example: LVHM}
         output_schema:
           results: {type: array, desc: 관계 검사}
+        aggregation_rules: ["dataset 하나를 기준으로 집계"]
+        visualization_hints: ["관계별 건수는 표가 적합"]
         status: verified
         """,
     )
@@ -196,6 +198,106 @@ def test_inactive_yaml_is_hidden_from_all_runtime_lookups(root: Path) -> None:
     assert store.get_recipe("wip_by_part")["status"] == "error"
     assert store.list_scenarios() == []
     assert store.get_scenario("lvhm_input_integrity")["status"] == "error"
+
+
+def test_simulation_exposes_aggregation_rules_and_visualization_hints(root: Path) -> None:
+    store = KnowledgeStore.load(root)
+
+    simulation = store.get_simulation("SMT2020_입력검증")
+
+    assert simulation["aggregation_rules"] == ["dataset 하나를 기준으로 집계"]
+    assert simulation["visualization_hints"] == ["관계별 건수는 표가 적합"]
+
+
+def test_simulation_rule_fields_default_to_empty(root: Path) -> None:
+    _write(
+        root / "simulations/minimal.yaml",
+        """
+        type: minimal
+        name: 최소
+        when_to_use: 확인
+        """,
+    )
+
+    simulation = KnowledgeStore.load(root).get_simulation("minimal")
+
+    assert simulation["aggregation_rules"] == []
+    assert simulation["visualization_hints"] == []
+
+
+def test_inactive_simulation_cannot_be_validated_or_run(root: Path, monkeypatch) -> None:
+    from services import knowledge_service, simulation_registry
+
+    store = KnowledgeStore.load(root)
+    monkeypatch.setattr(knowledge_service, "_store", store)
+    monkeypatch.setattr(simulation_registry, "get_store", lambda: store)
+    params = {"dataset": "LVHM"}
+    assert simulation_registry.validate_simulation_request("SMT2020_입력검증", params) is None
+
+    store.simulations["SMT2020_입력검증"].active = False
+
+    assert store.is_simulation_active("SMT2020_입력검증") is False
+    error = simulation_registry.validate_simulation_request("SMT2020_입력검증", params)
+    assert error and "알 수 없는 simulation_type" in error
+
+
+def test_references_to_inactive_items_are_hidden_from_active_items(root: Path) -> None:
+    store = KnowledgeStore.load(root)
+    store.tables["part"].active = False
+    store.recipes["wip_by_part"].active = False
+    store.kpis["initial_wip"].recipe_refs = ["wip_by_part"]
+    store.kpis["initial_wip"].diagnostics[0].ref = "part"
+    store.simulations["SMT2020_입력검증"].follows = ["SMT2020_입력검증"]
+
+    assert store.describe_table("wip")["joins"] == []
+    kpi = store.get_kpi("initial_wip")
+    assert kpi["recipe_refs"] == [] and kpi["diagnostics"] == []
+    assert store.list_glossary()[0]["related_tables"] == ["wip"]
+    store.kpis["initial_wip"].active = False
+    assert store.list_glossary()[0]["related_kpis"] == []
+    store.simulations["SMT2020_입력검증"].active = False
+    assert store.get_simulation("SMT2020_입력검증")["status"] == "error"
+
+
+def test_recipe_with_inactive_source_table_is_hidden(root: Path) -> None:
+    store = KnowledgeStore.load(root)
+    store.tables["part"].active = False
+
+    assert store.list_recipes() == []
+    result = store.get_recipe("wip_by_part")
+    assert result["status"] == "error"
+    assert "part" in result["message"] and "wip" not in result["message"].split(":")[-1]
+
+
+def test_kpi_with_inactive_source_table_is_hidden(root: Path) -> None:
+    store = KnowledgeStore.load(root)
+    store.tables["wip"].active = False
+
+    assert store.list_kpis() == []
+    result = store.get_kpi("initial_wip")
+    assert result["status"] == "error" and "wip" in result["message"]
+
+
+def test_unregistered_source_is_not_hidden(root: Path) -> None:
+    store = KnowledgeStore.load(root)
+    store.recipes["wip_by_part"].sources = ["wip", "not_registered"]
+
+    assert [row["recipe_id"] for row in store.list_recipes()] == ["wip_by_part"]
+    assert store.get_recipe("wip_by_part")["recipe_id"] == "wip_by_part"
+
+
+def test_references_to_unavailable_recipe_and_kpi_are_hidden(root: Path) -> None:
+    store = KnowledgeStore.load(root)
+    store.kpis["initial_wip"].recipe_refs = ["wip_by_part"]
+    store.kpis["initial_wip"].diagnostics[0].ref = "recipes/wip_by_part"
+    store.tables["part"].active = False  # wip_by_part 의 원천
+
+    kpi = store.get_kpi("initial_wip")
+    assert kpi["recipe_refs"] == [] and kpi["diagnostics"] == []
+
+    store.tables["part"].active = True
+    store.tables["wip"].active = False  # initial_wip 의 원천
+    assert store.list_glossary()[0]["related_kpis"] == []
 
 
 def test_invalid_yaml_error_includes_filename(root: Path) -> None:
@@ -341,6 +443,40 @@ def test_list_and_get_scenarios(root: Path) -> None:
     assert scenario["verified"] is False
 
 
+def test_scenario_accepts_arbitrary_dataset_identifier(root: Path) -> None:
+    _write(
+        root / "scenarios/plant_snapshot_validation.yaml",
+        """
+        scenario_id: plant_snapshot_validation
+        name: 공장 스냅샷 검증
+        description: 임의 운영 fixture 식별자를 사용하는 시나리오
+        dataset: plant_a_2026q3_snapshot
+        question: 공장 A 스냅샷의 입력 관계를 검증해줘
+        steps:
+          - action: recipe
+            ref: wip_by_part
+            params: {dataset: plant_a_2026q3_snapshot}
+            expectation: 제품별 집계가 조회된다
+          - action: simulation
+            ref: SMT2020_입력검증
+            params: {dataset: plant_a_2026q3_snapshot}
+            expectation: 입력 관계 검사가 완료된다
+        expected:
+          table_counts: {part: 3}
+          unmatched_rows: {wip_to_part: 0}
+        status: draft
+        """,
+    )
+
+    store = KnowledgeStore.load(root)
+
+    scenario = store.get_scenario("plant_snapshot_validation")
+    assert scenario["dataset"] == "plant_a_2026q3_snapshot"
+    assert [row["scenario_id"] for row in store.list_scenarios("2026q3")] == [
+        "plant_snapshot_validation"
+    ]
+
+
 def test_get_scenario_unknown_returns_error(root: Path) -> None:
     result = KnowledgeStore.load(root).get_scenario("no_such")
 
@@ -391,37 +527,3 @@ def test_invalid_recipe_guide_reports_filename(root: Path, guide: str) -> None:
 
     with pytest.raises(ValueError, match="invalid.yaml"):
         KnowledgeStore.load(root)
-def test_scenario_accepts_arbitrary_dataset_identifier(root: Path) -> None:
-    _write(
-        root / "scenarios/plant_snapshot_validation.yaml",
-        """
-        scenario_id: plant_snapshot_validation
-        name: 공장 스냅샷 검증
-        description: 임의 운영 fixture 식별자를 사용하는 시나리오
-        dataset: plant_a_2026q3_snapshot
-        question: 공장 A 스냅샷의 입력 관계를 검증해줘
-        steps:
-          - action: recipe
-            ref: wip_by_part
-            params: {dataset: plant_a_2026q3_snapshot}
-            expectation: 제품별 집계가 조회된다
-          - action: simulation
-            ref: SMT2020_입력검증
-            params: {dataset: plant_a_2026q3_snapshot}
-            expectation: 입력 관계 검사가 완료된다
-        expected:
-          table_counts: {part: 3}
-          unmatched_rows: {wip_to_part: 0}
-        status: draft
-        """,
-    )
-
-    store = KnowledgeStore.load(root)
-
-    scenario = store.get_scenario("plant_snapshot_validation")
-    assert scenario["dataset"] == "plant_a_2026q3_snapshot"
-    assert [row["scenario_id"] for row in store.list_scenarios("2026q3")] == [
-        "plant_snapshot_validation"
-    ]
-
-

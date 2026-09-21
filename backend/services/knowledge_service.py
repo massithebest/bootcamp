@@ -121,6 +121,8 @@ class KnowledgeSimulation(KnowledgeMeta):
     when_to_use: str
     params: dict[str, SimulationParam] = {}
     output_schema: dict[str, Any] = {}
+    aggregation_rules: list[str] = []
+    visualization_hints: list[str] = []
     follows: list[str] = []
 
 
@@ -328,13 +330,17 @@ class KnowledgeStore:
         found = self.tables.get(table) or self._find_ci(self.tables, table)
         if found is None or not found.active:
             return self._not_found("테이블", table, "list_tables")
-        return {**found.model_dump(mode="json"), "verified": self._verified(found)}
+        described = {**found.model_dump(mode="json"), "verified": self._verified(found)}
+        described["joins"] = [
+            join for join in described["joins"] if not self._is_unavailable(join["to"], self.tables)
+        ]
+        return described
 
     @logged_service_operation
     def list_kpis(self, keyword: str | None = None) -> list[dict]:
         rows = []
         for kpi in self.kpis.values():
-            if not kpi.active:
+            if not kpi.active or self._inactive_sources(kpi):
                 continue
             if keyword and not _contains(keyword, kpi.name, kpi.aliases, kpi.definition, kpi.kpi_id):
                 continue
@@ -353,7 +359,18 @@ class KnowledgeStore:
         found = self.kpis.get(kpi_id) or self._find_ci(self.kpis, kpi_id)
         if found is None or not found.active:
             return self._not_found("KPI", kpi_id, "list_kpis")
-        return {**found.model_dump(mode="json"), "verified": self._verified(found)}
+        if (unavailable := self._unavailable_reason("KPI", found)) is not None:
+            return unavailable
+        described = {**found.model_dump(mode="json"), "verified": self._verified(found)}
+        described["recipe_refs"] = [
+            ref for ref in described["recipe_refs"] if not self._is_unavailable(ref, self.recipes)
+        ]
+        described["diagnostics"] = [
+            item
+            for item in described["diagnostics"]
+            if not self._is_unavailable_diagnostic(item["how"], item["ref"])
+        ]
+        return described
 
     @logged_service_operation
     def list_simulations(self) -> list[dict]:
@@ -372,17 +389,25 @@ class KnowledgeStore:
 
     @logged_service_operation
     def list_glossary(self) -> list[dict]:
-        return [
-            {**entry.model_dump(mode="json"), "verified": self._verified(entry)}
-            for entry in self.glossary
-            if entry.active
-        ]
+        rows = []
+        for entry in self.glossary:
+            if not entry.active:
+                continue
+            row = {**entry.model_dump(mode="json"), "verified": self._verified(entry)}
+            row["related_kpis"] = [
+                ref for ref in row["related_kpis"] if not self._is_unavailable(ref, self.kpis)
+            ]
+            row["related_tables"] = [
+                ref for ref in row["related_tables"] if not self._is_unavailable(ref, self.tables)
+            ]
+            rows.append(row)
+        return rows
 
     @logged_service_operation
     def list_recipes(self, keyword: str | None = None) -> list[dict]:
         rows = []
         for recipe in self.recipes.values():
-            if not recipe.active:
+            if not recipe.active or self._inactive_sources(recipe):
                 continue
             if keyword and not _contains(
                 keyword,
@@ -408,6 +433,8 @@ class KnowledgeStore:
         found = self.recipes.get(recipe_id) or self._find_ci(self.recipes, recipe_id)
         if found is None or not found.active:
             return self._not_found("레시피", recipe_id, "list_recipes")
+        if (unavailable := self._unavailable_reason("레시피", found)) is not None:
+            return unavailable
         return {**found.model_dump(mode="json"), "verified": self._verified(found)}
 
     @logged_service_operation
@@ -446,6 +473,13 @@ class KnowledgeStore:
         return {**found.model_dump(mode="json"), "verified": self._verified(found)}
 
     @logged_service_operation
+    def is_simulation_active(self, simulation_type: str) -> bool:
+        """등록되어 있고 `active: true` 인 simulation 만 실행할 수 있다."""
+
+        found = self.simulations.get(simulation_type)
+        return found is not None and found.active
+
+    @logged_service_operation
     def table_names(self) -> set[str]:
         """execute_sql 가드레일이 쓰는 허용 테이블 목록."""
 
@@ -465,8 +499,47 @@ class KnowledgeStore:
                 return value
         return None
 
+    def _inactive_sources(self, item: KnowledgeMeta) -> list[str]:
+        """KPI·recipe 의 `sources` 중 등록되어 있으나 `active: false` 인 table 이름."""
+
+        if not isinstance(item, (KnowledgeKpi, KnowledgeRecipe)):
+            return []
+        return [name for name in item.sources if self._is_unavailable(name, self.tables)]
+
+    def _is_unavailable(self, key: str, mapping: dict) -> bool:
+        """등록되어 있으나 Agent 가 쓸 수 없는 항목을 가리키는 참조인지 확인한다.
+
+        `active: false` 이거나(KPI·recipe 는) 원천 table 이 비활성이면 사용할 수 없다.
+        등록되지 않은 참조는 무결성 테스트의 몫이므로 여기서는 숨기지 않는다.
+        """
+
+        found = mapping.get(key)
+        return found is not None and (not found.active or bool(self._inactive_sources(found)))
+
+    def _unavailable_reason(self, label: str, item: KnowledgeMeta) -> dict | None:
+        """활성이지만 원천 table 이 비활성이라 쓸 수 없으면 원인을 담은 오류를 돌려준다."""
+
+        inactive = self._inactive_sources(item)
+        if not inactive:
+            return None
+        return {
+            "status": "error",
+            "message": f"{label}의 원천 테이블이 비활성이라 사용할 수 없습니다: {', '.join(inactive)}.",
+        }
+
+    def _is_unavailable_diagnostic(self, how: str, ref: str) -> bool:
+        if how == "simulation":
+            return self._is_unavailable(ref, self.simulations)
+        if ref.startswith("recipes/"):
+            return self._is_unavailable(ref.removeprefix("recipes/"), self.recipes)
+        return self._is_unavailable(ref, self.tables)
+
     def _simulation_dict(self, sim: KnowledgeSimulation) -> dict:
-        return {**sim.model_dump(mode="json"), "verified": self._verified(sim)}
+        described = {**sim.model_dump(mode="json"), "verified": self._verified(sim)}
+        described["follows"] = [
+            ref for ref in described["follows"] if not self._is_unavailable(ref, self.simulations)
+        ]
+        return described
 
     @staticmethod
     def _not_found(label: str, key: str, hint_tool: str) -> dict:

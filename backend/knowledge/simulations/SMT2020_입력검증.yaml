@@ -9,6 +9,12 @@ output_schema:
   table: {type: object, desc: "11개 입력 테이블의 row count 표"}
   results: {type: array, desc: "핵심 관계별 source/matched/unmatched 건수"}
   summary: {type: string, desc: 실제 DES 결과가 아닌 입력 정합성 mock 설명}
+aggregation_rules:
+  - 테이블 건수와 관계별 unmatched 건수는 dataset 하나를 기준으로 집계하며 HVLM과 LVHM 값을 합산하지 않는다
+  - unmatched 건수는 source row 중 대상이 없는 행 수이므로 관계 간에 더하지 않는다
+visualization_hints:
+  - 11개 입력 테이블의 건수 비교에는 bar 차트가 적합하다
+  - 관계별 source·matched·unmatched 건수는 차트보다 표가 적합하다
 follows: []
 active: true
 status: verified

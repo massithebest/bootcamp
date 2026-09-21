@@ -16,9 +16,9 @@ def validate_simulation_request(simulation_type: str, params: dict[str, Any]) ->
     """Return an error message if the request is invalid, otherwise None."""
 
     store = get_store()
-    simulation = store.simulations.get(simulation_type)
-    if simulation is None:
+    if not store.is_simulation_active(simulation_type):
         return f"알 수 없는 simulation_type 입니다: {simulation_type}"
+    simulation = store.simulations[simulation_type]
 
     missing = [
         name
