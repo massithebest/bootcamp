@@ -11,6 +11,7 @@ from typing import Any
 import pandas as pd
 
 from services.result_store import ResultMeta, ResultStore, get_result_store
+from services.service_logging import logged_service_operation
 from services.visualization_models import (
     NormalizedSeries,
     NormalizedVisualizationSpec,
@@ -314,6 +315,7 @@ def _load_frame(store: ResultStore, result_id: str) -> pd.DataFrame:
         ) from exc
 
 
+@logged_service_operation
 def prepare_visualization(
     request: VisualizationRequest,
     *,
@@ -414,6 +416,7 @@ def _render_chart(frame: pd.DataFrame, spec: NormalizedVisualizationSpec) -> dic
     }
 
 
+@logged_service_operation
 def read_visualization(
     visualization_id: str,
     *,

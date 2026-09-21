@@ -18,6 +18,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
 from core.config import KNOWLEDGE_DIR
+from services.service_logging import logged_service_operation
 
 
 # ---- 모델 ----
@@ -26,6 +27,7 @@ from core.config import KNOWLEDGE_DIR
 class KnowledgeMeta(BaseModel):
     """모든 지식 항목이 공통으로 갖는 출처/신뢰도 메타데이터."""
 
+    active: bool = True
     status: Literal["draft", "verified"] = "draft"
     owner: str = ""
     updated: date | None = None
@@ -253,6 +255,7 @@ class KnowledgeStore:
     # -- 로드 --
 
     @classmethod
+    @logged_service_operation
     def load(cls, root: Path | str) -> "KnowledgeStore":
         """`root` 아래 YAML 을 전부 읽어 검증한다. 없는 디렉터리는 빈 목록."""
 
@@ -291,11 +294,14 @@ class KnowledgeStore:
 
     # -- 조회 (tool / API 공용) --
 
+    @logged_service_operation
     def list_tables(
         self, keyword: str | None = None, tag: str | None = None
     ) -> list[dict]:
         rows = []
         for table in self.tables.values():
+            if not table.active:
+                continue
             if keyword and not _contains(
                 keyword,
                 table.table,
@@ -317,15 +323,19 @@ class KnowledgeStore:
             )
         return rows
 
+    @logged_service_operation
     def describe_table(self, table: str) -> dict:
         found = self.tables.get(table) or self._find_ci(self.tables, table)
-        if found is None:
+        if found is None or not found.active:
             return self._not_found("테이블", table, "list_tables")
         return {**found.model_dump(mode="json"), "verified": self._verified(found)}
 
+    @logged_service_operation
     def list_kpis(self, keyword: str | None = None) -> list[dict]:
         rows = []
         for kpi in self.kpis.values():
+            if not kpi.active:
+                continue
             if keyword and not _contains(keyword, kpi.name, kpi.aliases, kpi.definition, kpi.kpi_id):
                 continue
             rows.append(
@@ -338,30 +348,42 @@ class KnowledgeStore:
             )
         return rows
 
+    @logged_service_operation
     def get_kpi(self, kpi_id: str) -> dict:
         found = self.kpis.get(kpi_id) or self._find_ci(self.kpis, kpi_id)
-        if found is None:
+        if found is None or not found.active:
             return self._not_found("KPI", kpi_id, "list_kpis")
         return {**found.model_dump(mode="json"), "verified": self._verified(found)}
 
+    @logged_service_operation
     def list_simulations(self) -> list[dict]:
-        return [self._simulation_dict(sim) for sim in self.simulations.values()]
+        return [
+            self._simulation_dict(sim)
+            for sim in self.simulations.values()
+            if sim.active
+        ]
 
+    @logged_service_operation
     def get_simulation(self, simulation_type: str) -> dict:
         found = self.simulations.get(simulation_type)
-        if found is None:
+        if found is None or not found.active:
             return self._not_found("시뮬레이션", simulation_type, "list_simulation")
         return self._simulation_dict(found)
 
+    @logged_service_operation
     def list_glossary(self) -> list[dict]:
         return [
             {**entry.model_dump(mode="json"), "verified": self._verified(entry)}
             for entry in self.glossary
+            if entry.active
         ]
 
+    @logged_service_operation
     def list_recipes(self, keyword: str | None = None) -> list[dict]:
         rows = []
         for recipe in self.recipes.values():
+            if not recipe.active:
+                continue
             if keyword and not _contains(
                 keyword,
                 recipe.recipe_id,
@@ -381,15 +403,19 @@ class KnowledgeStore:
             )
         return rows
 
+    @logged_service_operation
     def get_recipe(self, recipe_id: str) -> dict:
         found = self.recipes.get(recipe_id) or self._find_ci(self.recipes, recipe_id)
-        if found is None:
+        if found is None or not found.active:
             return self._not_found("레시피", recipe_id, "list_recipes")
         return {**found.model_dump(mode="json"), "verified": self._verified(found)}
 
+    @logged_service_operation
     def list_scenarios(self, keyword: str | None = None) -> list[dict]:
         rows = []
         for scenario in self.scenarios.values():
+            if not scenario.active:
+                continue
             if keyword and not _contains(
                 keyword,
                 scenario.scenario_id,
@@ -410,18 +436,20 @@ class KnowledgeStore:
             )
         return rows
 
+    @logged_service_operation
     def get_scenario(self, scenario_id: str) -> dict:
         found = self.scenarios.get(scenario_id) or self._find_ci(
             self.scenarios, scenario_id
         )
-        if found is None:
+        if found is None or not found.active:
             return self._not_found("시나리오", scenario_id, "list_scenarios")
         return {**found.model_dump(mode="json"), "verified": self._verified(found)}
 
+    @logged_service_operation
     def table_names(self) -> set[str]:
         """execute_sql 가드레일이 쓰는 허용 테이블 목록."""
 
-        return set(self.tables)
+        return {name for name, table in self.tables.items() if table.active}
 
     # -- 내부 --
 
@@ -451,6 +479,7 @@ class KnowledgeStore:
 _store: KnowledgeStore | None = None
 
 
+@logged_service_operation
 def get_store() -> KnowledgeStore:
     """`KNOWLEDGE_DIR` 에서 로드한 저장소를 캐시해 돌려준다."""
 
@@ -460,6 +489,7 @@ def get_store() -> KnowledgeStore:
     return _store
 
 
+@logged_service_operation
 def reset_store() -> None:
     """테스트에서 `KNOWLEDGE_DIR` 를 바꾼 뒤 캐시를 비우는 용도."""
 

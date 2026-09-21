@@ -1,8 +1,10 @@
 """Read-only projection of YAML and versioned text knowledge for the UI."""
 from services.knowledge_service import get_store
 from services.document_store import get_document_store, normalize
+from services.service_logging import logged_service_operation
 
 
+@logged_service_operation
 def entries(query: str = "", kind: str | None = None) -> list[dict]:
     store = get_store()
     items = []
@@ -18,7 +20,7 @@ def entries(query: str = "", kind: str | None = None) -> list[dict]:
                 "title": data.get("name", data.get("term", key)),
                 "summary": data.get("description", data.get("definition", "")),
                 "status": data["status"], "source": data["source"], "owner": data["owner"],
-                "updated": str(data["updated"] or ""), "active": None, "archived": False,
+                "updated": str(data["updated"] or ""), "active": data["active"], "archived": False,
                 "detail": data})
     for doc in get_document_store().list():
         latest = doc["versions"][0]

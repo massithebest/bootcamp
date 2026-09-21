@@ -29,6 +29,7 @@ sample_queries:
       FROM calendar_attach
       GROUP BY dataset, caltype, restype
       ORDER BY dataset, caltype, restype
+active: true
 status: verified
 owner: ""
 updated: 2026-09-15

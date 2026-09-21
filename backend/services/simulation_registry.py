@@ -8,8 +8,10 @@
 from typing import Any
 
 from services.knowledge_service import get_store
+from services.service_logging import logged_service_operation
 
 
+@logged_service_operation
 def validate_simulation_request(simulation_type: str, params: dict[str, Any]) -> str | None:
     """Return an error message if the request is invalid, otherwise None."""
 
@@ -29,6 +31,7 @@ def validate_simulation_request(simulation_type: str, params: dict[str, Any]) ->
     return None
 
 
+@logged_service_operation
 def list_simulation_types() -> list[dict[str, Any]]:
     """종류·파라미터 상세·사용 시점·출력 스키마·선후 관계를 함께 돌려준다."""
 

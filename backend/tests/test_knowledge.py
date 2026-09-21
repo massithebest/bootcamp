@@ -151,6 +151,53 @@ def test_load_reads_all_kinds(root: Path) -> None:
     assert store.table_names() == {"wip", "part"}
 
 
+def test_inactive_yaml_is_kept_for_management_but_hidden_from_runtime(root: Path) -> None:
+    _write(
+        root / "catalog/tables/disabled.yaml",
+        """
+        table: disabled
+        description: 비활성 테스트 테이블
+        grain: [id]
+        columns:
+          - {name: id, type: integer}
+        active: false
+        status: verified
+        """,
+    )
+
+    store = KnowledgeStore.load(root)
+
+    assert store.tables["disabled"].active is False
+    assert "disabled" not in {row["table"] for row in store.list_tables()}
+    assert "disabled" not in store.table_names()
+    assert store.describe_table("disabled")["status"] == "error"
+
+
+def test_legacy_yaml_defaults_to_active(root: Path) -> None:
+    store = KnowledgeStore.load(root)
+
+    assert all(item.active for item in store.tables.values())
+
+
+def test_inactive_yaml_is_hidden_from_all_runtime_lookups(root: Path) -> None:
+    store = KnowledgeStore.load(root)
+    store.kpis["initial_wip"].active = False
+    store.simulations["SMT2020_입력검증"].active = False
+    store.glossary[0].active = False
+    store.recipes["wip_by_part"].active = False
+    store.scenarios["lvhm_input_integrity"].active = False
+
+    assert store.list_kpis() == []
+    assert store.get_kpi("initial_wip")["status"] == "error"
+    assert store.list_simulations() == []
+    assert store.get_simulation("SMT2020_입력검증")["status"] == "error"
+    assert store.list_glossary() == []
+    assert store.list_recipes() == []
+    assert store.get_recipe("wip_by_part")["status"] == "error"
+    assert store.list_scenarios() == []
+    assert store.get_scenario("lvhm_input_integrity")["status"] == "error"
+
+
 def test_invalid_yaml_error_includes_filename(root: Path) -> None:
     _write(root / "catalog/tables/BROKEN.yaml", "table: BROKEN\n")  # description 등 누락
 

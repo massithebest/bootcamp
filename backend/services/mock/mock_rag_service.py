@@ -1,6 +1,7 @@
 """Mock adapter uses the same approved local documents; no fabricated hits."""
 from asyncio import to_thread
 from services.document_store import get_document_store
+from services.service_logging import logged_service_operation
 
 
 class MockRAGService:
@@ -11,5 +12,6 @@ class MockRAGService:
 _service = MockRAGService()
 
 
+@logged_service_operation
 async def search(query: str) -> dict:
     return await _service.search(query)

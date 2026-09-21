@@ -48,6 +48,7 @@ sample_queries:
       FROM initial_wip_by_part
       GROUP BY dataset
       ORDER BY dataset
+active: true
 status: draft
 owner: ""
 updated: 2026-09-15

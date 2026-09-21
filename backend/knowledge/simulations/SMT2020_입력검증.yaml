@@ -10,6 +10,7 @@ output_schema:
   results: {type: array, desc: "핵심 관계별 source/matched/unmatched 건수"}
   summary: {type: string, desc: 실제 DES 결과가 아닌 입력 정합성 mock 설명}
 follows: []
+active: true
 status: verified
 owner: ""
 updated: 2026-09-15

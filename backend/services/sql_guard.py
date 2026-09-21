@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import re
 
+from services.service_logging import logged_service_operation
+
 
 #: 한 번에 저장할 최대 행 수. 서비스는 MAX_ROWS + 1행으로 source_truncated를 판정한다.
 MAX_ROWS = 1000
@@ -25,6 +27,7 @@ class SqlGuardError(ValueError):
     """에이전트에게 그대로 보여줄 수 있는 거부 사유."""
 
 
+@logged_service_operation
 def check_sql(sql: str, allowed_tables: set[str]) -> str:
     """검사를 통과하면 LIMIT 가 보장된 SQL 을 돌려준다.
 

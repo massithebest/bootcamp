@@ -1,5 +1,7 @@
 """Real SQL query service."""
 
+from services.service_logging import logged_service_operation
+
 
 class RealSQLService:
     """사내 DB 조회를 담당하는 실제 SQL 서비스."""
@@ -14,8 +16,7 @@ class RealSQLService:
         양쪽에서 같은 규칙으로 동작해야 한다
         (backend/docs/domain-knowledge-management.md).
         결과를 Result Store에 저장할 때 mock과 동일하게 source_truncated와
-        access_scope를 채운다 (plan/260915-result-store-plan.md,
-        backend/plan/260915-chart-v2-plan.md Task 1).
+        access_scope를 채운다 (`plan/Todo.md`의 안정 계약 참고).
         """
 
         # TODO:
@@ -29,5 +30,6 @@ class RealSQLService:
 _service = RealSQLService()
 
 
+@logged_service_operation
 async def execute_sql(sql: str, purpose: str, *, access_scope: str | None = None) -> dict:
     return await _service.execute_sql(sql=sql, purpose=purpose, access_scope=access_scope)

@@ -4,6 +4,7 @@ from services.simulation_registry import (
     list_simulation_types,
     validate_simulation_request,
 )
+from services.service_logging import logged_service_operation
 
 
 class RealSimulationService:
@@ -35,10 +36,12 @@ class RealSimulationService:
 _service = RealSimulationService()
 
 
+@logged_service_operation
 async def list_simulation() -> dict:
     return await _service.list_simulation()
 
 
+@logged_service_operation
 async def run_simulation(
     simulation_type: str, params: dict, *, access_scope: str | None = None
 ) -> dict:

@@ -56,6 +56,7 @@ sample_queries:
       FROM route_step
       GROUP BY dataset
       ORDER BY dataset
+active: true
 status: verified
 owner: ""
 updated: 2026-09-15

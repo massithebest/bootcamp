@@ -27,6 +27,7 @@ sample_queries:
       SELECT dataset, fromloc, toloc, ddist, dtime, dtime2, dunits
       FROM transport
       ORDER BY dataset, fromloc, toloc
+active: true
 status: verified
 owner: ""
 updated: 2026-09-15

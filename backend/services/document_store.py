@@ -11,6 +11,7 @@ import unicodedata
 from uuid import uuid4
 
 from core import config
+from services.service_logging import logged_service_operation
 
 
 class KnowledgeError(Exception):
@@ -84,10 +85,12 @@ class DocumentStore:
                 "SELECT payload FROM history WHERE document_id=? ORDER BY revision DESC", (document_id,))],
         }
 
+    @logged_service_operation
     def get(self, document_id: str) -> dict:
         with self.connection() as conn:
             return self._get(conn, document_id)
 
+    @logged_service_operation
     def list(self) -> list[dict]:
         with self.connection() as conn:
             return [self._get(conn, row[0]) for row in conn.execute("SELECT id FROM documents ORDER BY rowid DESC")]
@@ -97,6 +100,7 @@ class DocumentStore:
         payload = dict(revision=revision, action=action, version=version, actor=actor, note=note, at=now())
         conn.execute("INSERT INTO history VALUES (?,?,?)", (document_id, revision, json.dumps(payload, ensure_ascii=False)))
 
+    @logged_service_operation
     def save(self, fields: dict, document_id: str | None = None, expected_revision: int | None = None) -> dict:
         with self.connection(write=True) as conn:
             if document_id is None:
@@ -121,6 +125,7 @@ class DocumentStore:
         if document["archived"]:
             raise KnowledgeError(409, "보관한 지식은 변경할 수 없습니다.")
 
+    @logged_service_operation
     def transition(self, document_id: str, action: str, expected_revision: int, *,
                    version: int | None = None, actor: str = "", note: str = "") -> dict:
         with self.connection(write=True) as conn:
@@ -153,6 +158,7 @@ class DocumentStore:
             self._history(conn, document_id, revision, action, version, actor, note)
             return self._get(conn, document_id)
 
+    @logged_service_operation
     def search(self, query: str) -> dict:
         tokens = terms(query)
         matches = []

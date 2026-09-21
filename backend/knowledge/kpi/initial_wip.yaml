@@ -24,6 +24,7 @@ diagnostics:
   - {hypothesis: WIP의 Part·현재 Step 및 Route의 설비 Family 연결 누락 여부, how: sql, ref: recipes/wip_integrity_diagnostics}
   - {hypothesis: dataset 키 생략에 따른 교차 연결과 Route 조인 중복 합산 위험 여부, how: sql, ref: recipes/wip_integrity_diagnostics}
   - {hypothesis: SMT2020 입력 테이블 관계가 완전함, how: simulation, ref: SMT2020_입력검증}
+active: true
 status: draft
 owner: ""
 updated: 2026-09-16

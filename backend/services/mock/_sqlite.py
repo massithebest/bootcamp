@@ -10,6 +10,7 @@ import sqlite3
 from pathlib import Path
 
 from core.config import SMT2020_DB_PATH
+from services.service_logging import logged_service_operation
 
 
 MISSING_DB_MESSAGE = (
@@ -24,6 +25,7 @@ class Smt2020DbMissingError(FileNotFoundError):
         super().__init__(MISSING_DB_MESSAGE)
 
 
+@logged_service_operation
 def connect() -> sqlite3.Connection:
     """읽기 전용 연결. `SMT2020_DB_PATH`는 호출 시점에 읽는다."""
 

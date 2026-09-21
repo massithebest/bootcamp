@@ -2,7 +2,7 @@
 
 이 문서는 생산계획 Agent가 사용하는 구조화 지식과 비정형 지식을 개발 환경과
 폐쇄망에서 같은 방식으로 관리하기 위한 운영 기준이다. 단계별 제품 범위와 상태는
-[상위 도메인 지식 계획](../../plan/260914-domain-knowledge-plan.md)을 따른다.
+[Backend 계획과 이력](../plan/Todo.md)을 따른다.
 
 ## 지식의 단일 기준
 
@@ -26,12 +26,17 @@ Skill, 긴 산문은 RAG가 기준이다. 실행 가능한 recipe/CTE는 RAG에 
 모든 지식 항목은 다음 정보를 가진다.
 
 ```yaml
+active: true         # true | false
 status: draft        # draft | verified
 owner: ""
 source: ""
 updated: 2026-09-15
 ```
 
+- `active: true`인 항목만 Agent의 지식 조회와 SQL 허용 테이블에 반영된다.
+  `false`인 항목도 관리 화면에서는 검색 제외 상태로 조회할 수 있다.
+- 필드를 생략한 기존 YAML은 하위 호환을 위해 `active: true`로 처리한다.
+- YAML은 시작 시 메모리에 로드되므로 값을 바꾼 뒤 Backend를 재시작한다.
 - `draft`는 구조 검증만 통과했거나 업무 담당자가 확인하지 않은 상태다.
 - `verified`는 실제 테이블·업무 정의·단위와 비교 기준을 담당자가 확인한 상태다.
 - 테스트 통과는 `verified`의 근거가 아니다.
@@ -361,7 +366,7 @@ Scenario는 원본 데이터를 변경하거나 실제 이산사건 시뮬레이
 recipe/simulation 순서로 검증하고 무엇이 변하면 회귀인가”를 기록하는 QA 계약이다.
 현재 scenario는 `KnowledgeStore`와 테스트가 읽으며 Agent에 직접 노출하는 별도
 tool은 없다. 향후 runtime tool로 공개하려면 tool payload와 프론트 표시 계약을
-상위 계획에서 먼저 정의한다.
+활성 Backend 계획에서 먼저 정의한다.
 
 | 필드 | 의미 |
 | --- | --- |
@@ -481,8 +486,9 @@ join 및 입력 관계 unmatched 건수를 포함한다.
 저장한다. 구조화 YAML과 운영 SQL DB를 수정하지 않는다. 이 파일에는 사용자 작성
 자료가 있으므로 소스와 함께 커밋하지 않는다. 배포 볼륨으로 영속 보관한다.
 
-구조화 지식은 `backend/knowledge/`의 기존 YAML을 별도 활성화 설정 없이 항상
-읽기 전용으로 조회한다. 텍스트 지식의 작성·검토·활성화·보관은 이 폐쇄망 앱의
+구조화 지식은 `backend/knowledge/` YAML의 `active` 값으로 Agent 검색 반영 여부를
+정하며 관리 화면에서는 계속 읽기 전용으로 조회한다. 텍스트 지식의
+작성·검토·활성화·보관은 이 폐쇄망 앱의
 내부 공용 관리 기능으로 바로 제공한다. 작성자·검토자 이름은 기록용이며 인증된
 사용자 신원이나 조직 권한을 의미하지 않는다. 기존 pp_session_scope도 인증으로
 사용하지 않는다.

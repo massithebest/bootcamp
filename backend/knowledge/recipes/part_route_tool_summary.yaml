@@ -56,6 +56,7 @@ sample_queries:
       FROM part_route_tool_summary
       WHERE required_tool_family_count <> matched_tool_family_count
       ORDER BY dataset, part
+active: true
 status: draft
 owner: ""
 updated: 2026-09-15

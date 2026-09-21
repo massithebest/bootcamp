@@ -107,7 +107,7 @@ def test_catalog_matches_sdk_wire_and_structured_readonly(store):
     assert len(rows) == 14
     entries = client.get("/api/knowledge/entries").json()
     assert {e["type"] for e in entries} >= {"table", "kpi", "recipe", "glossary", "simulation"}
-    assert all(e["active"] is None for e in entries)
+    assert all(e["active"] is True for e in entries)
     detail = client.get("/api/knowledge/entries/kpi/initial_wip").json()
     assert detail["detail"] == get_store().kpis["initial_wip"].model_dump(mode="json")
     table_detail = client.get("/api/knowledge/entries/table/wip").json()["detail"]

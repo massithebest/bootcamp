@@ -55,6 +55,7 @@ sample_queries:
     sql: SELECT * FROM wip_integrity_diagnostics WHERE dataset = 'LVHM'
   - question: HVLM WIP 입력 연결과 Route 조인 중복 위험은 어때?
     sql: SELECT * FROM wip_integrity_diagnostics WHERE dataset = 'HVLM'
+active: true
 status: draft
 owner: ""
 source: SMT2020 입력 관계 및 테스트 전용 오류 fixture

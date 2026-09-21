@@ -1,5 +1,7 @@
 """Real production planning knowledge search service."""
 
+from services.service_logging import logged_service_operation
+
 
 class RealRAGService:
     """Milvus / Hybrid Search 기반 실제 RAG 서비스."""
@@ -18,5 +20,6 @@ class RealRAGService:
 _service = RealRAGService()
 
 
+@logged_service_operation
 async def search(query: str) -> dict:
     return await _service.search(query)

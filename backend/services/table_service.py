@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from services.result_store import ResultMeta, ResultStore, dataframe_rows, get_result_store
+from services.service_logging import logged_service_operation
 
 
 TABLE_DISPLAY_ROW_LIMIT = 100
@@ -76,6 +77,7 @@ def _normalize_columns(columns: list[str] | None, available: list[str]) -> list[
     return normalized
 
 
+@logged_service_operation
 def prepare_table_payload(
     result_id: str,
     *,

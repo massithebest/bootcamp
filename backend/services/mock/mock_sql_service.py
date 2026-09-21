@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import logging
 import sqlite3
 
 import pandas as pd
@@ -14,10 +13,10 @@ import pandas as pd
 from services.knowledge_service import get_store
 from services.mock._sqlite import MISSING_DB_MESSAGE, Smt2020DbMissingError, connect
 from services.result_store import get_result_store, summarize_dataframe
+from services.service_logging import logged_service_operation
 from services.sql_guard import MAX_ROWS, SqlGuardError, check_sql
 
 
-logger = logging.getLogger(__name__)
 INLINE_ROW_THRESHOLD = 100
 SAMPLE_ROW_COUNT = 10
 
@@ -33,9 +32,6 @@ class MockSQLService:
         self, sql: str, purpose: str, *, access_scope: str | None = None
     ) -> dict:
         """카탈로그에 등록된 테이블을 SELECT 로 조회한다."""
-
-        # purpose 는 실행 전에 남긴다 — 프론트 진행 표시와 사후 감사에 쓴다.
-        logger.info("execute_sql purpose=%s", purpose)
 
         allowed_tables = get_store().table_names()
         try:
@@ -105,5 +101,6 @@ class MockSQLService:
 _service = MockSQLService()
 
 
+@logged_service_operation
 async def execute_sql(sql: str, purpose: str, *, access_scope: str | None = None) -> dict:
     return await _service.execute_sql(sql=sql, purpose=purpose, access_scope=access_scope)

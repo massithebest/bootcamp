@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from core.config import VISUALIZATION_STORE_DIR
 from services.result_store import ResultStore, get_result_store
+from services.service_logging import logged_service_operation
 from services.visualization_models import (
     NormalizedSeries,
     NormalizedVisualizationSpec,
@@ -133,6 +134,7 @@ class LocalVisualizationStore(VisualizationStore):
     def _meta_path(self, visualization_id: str) -> Path:
         return self.directory / f"{visualization_id}.meta.json"
 
+    @logged_service_operation
     def save(
         self,
         *,
@@ -166,6 +168,7 @@ class LocalVisualizationStore(VisualizationStore):
             temporary.unlink(missing_ok=True)
         return meta
 
+    @logged_service_operation
     def get(self, visualization_id: str) -> VisualizationMeta | None:
         if not _VISUALIZATION_ID_PATTERN.fullmatch(visualization_id):
             return None
@@ -178,14 +181,20 @@ class LocalVisualizationStore(VisualizationStore):
             if meta.visualization_id != visualization_id:
                 return None
             return meta
-        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
-            logger.warning("시각화 메타데이터를 읽지 못했습니다: %s", path)
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            logger.warning(
+                "시각화 메타데이터를 읽지 못했습니다: visualization_id=%s error_type=%s",
+                visualization_id,
+                type(exc).__name__,
+            )
             return None
 
+    @logged_service_operation
     def delete(self, visualization_id: str) -> None:
         if _VISUALIZATION_ID_PATTERN.fullmatch(visualization_id):
             self._meta_path(visualization_id).unlink(missing_ok=True)
 
+    @logged_service_operation
     def delete_for_result(self, result_id: str) -> int:
         if not self.directory.exists():
             return 0
@@ -198,6 +207,7 @@ class LocalVisualizationStore(VisualizationStore):
                 deleted += 1
         return deleted
 
+    @logged_service_operation
     def cleanup_expired(self, result_store: ResultStore | None = None) -> int:
         if not self.directory.exists():
             return 0

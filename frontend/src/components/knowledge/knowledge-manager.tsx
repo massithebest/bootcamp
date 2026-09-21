@@ -96,7 +96,7 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
   const navigate = (next: KnowledgeTarget | "new" | null) => requestLeave(() => { setSelection(next); setNotice(""); });
   const field = (name: keyof Form, label: string, max: number, multiline = false) => <label className="block space-y-1 text-ui" key={name}><span className="text-ink-2">{label}{name !== "tagsText" && " *"}</span>{multiline ? <textarea name={name} className={`${controlClass} min-h-64 resize-y`} required readOnly={!editable} maxLength={max} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })} /> : <input name={name} className={controlClass} required={name !== "tagsText"} readOnly={!editable} maxLength={max} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })} />}</label>;
   return <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-    <div className="shrink-0 border-b border-line px-5 py-3"><p className="text-ui text-ink-2">공용 지식 · 활성화 변경은 모든 대화의 이후 검색에 적용됩니다.</p><p className="mt-1 text-2xs text-ink-3">기존 YAML 구조화 지식은 별도 설정 없이 항상 읽기 전용으로 표시됩니다. 작성자와 검토자 이름은 기록용입니다.</p></div>
+    <div className="shrink-0 border-b border-line px-5 py-3"><p className="text-ui text-ink-2">공용 지식 · 활성화 변경은 모든 대화의 이후 검색에 적용됩니다.</p><p className="mt-1 text-2xs text-ink-3">YAML 구조화 지식은 파일의 활성 상태를 읽기 전용으로 표시합니다. 작성자와 검토자 이름은 기록용입니다.</p></div>
     <div className="flex min-h-0 flex-1 overflow-hidden">
       <section aria-label="지식 목록" className={`${selection ? "hidden lg:flex" : "flex"} thin-scroll w-full shrink-0 flex-col gap-3 overflow-y-auto border-r border-line p-4 lg:w-72`}>
         <button className={buttonClass} disabled={busy} onClick={() => navigate("new")}>텍스트 지식 등록</button>

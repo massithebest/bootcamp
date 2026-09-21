@@ -39,6 +39,7 @@ expected:
     wip_to_part: 0
     orders_to_part: 0
     wip_curstep_to_route_step: 0
+active: true
 status: draft
 owner: ""
 updated: 2026-09-15

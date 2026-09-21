@@ -19,6 +19,7 @@ from core.config import (
     RESULT_STORE_MAX_BYTES,
     RESULT_STORE_TTL_HOURS,
 )
+from services.service_logging import logged_service_operation
 
 
 logger = logging.getLogger(__name__)
@@ -150,6 +151,7 @@ class LocalParquetResultStore(ResultStore):
     def _meta_path(self, result_id: str) -> Path:
         return self.directory / f"{result_id}.meta.json"
 
+    @logged_service_operation
     def save(
         self,
         columns: list[str],
@@ -195,6 +197,7 @@ class LocalParquetResultStore(ResultStore):
         )
         return meta
 
+    @logged_service_operation
     def get_meta(self, result_id: str) -> ResultMeta | None:
         if not _RESULT_ID_PATTERN.fullmatch(result_id):
             return None
@@ -215,6 +218,7 @@ class LocalParquetResultStore(ResultStore):
             access_scope=payload.get("access_scope"),
         )
 
+    @logged_service_operation
     def get_page(self, result_id: str, offset: int, limit: int) -> ResultPage | None:
         meta = self.get_meta(result_id)
         if meta is None:
@@ -229,9 +233,11 @@ class LocalParquetResultStore(ResultStore):
             row_count=meta.row_count,
         )
 
+    @logged_service_operation
     def load(self, result_id: str) -> pd.DataFrame:
         return pd.read_parquet(self._parquet_path(result_id), engine="pyarrow")
 
+    @logged_service_operation
     def delete(self, result_id: str) -> None:
         if not _RESULT_ID_PATTERN.fullmatch(result_id):
             return
@@ -246,6 +252,7 @@ def get_result_store() -> ResultStore:
     return _store
 
 
+@logged_service_operation
 def cleanup_expired() -> int:
     """만료 결과와 디스크 상한을 넘긴 오래된 결과를 삭제한다."""
 
@@ -259,8 +266,12 @@ def cleanup_expired() -> int:
         result_id = meta_path.name.removesuffix(".meta.json")
         try:
             meta = _store.get_meta(result_id)
-        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
-            logger.warning("결과 메타데이터를 읽지 못했습니다: %s", meta_path)
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            logger.warning(
+                "결과 메타데이터를 읽지 못했습니다: result_id=%s error_type=%s",
+                result_id,
+                type(exc).__name__,
+            )
             continue
         if meta is None:
             continue
