@@ -29,8 +29,12 @@ export async function runWorkbenchRegressions() {
       name: "kpi-shortfall-analysis", description: "실적 부진 원인을 검증하는 업무 절차입니다.", status: "active",
       content: "# 실적 부진 원인 분석\n\n## 절차\n\n1. **KPI 확정**: `list_kpis`로 정의를 확인한다.\n2. **가설 검증**: 근거 수치로 검증한다.\n\n## 규칙\n\n- 기각 근거도 답변에 남긴다.",
     });
-    if (url.includes("/api/visualizations/")) return Response.json({
-      visualization_id: "b".repeat(32), result_id: resultId, schema_version: 1, expires_at: "2099-01-01T00:00:00Z", warnings: [],
+    if (url.includes(`/api/query-results/${resultId}/table`)) return Response.json({
+      status: "ok", result_id: resultId, page: 1, page_size: 50, row_count: 1, filtered_row_count: 1, source_truncated: false,
+      columns: [{ name: "제품", dtype: "str", role: "category" }, { name: "WIP", dtype: "int64", role: "measure" }], rows: [["A", 20]],
+    });
+    if (url.includes(`/api/query-results/${resultId}/chart`)) return Response.json({
+      status: "ok", result_id: resultId, warnings: [],
       chart: { type: "bar", x: "part", series: [{ key: "qty", label: "WIP" }], categories: ["A"], data: [{ part: "A", qty: 20 }], title: "WIP 비교", x_label: "제품", y_label: "수량", unit: "개" },
     });
     return Response.json([]);
@@ -206,8 +210,8 @@ export async function runWorkbenchRegressions() {
       await newChat(); await send();
       const long = "LOT_".repeat(120);
       await emit({ type: "text", content: `# 분석\n\n### 세부\n\n${long}\n\n| 지표 | 비율 |\n| --- | --- |\n| 불량률 | 2% |` },
-        { type: "tool_call", tool_name: "prepare_table", tool_call_id: "table", data: { args: { result_id: resultId } } },
-        { type: "tool_result", tool_name: "prepare_table", tool_call_id: "table", data: { status: "ok", result_id: resultId, title: "WIP", columns: ["제품", "WIP"], rows: [["A", 20]], row_count: 1, displayed_count: 1, source_truncated: false } }, { type: "done" });
+        { type: "tool_call", tool_name: "present_table", tool_call_id: "table", data: { args: { result_id: resultId } } },
+        { type: "tool_result", tool_name: "present_table", tool_call_id: "table", data: { status: "ok", result_id: resultId } }, { type: "done" });
       await waitFor(() => !!host.textContent?.includes(long));
       check(host.textContent?.includes("불량률"), "separate Markdown table disappeared");
       const paragraph = [...host.querySelectorAll("p")].find(p => p.textContent === long)!;
@@ -219,8 +223,8 @@ export async function runWorkbenchRegressions() {
     });
     await run("F13 chart data alternative uses real values", async () => {
       await newChat(); await send();
-      await emit({ type: "tool_call", tool_name: "prepare_visualization", tool_call_id: "chart", data: { args: { result_id: resultId } } },
-        { type: "tool_result", tool_name: "prepare_visualization", tool_call_id: "chart", data: { status: "ok", visualization_id: "b".repeat(32) } }, { type: "done" });
+      await emit({ type: "tool_call", tool_name: "present_chart", tool_call_id: "chart", data: { args: { result_id: resultId, chart_type: "bar", x_column: "part", y_column: "qty" } } },
+        { type: "tool_result", tool_name: "present_chart", tool_call_id: "chart", data: { status: "ok", result_id: resultId } }, { type: "done" });
       await waitFor(() => !!host.textContent?.includes("차트 데이터 표로 보기"));
       await click("차트 데이터 표로 보기");
       await waitFor(() => !!host.querySelector("table"));

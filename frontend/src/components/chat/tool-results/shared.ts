@@ -25,12 +25,11 @@ export function asRows(v: unknown): string[][] {
     .map((row) => row.map((cell) => String(cell)));
 }
 
-/** 조회 preview의 `sample_rows`는 객체 배열, legacy large_result는 배열의 배열이다. */
+/** 조회 preview의 `sample_rows`는 객체 배열이다. */
 export function asSampleRows(v: unknown, columnNames: string[]): string[][] {
   if (!Array.isArray(v)) return [];
   return v.flatMap((row): string[][] => {
-    if (Array.isArray(row)) return [row.map((cell) => String(cell ?? "—"))];
-    if (typeof row === "object" && row !== null) {
+    if (typeof row === "object" && row !== null && !Array.isArray(row)) {
       const record = row as Record<string, unknown>;
       const names = columnNames.length > 0 ? columnNames : Object.keys(record);
       return [names.map((name) => (record[name] == null ? "—" : String(record[name])))];
@@ -54,17 +53,9 @@ export function toneOf(v: unknown): ResultTone {
 }
 
 /**
- * `execute_sql`/`run_simulation` 결과가 대용량(100행 초과)이라
- * 원본 행 대신 `sample_rows`/`summary` 요약만 실려 왔는지 판별한다.
- * `database-result.tsx`/`simulation-result.tsx` 양쪽에서 같은 판별 로직을 쓴다.
- */
-export function isLargeResult(data: Record<string, unknown>): boolean {
-  return data.type === "large_result";
-}
-
-/**
- * `RESULT_UI_MODE=present`의 `execute_sql`·`run_simulation` 결과는 전체 행 대신
- * bounded preview(`sample_rows`, `statistics` …)만 담는다.
+ * `execute_sql`·`run_simulation` 결과는 전체 행 대신 bounded preview
+ * (`sample_rows`, `statistics` …)만 담는다. `database-result.tsx`/
+ * `simulation-result.tsx` 양쪽에서 같은 판별 로직을 쓴다.
  */
 export function isPreviewResult(data: Record<string, unknown>): boolean {
   return (

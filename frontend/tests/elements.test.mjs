@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createServer } from 'vite';
 
 let server, AgentPlan, TooltipIconButton, TooltipProvider, RetrievalChunks, DataTable, MarkdownTableBody;
-let VisualizationToolUI, TableToolUI, ToolResultCard, productionPlanningToolkit;
+let ToolResultCard;
 before(async () => {
   server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom' });
   ({ RetrievalChunks } = await server.ssrLoadModule('/src/components/assistant-ui/elements/retrieval-chunks.tsx'));
@@ -15,9 +15,6 @@ before(async () => {
   ({ DataTable } = await server.ssrLoadModule('/src/components/chat/primitives.tsx'));
   ({ MarkdownTableBody } = await server.ssrLoadModule('/src/components/assistant-ui/elements/markdown-text.tsx'));
   ({ ToolResultCard } = await server.ssrLoadModule('/src/components/chat/tool-result-card.tsx'));
-  ({ VisualizationToolUI } = await server.ssrLoadModule('/src/components/chat/tool-results/visualization-tool-ui.tsx'));
-  ({ TableToolUI } = await server.ssrLoadModule('/src/components/chat/tool-results/table-tool-ui.tsx'));
-  ({ productionPlanningToolkit } = await server.ssrLoadModule('/src/components/chat/toolkit/index.tsx'));
 });
 after(async () => { await server.close(); });
 
@@ -80,102 +77,6 @@ test('markdown table bodies render at most one hundred data rows', () => {
   assert.doesNotMatch(html, /markdown-row-101/);
   assert.match(html, /전체 102건 중 100건 표시/);
 });
-
-test('table tool is a standalone render-only backend tool', () => {
-  const tool = productionPlanningToolkit.prepare_table;
-  assert.equal(tool.type, 'backend');
-  assert.equal(tool.display, 'standalone');
-  assert.equal(tool.render, TableToolUI);
-  assert.equal(tool.execute, undefined);
-});
-
-test('table tool UI covers running, errors and interactive result controls', () => {
-  const render = (props) => renderToStaticMarkup(createElement(TableToolUI, props));
-  assert.match(render({ status: { type: 'running' } }), /표를 준비하고 있습니다/);
-  assert.match(render({
-    status: { type: 'complete' },
-    result: { data: { status: 'error', message: '컬럼이 없습니다.' } },
-  }), /컬럼이 없습니다/);
-
-  const html = render({
-    status: { type: 'complete' },
-    result: { data: {
-      status: 'ok',
-      result_id: 'd'.repeat(32),
-      title: '제품별 WIP',
-      columns: ['part', 'qty'],
-      rows: [['A', 10], ['B', 20]],
-      row_count: 2,
-      displayed_count: 2,
-      source_truncated: false,
-    } },
-  });
-  assert.match(html, /제품별 WIP/);
-  assert.match(html, /표 내용 검색/);
-  assert.match(html, /part 열 정렬/);
-  assert.match(html, /페이지당 행/);
-  assert.match(html, /다음 페이지/);
-});
-
-test('table tool UI rejects malformed or oversized result payloads', () => {
-  const rows = Array.from({ length: 101 }, (_, index) => [index]);
-  const html = renderToStaticMarkup(createElement(TableToolUI, {
-    status: { type: 'complete' },
-    result: { data: {
-      status: 'ok', result_id: 'e'.repeat(32), title: null,
-      columns: ['id'], rows, row_count: 101, displayed_count: 101,
-      source_truncated: false,
-    } },
-  }));
-  assert.match(html, /유효한 표 결과를 받지 못했습니다/);
-});
-
-test('visualization tool is a standalone render-only backend tool', () => {
-  const tool = productionPlanningToolkit.prepare_visualization;
-  assert.equal(tool.type, 'backend');
-  assert.equal(tool.display, 'standalone');
-  assert.equal(tool.render, VisualizationToolUI);
-  assert.equal(tool.execute, undefined);
-});
-
-test('visualization tool UI covers running, safe error and validated result states', () => {
-  const render = (props) => renderToStaticMarkup(createElement(VisualizationToolUI, props));
-
-  assert.match(render({ status: { type: 'running' } }), /차트를 준비하고 있습니다/);
-  assert.match(render({
-    status: { type: 'complete' },
-    result: { data: { status: 'error', message: '표시 한도를 초과했습니다.' } },
-  }), /표시 한도를 초과했습니다/);
-  assert.match(render({
-    status: { type: 'complete' },
-    result: { data: { status: 'ok', visualization_id: 'a'.repeat(32) } },
-  }), /aria-label="차트를 불러오는 중"/);
-  assert.match(render({
-    status: { type: 'complete' },
-    result: { data: { status: 'ok', visualization_id: 'invalid' } },
-  }), /유효한 차트 결과를 받지 못했습니다/);
-});
-
-
-test('repeated table results have distinct page size labels', () => {
-  const props = {
-    status: { type: 'complete' },
-    result: { data: {
-      status: 'ok', result_id: 'd'.repeat(32), title: null,
-      columns: ['id'], rows: [[1]], row_count: 1, displayed_count: 1,
-      source_truncated: false,
-    } },
-  };
-  const html = renderToStaticMarkup(createElement('div', null,
-    createElement(TableToolUI, props), createElement(TableToolUI, props),
-  ));
-  const ids = [...html.matchAll(/<select id="([^"]+)"/g)].map(match => match[1]);
-  const labels = [...html.matchAll(/<label for="([^"]+)"/g)].map(match => match[1]);
-  assert.equal(ids.length, 2);
-  assert.equal(new Set(ids).size, 2);
-  assert.deepEqual(labels, ids);
-});
-
 
 test('a tool without a result is not marked complete after cancellation or failure', () => {
   const html = renderToStaticMarkup(createElement(ToolResultCard, {

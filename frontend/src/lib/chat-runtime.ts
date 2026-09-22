@@ -19,62 +19,8 @@ import type {
   StatusStep,
   ObservedTiming,
 } from "@/types/chat";
-import { visualizationIdFromToolResult } from "./chart-marker";
-import { tablePayloadFromToolResult, type StandaloneTablePayload } from "./table-tool";
 import { isStandaloneTool } from "./standalone-tools";
 import { toolResultError } from "./tool-result";
-
-
-const MARKDOWN_TABLE_DELIMITER =
-  /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/;
-
-/** Only exact, plain-cell matches are safe to deduplicate. Ambiguous Markdown stays. */
-export function removeMarkdownTables(text: string, tables: readonly StandaloneTablePayload[] = []): string {
-  const lines = text.split("\n");
-  const kept: string[] = [];
-  let fence: { marker: string; length: number } | null = null;
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const fenceMatch = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
-    if (fence) {
-      kept.push(line);
-      if (fenceMatch && fenceMatch[1][0] === fence.marker &&
-          fenceMatch[1].length >= fence.length && !fenceMatch[2].trim()) fence = null;
-      continue;
-    }
-    if (fenceMatch) {
-      fence = { marker: fenceMatch[1][0], length: fenceMatch[1].length };
-      kept.push(line);
-      continue;
-    }
-    const nextLine = lines[index + 1];
-    if (lines[index].includes("|") && nextLine && MARKDOWN_TABLE_DELIMITER.test(nextLine)) {
-      const start = index;
-      index += 2;
-      while (index < lines.length && lines[index].includes("|")) {
-        index += 1;
-      }
-      const block = lines.slice(start, index);
-      const cells = (line: string) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
-      const columns = cells(block[0]);
-      const rows = block.slice(2).map(cells);
-      const matches = !block.some((line) => /[\\`*_[\]<>]/.test(line)) && tables.some((table) =>
-        rows.length > 0 && rows.length === table.rows.length &&
-        JSON.stringify(columns) === JSON.stringify(table.columns) &&
-        rows.every((row, i) => row.length === table.columns.length && row.every((cell, j) =>
-          table.rows[i][j] !== null && cell === String(table.rows[i][j]),
-        )),
-      );
-      if (!matches) kept.push(...block);
-      index -= 1;
-      continue;
-    }
-    kept.push(lines[index]);
-  }
-
-  return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
-}
 
 export interface AgentMessageMetadata {
   /** Tool 호출과 별개로 Backend가 공개한 사용자용 업무 진행 단계. */
@@ -179,10 +125,6 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
     !hasTrailingText
       ? progressText
       : undefined;
-  const successfulTables = standaloneParts.flatMap((part) => {
-    const table = part.toolName === "prepare_table" ? tablePayloadFromToolResult(part.result) : null;
-    return table ? [table] : [];
-  });
   const visibleStandaloneIds = new Set(standaloneParts.map((part) => part.toolCallId));
   const contextualParts: MessagePart[] = [];
   for (const part of responseParts) {
@@ -193,8 +135,7 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
       continue;
     }
     if (part.kind !== "text") continue;
-    const text = successfulTables.length ? removeMarkdownTables(part.text, successfulTables) : part.text;
-    if (text.length > 0) contextualParts.push({ ...part, text });
+    if (part.text.length > 0) contextualParts.push(part);
   }
   const visibleParts = [...processParts, ...contextualParts];
   // Tool에 연결된 status는 Tool part가 직접 표현한다. metadata에는 독립적인
@@ -291,14 +232,5 @@ function shouldShowStandalonePart(
 function isSuccessfulStandalonePart(
   part: Extract<MessagePart, { kind: "tool" }>,
 ): boolean {
-  if (part.toolName.startsWith("present_")) {
-    return part.result !== undefined && toolResultError(part.result) === null;
-  }
-  if (part.toolName === "prepare_visualization") {
-    return visualizationIdFromToolResult(part.result) !== null;
-  }
-  if (part.toolName === "prepare_table") {
-    return tablePayloadFromToolResult(part.result) !== null;
-  }
-  return false;
+  return part.result !== undefined && toolResultError(part.result) === null;
 }

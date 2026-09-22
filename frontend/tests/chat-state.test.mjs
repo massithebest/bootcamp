@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { createServer } from 'vite';
-let server, applyAgentEvent, convertMessage, removeMarkdownTables, toolResultError, visualizationIdFromToolResult;
+let server, applyAgentEvent, convertMessage, toolResultError;
 before(async () => {
   server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom' });
   ({ applyAgentEvent } = await server.ssrLoadModule('/src/lib/chat-state.ts'));
-  ({ convertMessage, removeMarkdownTables } = await server.ssrLoadModule('/src/lib/chat-runtime.ts'));
+  ({ convertMessage } = await server.ssrLoadModule('/src/lib/chat-runtime.ts'));
   ({ toolResultError } = await server.ssrLoadModule('/src/lib/tool-result.ts'));
-  ({ visualizationIdFromToolResult } = await server.ssrLoadModule('/src/lib/chart-marker.ts'));
 });
 after(async () => server.close());
 const message = () => ({ id: 'assistant', role: 'assistant', content: '', parts: [], statuses: [], runState: { type: 'running' } });
@@ -101,22 +100,22 @@ test('repeated tool names pair parameters and results by tool_call_id', () => {
   assert.deepEqual(current.parts.map(part => part.result.data.rows[0][0]), [1, 2]);
 });
 
-test('standalone visualization preserves its position before the following explanation', () => {
+test('standalone chart preserves its position before the following explanation', () => {
   let current = message();
-  const visualizationId = 'b'.repeat(32);
+  const resultId = 'b'.repeat(32);
   const events = [
     { type: 'tool_call', tool_name: 'execute_sql', tool_call_id: 'sql', data: { args: {} } },
     { type: 'tool_result', tool_name: 'execute_sql', tool_call_id: 'sql', data: { status: 'ok' } },
-    { type: 'tool_call', tool_name: 'prepare_visualization', tool_call_id: 'chart', data: { args: {} } },
-    { type: 'tool_result', tool_name: 'prepare_visualization', tool_call_id: 'chart', data: { status: 'ok', visualization_id: visualizationId } },
+    { type: 'tool_call', tool_name: 'present_chart', tool_call_id: 'chart', data: { args: { result_id: resultId } } },
+    { type: 'tool_result', tool_name: 'present_chart', tool_call_id: 'chart', data: { status: 'ok', result_id: resultId } },
     { type: 'text', content: '최종 설명' },
   ];
   events.forEach((event, i) => { current = applyAgentEvent(current, event, `visual-${i}`); });
 
   const rendered = convertMessage(current).content;
   assert.deepEqual(rendered.map(part => part.type), ['tool-call', 'tool-call', 'text']);
-  assert.equal(rendered[1].toolName, 'prepare_visualization');
-  assert.equal(visualizationIdFromToolResult(rendered[1].result), visualizationId);
+  assert.equal(rendered[1].toolName, 'present_chart');
+  assert.equal(rendered[1].result.data.result_id, resultId);
 });
 
 test('standalone table preserves its position before the following explanation', () => {
@@ -125,37 +124,30 @@ test('standalone table preserves its position before the following explanation',
   const events = [
     { type: 'tool_call', tool_name: 'execute_sql', tool_call_id: 'sql', data: { args: {} } },
     { type: 'tool_result', tool_name: 'execute_sql', tool_call_id: 'sql', data: { status: 'ok' } },
-    { type: 'tool_call', tool_name: 'prepare_table', tool_call_id: 'table', data: { args: { result_id: resultId } } },
-    { type: 'tool_result', tool_name: 'prepare_table', tool_call_id: 'table', data: {
-      status: 'ok', result_id: resultId, title: '표', columns: ['id'], rows: [[1]],
-      row_count: 1, displayed_count: 1, source_truncated: false,
-    } },
+    { type: 'tool_call', tool_name: 'present_table', tool_call_id: 'table', data: { args: { result_id: resultId } } },
+    { type: 'tool_result', tool_name: 'present_table', tool_call_id: 'table', data: { status: 'ok', result_id: resultId } },
     { type: 'text', content: '최종 설명' },
   ];
   events.forEach((event, i) => { current = applyAgentEvent(current, event, `table-${i}`); });
 
   const rendered = convertMessage(current).content;
   assert.deepEqual(rendered.map(part => part.type), ['tool-call', 'tool-call', 'text']);
-  assert.equal(rendered[1].toolName, 'prepare_table');
-  assert.equal(rendered[1].result.data.displayed_count, 1);
+  assert.equal(rendered[1].toolName, 'present_table');
+  assert.equal(rendered[1].result.data.result_id, resultId);
 });
 
 test('table, chart, and their explanations keep the AgentEvent sequence', () => {
   let current = message();
   const resultId = 'f'.repeat(32);
-  const visualizationId = 'a'.repeat(32);
   const events = [
     { type: 'tool_call', tool_name: 'execute_sql', tool_call_id: 'sql', data: { args: {} } },
     { type: 'tool_result', tool_name: 'execute_sql', tool_call_id: 'sql', data: { status: 'ok' } },
     { type: 'text', content: '표에서 제품별 수량을 먼저 확인할 수 있습니다.' },
-    { type: 'tool_call', tool_name: 'prepare_table', tool_call_id: 'table', data: { args: { result_id: resultId } } },
-    { type: 'tool_result', tool_name: 'prepare_table', tool_call_id: 'table', data: {
-      status: 'ok', result_id: resultId, title: '제품별 수량', columns: ['part', 'count'], rows: [['A', 20]],
-      row_count: 1, displayed_count: 1, source_truncated: false,
-    } },
+    { type: 'tool_call', tool_name: 'present_table', tool_call_id: 'table', data: { args: { result_id: resultId } } },
+    { type: 'tool_result', tool_name: 'present_table', tool_call_id: 'table', data: { status: 'ok', result_id: resultId } },
     { type: 'text', content: 'A 제품이 20개입니다. 같은 결과의 분포를 차트로 비교합니다.' },
-    { type: 'tool_call', tool_name: 'prepare_visualization', tool_call_id: 'chart', data: { args: { result_id: resultId } } },
-    { type: 'tool_result', tool_name: 'prepare_visualization', tool_call_id: 'chart', data: { status: 'ok', visualization_id: visualizationId } },
+    { type: 'tool_call', tool_name: 'present_chart', tool_call_id: 'chart', data: { args: { result_id: resultId } } },
+    { type: 'tool_result', tool_name: 'present_chart', tool_call_id: 'chart', data: { status: 'ok', result_id: resultId } },
     { type: 'text', content: '차트에서도 A 제품이 가장 큽니다.' },
   ];
   events.forEach((event, i) => { current = applyAgentEvent(current, event, `context-${i}`); });
@@ -163,7 +155,7 @@ test('table, chart, and their explanations keep the AgentEvent sequence', () => 
   const rendered = convertMessage(current).content;
   assert.deepEqual(
     rendered.map(part => part.type === 'tool-call' ? `${part.type}:${part.toolName}` : part.type),
-    ['tool-call:execute_sql', 'text', 'tool-call:prepare_table', 'text', 'tool-call:prepare_visualization', 'text'],
+    ['tool-call:execute_sql', 'text', 'tool-call:present_table', 'text', 'tool-call:present_chart', 'text'],
   );
   assert.deepEqual(rendered.filter(part => part.type === 'text').map(part => part.text), [
     '표에서 제품별 수량을 먼저 확인할 수 있습니다.',
@@ -172,41 +164,20 @@ test('table, chart, and their explanations keep the AgentEvent sequence', () => 
   ]);
 });
 
-test('table fallback appended after text keeps prose and removes duplicate markdown table', () => {
-  let current = message();
-  const resultId = 'e'.repeat(32);
-  const events = [
-    { type: 'tool_call', tool_name: 'execute_sql', tool_call_id: 'sql', data: { args: {} } },
-    { type: 'tool_result', tool_name: 'execute_sql', tool_call_id: 'sql', data: { status: 'ok', result_id: resultId } },
-    { type: 'text', content: '조회 결과입니다.\n\n| Step | 수량 |\n| --- | ---: |\n| 1 | 20 |\n| 2 | 10 |\n\n필요한 행을 검색할 수 있습니다.' },
-    { type: 'tool_call', tool_name: 'prepare_table', tool_call_id: 'table-auto', data: { args: { result_id: resultId } } },
-    { type: 'tool_result', tool_name: 'prepare_table', tool_call_id: 'table-auto', data: {
-      status: 'ok', result_id: resultId, title: '조회 결과', columns: ['Step', '수량'], rows: [[1, 20], [2, 10]],
-      row_count: 2, displayed_count: 2, source_truncated: false,
-    } },
-  ];
-  events.forEach((event, i) => { current = applyAgentEvent(current, event, `fallback-${i}`); });
-
-  const rendered = convertMessage(current).content;
-  assert.deepEqual(rendered.map(part => part.type), ['tool-call', 'text', 'tool-call']);
-  assert.equal(rendered[1].text, '조회 결과입니다.\n\n필요한 행을 검색할 수 있습니다.');
-  assert.equal(rendered.at(-1).toolName, 'prepare_table');
-});
-
-test('a corrected visualization failure is hidden when the same result later succeeds', () => {
+test('a corrected chart failure is hidden when the same result later succeeds', () => {
   let current = message();
   const resultId = 'result-1';
   const events = [
-    { type: 'tool_call', tool_name: 'prepare_visualization', tool_call_id: 'chart-failed', data: { args: { result_id: resultId } } },
-    { type: 'tool_result', tool_name: 'prepare_visualization', tool_call_id: 'chart-failed', data: { status: 'error', message: 'group_by 오류' } },
-    { type: 'tool_call', tool_name: 'prepare_visualization', tool_call_id: 'chart-success', data: { args: { result_id: resultId } } },
-    { type: 'tool_result', tool_name: 'prepare_visualization', tool_call_id: 'chart-success', data: { status: 'ok', visualization_id: 'c'.repeat(32) } },
+    { type: 'tool_call', tool_name: 'present_chart', tool_call_id: 'chart-failed', data: { args: { result_id: resultId } } },
+    { type: 'tool_result', tool_name: 'present_chart', tool_call_id: 'chart-failed', data: { status: 'error', message: 'group_by 오류' } },
+    { type: 'tool_call', tool_name: 'present_chart', tool_call_id: 'chart-success', data: { args: { result_id: resultId } } },
+    { type: 'tool_result', tool_name: 'present_chart', tool_call_id: 'chart-success', data: { status: 'ok', result_id: resultId } },
     { type: 'text', content: '보정 완료' },
   ];
   events.forEach((event, i) => { current = applyAgentEvent(current, event, `corrected-${i}`); });
 
   const chartParts = convertMessage(current).content.filter(
-    part => part.type === 'tool-call' && part.toolName === 'prepare_visualization',
+    part => part.type === 'tool-call' && part.toolName === 'present_chart',
   );
   assert.equal(chartParts.length, 1);
   assert.equal(chartParts[0].toolCallId, 'chart-success');
@@ -229,16 +200,13 @@ test('later execution tools preserve earlier standalone results and their contex
     { type: 'text', content: '조회 준비' },
     { type: 'tool_call', tool_name: 'execute_sql', tool_call_id: 'sql-1' },
     { type: 'text', content: '첫 결과의 분포입니다.' },
-    { type: 'tool_call', tool_name: 'prepare_visualization', tool_call_id: 'chart' },
-    { type: 'tool_result', tool_name: 'prepare_visualization', tool_call_id: 'chart', data: { status: 'ok', visualization_id: 'a'.repeat(32) } },
+    { type: 'tool_call', tool_name: 'present_chart', tool_call_id: 'chart' },
+    { type: 'tool_result', tool_name: 'present_chart', tool_call_id: 'chart', data: { status: 'ok', result_id: 'a'.repeat(32) } },
     { type: 'text', content: '차트를 설명하고 추가 데이터를 조회합니다.' },
     { type: 'tool_call', tool_name: 'execute_sql', tool_call_id: 'sql-2' },
     { type: 'text', content: '두 번째 결과입니다.' },
-    { type: 'tool_call', tool_name: 'prepare_table', tool_call_id: 'table' },
-    { type: 'tool_result', tool_name: 'prepare_table', tool_call_id: 'table', data: {
-      status: 'ok', result_id: 'b'.repeat(32), title: null, columns: ['id'], rows: [[1]],
-      row_count: 1, displayed_count: 1, source_truncated: false,
-    } },
+    { type: 'tool_call', tool_name: 'present_table', tool_call_id: 'table' },
+    { type: 'tool_result', tool_name: 'present_table', tool_call_id: 'table', data: { status: 'ok', result_id: 'b'.repeat(32) } },
     { type: 'text', content: '표의 해석입니다.' },
     { type: 'tool_call', tool_name: 'get_result_summary', tool_call_id: 'summary' },
     { type: 'text', content: '최종 결론입니다.' },
@@ -250,12 +218,4 @@ test('later execution tools preserve earlier standalone results and their contex
     '차트를 설명하고 추가 데이터를 조회합니다.', '두 번째 결과입니다.', 'table',
     '표의 해석입니다.', '최종 결론입니다.',
   ]);
-});
-
-
-test('removing duplicate tables preserves fenced code examples', () => {
-  for (const fence of ['```', '~~~~']) {
-    const example = `${fence}markdown\n| column | value |\n| --- | --- |\n| A | 1 |\n${fence}`;
-    assert.equal(removeMarkdownTables(`${example}\n\n| column | value |\n| --- | --- |\n| A | 1 |`, [{ columns: ['column', 'value'], rows: [['A', 1]] }]), example);
-  }
 });

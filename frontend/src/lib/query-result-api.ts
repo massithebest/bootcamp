@@ -10,7 +10,7 @@
  */
 
 import { API_BASE_URL } from "@/lib/chat-api";
-import { parseChartSpec, parseWarnings } from "@/lib/visualization-api";
+import type { ChartSpec, VisualizationWarning } from "@/types/chat";
 import {
   RESULT_ID_PATTERN,
   type QueryChartRequest,
@@ -47,6 +47,105 @@ const INVALID_RESPONSE_MESSAGE = "결과 응답 형식이 올바르지 않습니
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function isCategory(value: unknown): value is string | number {
+  return (
+    typeof value === "string" ||
+    (typeof value === "number" && Number.isFinite(value))
+  );
+}
+
+export function parseWarnings(value: unknown): VisualizationWarning[] | null {
+  if (!Array.isArray(value)) return null;
+  const warnings: VisualizationWarning[] = [];
+  for (const warning of value) {
+    if (
+      !isRecord(warning) ||
+      typeof warning.code !== "string" ||
+      typeof warning.message !== "string"
+    ) {
+      return null;
+    }
+    warnings.push({ code: warning.code, message: warning.message });
+  }
+  return warnings;
+}
+
+/** present_chart/차트 조회 API가 공유하는 chart 검증. bar/line/area만 허용한다. */
+export function parseChartSpec(
+  value: unknown,
+  allowed: readonly ChartSpec["type"][] = ["bar", "line", "area"],
+): ChartSpec | null {
+  if (!isRecord(value) || !allowed.includes(value.type as ChartSpec["type"])) {
+    return null;
+  }
+  if (
+    typeof value.x !== "string" ||
+    !Array.isArray(value.series) ||
+    value.series.length === 0 ||
+    value.series.length > 8 ||
+    !Array.isArray(value.categories) ||
+    value.categories.length > 500 ||
+    !Array.isArray(value.data) ||
+    value.data.length !== value.categories.length ||
+    !isNullableString(value.title) ||
+    !isNullableString(value.x_label) ||
+    !isNullableString(value.y_label) ||
+    !isNullableString(value.unit)
+  ) {
+    return null;
+  }
+
+  const series: ChartSpec["series"] = [];
+  const keys = new Set<string>();
+  for (const raw of value.series) {
+    if (
+      !isRecord(raw) ||
+      typeof raw.key !== "string" ||
+      !raw.key ||
+      keys.has(raw.key) ||
+      typeof raw.label !== "string"
+    ) {
+      return null;
+    }
+    keys.add(raw.key);
+    series.push({ key: raw.key, label: raw.label });
+  }
+
+  if (!value.categories.every(isCategory)) return null;
+  const data: Record<string, unknown>[] = [];
+  for (let index = 0; index < value.data.length; index += 1) {
+    const row = value.data[index];
+    if (!isRecord(row) || row[value.x] !== value.categories[index]) return null;
+    if (Object.keys(row).some((key) => key !== value.x && !keys.has(key))) return null;
+    for (const key of keys) {
+      const point = row[key];
+      if (
+        point !== null &&
+        !(typeof point === "number" && Number.isFinite(point))
+      ) {
+        return null;
+      }
+    }
+    data.push(row);
+  }
+
+  return {
+    type: value.type as ChartSpec["type"],
+    x: value.x,
+    series,
+    categories: value.categories,
+    data,
+    title: value.title,
+    x_label: value.x_label,
+    y_label: value.y_label,
+    unit: value.unit,
+  };
 }
 
 function parseColumns(value: unknown): QueryColumn[] | null {

@@ -15,8 +15,8 @@ test('numeric simulation KPIs include zero', () => {
   const html = render('simulation', { kpis: [{ label: 'Part', value: 10 }, { label: '미연결', value: 0 }] });
   assert.match(html, />10</); assert.match(html, />0</);
 });
-test('summary tool displays rows and statistics without type:large_result', () => {
-  const html = render('database', { status: 'ok', result_id: 'fixture', row_count: 250, columns: [{ name: 'qty', dtype: 'int64', role: 'measure' }], summary: { qty: { min: 1, max: 40, mean: 20, null_count: 0 } } });
+test('preview summary displays row count and column statistics', () => {
+  const html = render('database', { status: 'ok', result_id: 'fixture', row_count: 250, columns: [{ name: 'qty', dtype: 'int64', role: 'measure' }], sample_rows: [{ qty: 20 }], statistics: { qty: { min: 1, max: 40, mean: 20, null_count: 0 } } });
   assert.match(html, /250/); assert.match(html, /40/); assert.match(html, /qty/);
 });
 test('simulation discovery renders available type', () => {
@@ -32,7 +32,7 @@ test('recipe details and list remain visible', () => {
   assert.match(render('catalog', { catalog_type: 'recipe', data: { name: 'WIP recipe', description: '제품별 집계', cte_sql: 'SELECT part FROM wip' } }), /제품별 집계/);
   assert.match(render('catalog', { catalog_type: 'recipe_list', data: [{ name: 'WIP recipe', description: '제품별 집계' }] }), /WIP recipe/);
 });
-test('inline table and large_result retain source values', () => {
+test('inline table and preview summary retain source values', () => {
   assert.match(render('database', { table: { columns: ['part', 'qty'], rows: [['part_1', 12]] } }), /part_1/);
-  assert.match(render('database', { type: 'large_result', row_count: 500, columns: [{ name: 'qty' }], sample_rows: [[42]], summary: {} }), /42/);
+  assert.match(render('database', { status: 'ok', result_id: 'fixture', row_count: 500, columns: [{ name: 'qty' }], sample_rows: [{ qty: 42 }], statistics: {} }), /42/);
 });

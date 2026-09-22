@@ -24,18 +24,16 @@ function formatStat(v: ResultColumnSummary["min"] | ResultColumnSummary["mean"])
 }
 
 /**
- * 대용량 조회 결과(`type: "large_result"`) 요약 카드.
- * 원본 행 대신 표본 몇 행 + 컬럼별 기초 통계만 보여준다.
- * 이 카드에는 페이지 이동을 두지 않으며 독립 대화형 표는 `prepare_table`이 제공한다.
+ * 대용량 조회 결과(bounded preview) 요약 카드.
+ * 원본 행 대신 표본 몇 행 + 컬럼별 기초 통계(`statistics`)만 보여준다.
+ * 이 카드에는 페이지 이동을 두지 않으며 독립 대화형 표는 `present_table`이 제공한다.
  */
 export function ResultSummaryCard({ data }: { data: Record<string, unknown> }) {
   const rowCount = num(data.row_count);
   const columns = asResultColumns(data.columns);
   const columnNames = columns.map((c) => c.name);
   const sampleRows = asSampleRows(data.sample_rows, columnNames);
-  // preview는 `statistics`, legacy large_result는 `summary`가 컬럼별 통계다.
-  const preview = typeof data.statistics === "object" && data.statistics !== null;
-  const summary = asResultSummary(preview ? data.statistics : data.summary);
+  const summary = asResultSummary(data.statistics);
   const dateRanges = asRecord(data.date_ranges);
   const distinctCounts = asRecord(data.distinct_counts);
   const topGroups = asRecord(data.top_groups);

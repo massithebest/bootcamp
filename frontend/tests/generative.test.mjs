@@ -208,19 +208,11 @@ test('a failed present_table is hidden once a later present_table succeeds; all-
   assert.equal(convertMessage(assistant([failed])).content[0].isError, true);
 });
 
-test('legacy Markdown table de-duplication is unchanged and not applied to present messages', () => {
-  const md = '| a | b |\n| --- | --- |\n| 1 | x |';
-  const legacy = assistant([tool('t', 'prepare_table', { result_id: ID }, { status: 'ok', result_id: ID, title: null, columns: ['a', 'b'], rows: [[1, 'x']], row_count: 1, displayed_count: 1, source_truncated: false }), text('m', md)]);
-  assert.equal(convertMessage(legacy).content.filter((p) => p.type === 'text').length, 0);
-  const present = assistant([tool('p', 'present_table', { result_id: ID }, {}), text('m', md)]);
-  assert.equal(convertMessage(present).content.filter((p) => p.type === 'text').length, 1);
-});
-
-/* ---------------- 두 결과 shape (legacy 인라인 / present preview) ---------------- */
+/* ---------------- present preview 결과 shape ---------------- */
 
 const html = (Component, data) => renderToStaticMarkup(createElement(Component, { data }));
 
-test('DatabaseResult renders present preview without full rows and keeps legacy inline table', () => {
+test('DatabaseResult renders present preview without full rows', () => {
   const preview = { status: 'ok', kind: 'database', result_id: ID, row_count: 250, source_truncated: false, columns: [{ name: 'work_month', dtype: 'str', role: 'time' }, { name: 'qty', dtype: 'int64', role: 'measure' }, { name: 'line', dtype: 'str', role: 'category' }],
     sample_rows: [{ work_month: '2026-01', qty: 10, line: 'A' }], date_ranges: { work_month: { min: '2026-01', max: '2026-12' } }, distinct_counts: { work_month: 12, line: 2 }, statistics: { qty: { min: 1, max: 40, avg: 20, sum: 5000, null_count: 0 } }, top_groups: { line: [{ value: 'A', count: 120 }] } };
   const out = html(DatabaseResult, preview);

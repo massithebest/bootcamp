@@ -38,8 +38,6 @@ const TOOL_META: Record<string, { label: string; kind: Kind }> = {
   get_recipe: { label: "집계 레시피", kind: "catalog" },
   get_result_summary: { label: "결과 요약 조회", kind: "database" },
   get_result_page: { label: "결과 구간 조회", kind: "database" },
-  prepare_table: { label: "표 준비", kind: "generic" },
-  prepare_visualization: { label: "차트 준비", kind: "generic" },
 };
 
 function resolveKind(toolName: string, result?: ToolResult): { label: string; kind: Kind } {

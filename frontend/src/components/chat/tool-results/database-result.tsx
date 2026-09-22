@@ -1,6 +1,6 @@
 import { DataTable, Disclosure } from "../primitives";
 import { ResultSummaryCard } from "./result-summary";
-import { asRecord, asRows, asStrings, isLargeResult, isPreviewResult, str } from "./shared";
+import { asRecord, asRows, asStrings, isPreviewResult, str } from "./shared";
 
 /**
  * DB 조회 결과 → 표 + 실행 SQL 펼쳐보기.
@@ -9,9 +9,9 @@ import { asRecord, asRows, asStrings, isLargeResult, isPreviewResult, str } from
  * (`{ table: { columns, rows }, row_count }`). 초기 더미가 쓰던
  * 최상위 `columns`/`rows` 형태도 함께 받아준다.
  *
- * `type: "large_result"`(100행 초과)나 present 모드의 preview면 전체 행 대신
- * `sample_rows`/`summary` 요약 카드를 렌더한다. 이 실행 상세 카드에는 페이지 이동을
- * 넣지 않고, 독립적인 검색·정렬·페이지 이동 표는 `prepare_table` Tool UI가 맡는다.
+ * preview(bounded `sample_rows`/`statistics`)면 전체 행 대신 요약 카드를 렌더한다.
+ * 이 실행 상세 카드에는 페이지 이동을 넣지 않고, 독립적인 검색·정렬·페이지 이동
+ * 표는 `present_table` Tool UI가 맡는다.
  */
 export function DatabaseResult({ data }: { data: Record<string, unknown> }) {
   const sql = str(data.sql);
@@ -29,10 +29,7 @@ export function DatabaseResult({ data }: { data: Record<string, unknown> }) {
         ? rows[0].map((_, i) => String(i))
         : [];
 
-  const summary = isLargeResult(data) || isPreviewResult(data) || (
-    typeof data.result_id === "string" && data.summary !== null &&
-    typeof data.summary === "object" && !Array.isArray(data.summary)
-  );
+  const summary = isPreviewResult(data);
   const empty = data.row_count === 0 && rows.length === 0;
 
   return (

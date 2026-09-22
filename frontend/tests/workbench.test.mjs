@@ -4,11 +4,11 @@ import { createServer } from 'vite';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-let server, applyAgentEvent, finishObservedTiming, convertMessage, removeMarkdownTables, executionSummary, formatObservedDuration, DatabaseResult, ChartBlock;
+let server, applyAgentEvent, finishObservedTiming, convertMessage, executionSummary, formatObservedDuration, DatabaseResult, ChartBlock;
 before(async () => {
   server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom' });
   ({ applyAgentEvent, finishObservedTiming } = await server.ssrLoadModule('/src/lib/chat-state.ts'));
-  ({ convertMessage, removeMarkdownTables } = await server.ssrLoadModule('/src/lib/chat-runtime.ts'));
+  ({ convertMessage } = await server.ssrLoadModule('/src/lib/chat-runtime.ts'));
   ({ executionSummary, formatObservedDuration } = await server.ssrLoadModule('/src/lib/execution-summary.ts'));
   ({ DatabaseResult } = await server.ssrLoadModule('/src/components/chat/tool-results/database-result.tsx'));
   ({ ChartBlock } = await server.ssrLoadModule('/src/components/chat/tool-results/chart-block.tsx'));
@@ -18,21 +18,6 @@ const message = () => ({ id: 'a', role: 'assistant', content: '', parts: [], sta
 const call = id => ({ type: 'tool_call', tool_name: 'execute_sql', tool_call_id: id, data: { args: {} } });
 const result = (id, data) => ({ type: 'tool_result', tool_name: 'execute_sql', tool_call_id: id, data });
 const zero = { status: 'ok', kind: 'database', row_count: 0, table: { columns: ['qty'], rows: [] } };
-
-test('F01 unrelated, ambiguous and unknown Markdown tables survive; only exact rows match', () => {
-  const known = { columns: ['제품', 'WIP'], rows: [['A', 20]] };
-  const exact = '| 제품 | WIP |\n| --- | --- |\n| A | 20 |';
-  const separate = '| 지표 | 비율 |\n| --- | --- |\n| 불량률 | 2% |';
-  assert.equal(removeMarkdownTables(`${exact}\n\n${separate}`, [known]), separate);
-  assert.equal(removeMarkdownTables(exact), exact);
-  assert.equal(removeMarkdownTables(exact.replace('20', '21'), [known]), exact.replace('20', '21'));
-  assert.equal(removeMarkdownTables(exact.replace('20', '**20**'), [known]), exact.replace('20', '**20**'));
-  const current = message();
-  current.parts = [{ kind: 'text', id: 't', text: separate }, { kind: 'tool', id: 'table', toolCallId: 'table', toolName: 'prepare_table', args: {}, result: {
-    id: 'r', toolCallId: 'table', toolName: 'prepare_table', data: { status: 'ok', result_id: 'a'.repeat(32), title: 'WIP', columns: known.columns, rows: known.rows, row_count: 1, displayed_count: 1, source_truncated: false },
-  } }];
-  assert.equal(convertMessage(current).content[0].text, separate);
-});
 
 for (const [name, events, expected] of [
   ['tool-error-done', [call('1'), result('1', { status: 'error', message: '조건 확인' }), { type: 'text', content: '확인 필요' }, { type: 'done' }], [1, 0]],

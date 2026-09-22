@@ -41,9 +41,9 @@ test('suggestion adapter reads only the last completed assistant message', async
   assert.deepEqual(await gen([{ ...done, metadata: { custom: {} } }]), []);
 });
 
-test('toolkit registers every Backend tool of both result UI modes', () => {
-  const expected = ['execute_sql', 'search_documents', 'list_simulation', 'run_simulation', 'list_tables', 'describe_table', 'list_kpis', 'get_kpi', 'list_recipes', 'get_recipe', 'get_result_summary', 'get_result_page', 'prepare_table', 'prepare_visualization', 'present_sql_preview', 'present_chart', 'present_table', 'present_simulation'];
+test('toolkit registers every Backend tool', () => {
+  const expected = ['execute_sql', 'search_documents', 'list_simulation', 'run_simulation', 'list_tables', 'describe_table', 'list_kpis', 'get_kpi', 'list_recipes', 'get_recipe', 'get_result_summary', 'get_result_page', 'present_sql_preview', 'present_chart', 'present_table', 'present_simulation'];
   assert.deepEqual(Object.keys(toolkitModule.productionPlanningToolkit).sort(), expected.sort());
-  for (const name of ['present_sql_preview', 'present_chart', 'present_table', 'present_simulation', 'prepare_table', 'prepare_visualization']) assert.equal(toolkitModule.productionPlanningToolkit[name].display, 'standalone', name);
+  for (const name of ['present_sql_preview', 'present_chart', 'present_table', 'present_simulation']) assert.equal(toolkitModule.productionPlanningToolkit[name].display, 'standalone', name);
   for (const name of toolkitModule.GROUPED_TOOL_NAMES) assert.notEqual(toolkitModule.productionPlanningToolkit[name].display, 'standalone', name);
 });

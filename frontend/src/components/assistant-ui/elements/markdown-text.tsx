@@ -13,11 +13,7 @@
 
 import { Children, Fragment, type ComponentPropsWithoutRef } from "react";
 import remarkGfm from "remark-gfm";
-import {
-  MarkdownTextPrimitive,
-  type SyntaxHighlighterProps,
-} from "@assistant-ui/react-markdown";
-import { ChartMarker } from "@/components/chat/tool-results/chart-marker";
+import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
 import { TABLE_DISPLAY_ROW_LIMIT } from "@/components/chat/primitives";
 import { remarkChatHeadings } from "@/lib/markdown-headings";
 
@@ -186,18 +182,12 @@ function Pre(props: ComponentPropsWithoutRef<"pre">) {
   );
 }
 
-/** language-chart 펜스는 기본 Pre/Code 셸 없이 전용 조회 컨테이너로 위임한다. */
-function ChartFence({ code }: SyntaxHighlighterProps) {
-  return <ChartMarker source={code.replace(/\n$/, "")} />;
-}
-
 export function MarkdownText() {
   return (
     <MarkdownTextPrimitive
       remarkPlugins={[remarkGfm, remarkChatHeadings]}
       preprocess={preprocess}
       className="flex min-w-0 flex-col gap-2 [overflow-wrap:anywhere] [&_pre]:[overflow-wrap:normal] [&_table]:[overflow-wrap:normal]"
-      componentsByLanguage={{ chart: { SyntaxHighlighter: ChartFence } }}
       components={{
         h3: Heading3,
         h4: Heading4,

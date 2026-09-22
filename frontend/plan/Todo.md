@@ -31,9 +31,9 @@ Backend에 없는 기능을 동작하는 것처럼 표시하는 것은 범위 �
 | 채팅 runtime | 완료 | LocalRuntime + SSE `ChatModelAdapter`, 분기(BranchPicker)·취소·편집·재생성, 다중 thread(브라우저 세션) |
 | 메시지 lifecycle | 완료 | complete/cancelled/error, 부분 응답과 terminal event 구분 |
 | 실행 과정 | 완료 | 공개 status, ToolGroup, 호출 ID별 args/result와 2단계 disclosure |
-| 표 | 완료 | legacy 최대 100행 local 표 + `QueryTable` 최대 1,000건 서버 검색·정렬·10/25/50/100 pagination |
-| 차트 | 완료 | legacy 검증 API bar/line + 조합형 `QueryChart`(bar/line/area, 서버 집계), loading/error와 데이터 표 대안 |
-| 조합형 결과 | 구현(플래그 대기) | flat `present_sql_preview`·`present_chart`·`present_table`·`present_simulation` Tool renderer(`SqlPreview`·`QueryChart`·`QueryTable`·`SimulationSummary`); Backend `RESULT_UI_MODE=present` 전환 후 사용 |
+| 표 | 완료 | `QueryTable` 최대 1,000건 서버 검색·정렬·10/25/50/100 pagination |
+| 차트 | 완료 | `QueryChart`(bar/line/area, 서버 집계), loading/error와 데이터 표 대안 |
+| 조합형 결과 | 완료 | flat `present_sql_preview`·`present_chart`·`present_table`·`present_simulation` Tool renderer(`SqlPreview`·`QueryChart`·`QueryTable`·`SimulationSummary`) |
 | 후속질문 | 파서·UI 완료 | `done.data.suggestions`를 Backend가 보내면 표시(현재 미전송) |
 | 지식 관리 | 완료 | 구조화 지식 조회·수정 요청·검토·승인(가이드 폼·원문 YAML·diff), 텍스트 등록·검토·활성화, 정확한 버전 인용 |
 | Layout | 완료 | Sidebar·Chat·Inspector, Inspector resize, 좁은 화면 overlay |
@@ -54,7 +54,7 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 - 오류 흐름은 `error` 다음 terminal `done`으로 끝난다.
 - `done.data.suggestions`(후속질문)는 선택 필드다. 엄격히 검증하고 없으면 표시하지 않는다.
 
-### 조합형 결과 (`RESULT_UI_MODE=present`)
+### 조합형 결과
 
 - Backend는 `present` Tool 하나 대신 flat(스칼라 인자) Tool 4개를 보낸다:
   `present_sql_preview(sql, title?)`,
@@ -88,10 +88,6 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 
 ### 표·차트·지식
 
-- `prepare_table` 성공 결과는 columns, rows, row_count, displayed_count와
-  source_truncated를 포함하며 rows는 최대 100행이다.
-- `prepare_visualization` 성공 결과의 `visualization_id`로
-  `/api/visualizations/{id}`를 조회한다.
 - 지식 API는 Tool·Skill·구조화 entry와 버전형 text document, 구조화 지식 변경 요청을 제공한다.
 - 문서 검색 Tool 이름은 `search_documents`이며 결과 `kind`는 `knowledge`다.
 - 브라우저는 credential cookie를 포함하고 내부 path·scope를 표시하지 않는다.
@@ -130,9 +126,6 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 
 ### P1
 
-- [ ] **조합형 결과 운영 전환**: Backend가 `RESULT_UI_MODE=present`로 전환된 환경에서 관통 검증(SQL·simulation →
-  `present_chart`/`present_table`/`present_sql_preview`/`present_simulation` → 표·차트·SQL)하고 legacy
-  `prepare_*` renderer·`chart` marker·`/api/visualizations` client 삭제 계획을 별도로 만든다.
 - [ ] **후속질문 표시 검증**: Backend가 `done.data.suggestions`를 보내면 실제 응답에서 표시·전송·오류/취소 미표시를 확인한다.
 
 ### P2
@@ -155,7 +148,36 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 
 ## 완료 이력 요약
 
-### 2026-09-22 — 개발 문서와 디자인 기준 분리
+### 2026-09-22 — legacy 결과 모드 삭제
+
+- Backend가 legacy `prepare_table`/`prepare_visualization` Tool과 `RESULT_UI_MODE`
+  플래그를 완전히 제거하기로 함에 따라(원래 계획한 운영 관통 검증·observation
+  gate는 사용자 결정으로 건너뜀), Frontend의 legacy 전용 코드를 모두 제거했다.
+  이제 결과 렌더링은 `present_*` Tool 경로 하나만 존재한다.
+- 삭제: `lib/visualization-api.ts`, `lib/table-tool.ts`, `lib/chart-marker.ts`,
+  `hooks/use-visualization.ts`, `components/chat/tool-results/table-tool-ui.tsx`,
+  `visualization-tool-ui.tsx`, `chart-marker.tsx`, `interactive-data-table.tsx`.
+- `query-result-api.ts`가 `parseChartSpec`/`parseWarnings`를 자체 소유하도록
+  옮겼다(기존에는 legacy `visualization-api.ts`에서 가져다 썼다).
+- `toolkit/index.tsx`·`standalone-tools.ts`·`tool-result-card.tsx`에서
+  `prepare_table`/`prepare_visualization` 등록·메타데이터를 제거했다(toolkit은
+  이제 16개 Tool: 실행 과정 12개 + `present_*` 4개).
+- `chat-runtime.ts`: legacy Tool 이름에 의존하던 `removeMarkdownTables`
+  Markdown 표 중복 제거(및 그 호출부 `successfulTables`)와
+  `isSuccessfulStandalonePart`의 `prepare_table`/`prepare_visualization` 분기를
+  제거했다. standalone 성공 판정은 이제 `result !== undefined &&
+  toolResultError(result) === null` 하나로 단순화됐다.
+- `result-summary.tsx`·`shared.ts`(`isLargeResult` 삭제)·`database-result.tsx`·
+  `simulation-result.tsx`에서 legacy 인라인 payload 모양(배열의 배열
+  `sample_rows`, `type: "large_result"`, top-level `summary` 객체) 분기를
+  제거하고 present preview 모양(`statistics`, 객체 배열 `sample_rows`)만 남겼다.
+- `markdown-text.tsx`의 `chart` 코드펜스 → `ChartMarker` 인라인 렌더 경로를
+  제거했다(present 모드는 차트를 `present_chart` Tool로만 그린다).
+- 관련 테스트(`chat-state`·`workbench`·`elements`·`generative`·`suggestions`·
+  `chat-model-adapter`·`results`·`workbench-browser`)를 present 전용 시나리오로
+  갱신했다. `tests/fixtures/present-vocabulary.json` 계약은 변경 없음.
+- 검증: `npm test`(101 passed) · `npm run build`(`tsc -b` 0 errors) ·
+  `npm run lint`(0 errors, 기존 Fast Refresh warning 4개만) 통과.
 
 - `AGENTS.md`는 Frontend 구조·공유 계약·검증만 남기고, `CLAUDE.md`는 상세 내용을
   복제하지 않는 문서 진입점으로 축약했다.

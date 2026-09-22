@@ -680,9 +680,8 @@ Inspector는 `absolute` overlay만 적용해 중앙 Chat의 grid 폭을 소비�
   Assistant Markdown으로 설명한다. 별도 Card grouping 계약은 없다.
 - **실패한 `present`**: 같은 메시지에서 이후 `present`가 성공하면 실패 호출은 숨기고, 전부 실패하면 오류 알림 표면을
   그대로 보여 준다(계획의 "ToolGroup 안 표시"에서 단순화).
-- **두 결과 모드**: `RESULT_UI_MODE=legacy|present` 플래그는 Backend가 소유한다. `DatabaseResult`·`SimulationResult`는
-  legacy 인라인 표와 preview(`sample_rows` 객체, `statistics`)를 모두 받는다. 표 중복 제거(`removeMarkdownTables`)는
-  legacy 메시지 전용이다(`present`에는 행이 없어 비교 불가).
+- **결과 모드**: Backend는 `present` 결과 UI만 보낸다(legacy `prepare_*`/`RESULT_UI_MODE` 플래그는 제거됨).
+  `DatabaseResult`·`SimulationResult`는 bounded preview(`sample_rows` 객체 배열, `statistics`)만 받는다.
 - **Tool UI**: 실행 과정 그룹의 12개 도구를 toolkit에 등록하고(`RegisteredToolUI`) 표·차트·`present`는 standalone으로
   등록했다. 종류별 본문 선택(`TOOL_META`)은 `ToolResultCard`에 남겼다.
 - **후속질문**: `done.data.suggestions`(2~4개·각 120자 이하·중복 제거)를 엄격히 검증해 `metadata.custom`에 싣고
@@ -694,4 +693,7 @@ Inspector는 `absolute` overlay만 적용해 중앙 Chat의 grid 폭을 소비�
 
 - 취소된 응답은 소요 시간을 표시하지 않는다(runtime이 취소 뒤 스냅샷을 받지 않아 종료 시각을 기록할 수 없음).
 - 새로고침하면 대화·분기·목록이 사라진다. 영속 대화 API가 필요하다.
-- legacy `prepare_*` renderer·`/api/visualizations` client는 호환을 위해 유지한다. 삭제는 별도 계획이다.
+- legacy `prepare_*` renderer(`table-tool-ui`·`visualization-tool-ui`·`chart-marker`)와
+  `/api/visualizations` client(`visualization-api.ts`)는 2026-09-22에 삭제했다. Backend가
+  더 이상 `prepare_table`/`prepare_visualization`을 호출하지 않는다(사용자 결정으로 별도
+  observation gate 없이 즉시 제거).

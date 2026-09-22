@@ -63,14 +63,14 @@ test('streams cumulative snapshots and finishes complete with the turn id as the
   const { results, calls, conversation } = await collect([
     { type: 'text', content: '조회' }, { type: 'text', content: '합니다.' },
     call('sql', 'execute_sql', { sql: 'S' }), result('sql', 'execute_sql', { status: 'ok', result_id: 'a'.repeat(32) }),
-    call('p', 'present', { $type: 'QueryTable', resultId: 'a'.repeat(32) }), result('p', 'present', {}),
+    call('p', 'present_table', { result_id: 'a'.repeat(32) }), result('p', 'present_table', {}),
     { type: 'text', content: '표에는 결과가 있습니다.' }, { type: 'done', data: { turn_id: 'T1' } },
   ]);
   assert.deepEqual(calls, [{ message: '질문', conversationId: 'conv-1', forkFromTurnId: undefined, hasSignal: true }]);
   const last = results.at(-1);
   assert.deepEqual(last.status, { type: 'complete', reason: 'stop' });
-  assert.deepEqual(last.content.map((p) => (p.type === 'text' ? 'text' : p.toolName)), ['execute_sql', 'present', 'text']);
-  assert.deepEqual(last.content.filter((p) => p.type === 'tool-call').map((p) => [p.toolName, p.result !== undefined]), [['execute_sql', true], ['present', true]]);
+  assert.deepEqual(last.content.map((p) => (p.type === 'text' ? 'text' : p.toolName)), ['execute_sql', 'present_table', 'text']);
+  assert.deepEqual(last.content.filter((p) => p.type === 'tool-call').map((p) => [p.toolName, p.result !== undefined]), [['execute_sql', true], ['present_table', true]]);
   assert.equal(last.metadata.custom.turnId, 'T1');
   assert.ok(Array.isArray(last.metadata.custom.statuses) && last.metadata.custom.observedTiming.endedAt >= last.metadata.custom.observedTiming.startedAt);
   assert.equal(conversation.headTurnId, 'T1');

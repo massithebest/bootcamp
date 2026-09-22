@@ -15,9 +15,9 @@ Vite 7, React 18, strict TypeScript 기반의 데스크톱 SPA다. 작업 전
   영속 API가 생기면 adapter 경계에서 교체한다.
 - `AgentEvent`, `tool_call_id`, `done.data.turn_id`, 포크와 결과 payload는 Backend
   계약과 동기화한다. 준비되지 않은 값이나 기능을 UI에서 추측하지 않는다.
-- `RESULT_UI_MODE=present`는 flat `present_sql_preview`·`present_chart`·
-  `present_table`·`present_simulation` Tool을 이름별 renderer로 표시한다. wire의
-  snake_case schema, Zod parser와 fixture를 함께 갱신한다. 재귀 `$type` UI tree와
+- 결과는 flat `present_sql_preview`·`present_chart`·`present_table`·
+  `present_simulation` Tool을 이름별 renderer로 표시한다. wire의 snake_case
+  schema, Zod parser와 fixture를 함께 갱신한다. 재귀 `$type` UI tree와
   `@assistant-ui/react-generative-ui`는 사용하지 않는다.
 
 ## assistant-ui와 UI

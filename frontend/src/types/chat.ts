@@ -66,15 +66,6 @@ export interface VisualizationWarning {
   message: string;
 }
 
-export interface VisualizationResponse {
-  visualization_id: string;
-  result_id: string;
-  schema_version: 1;
-  expires_at: string;
-  chart: ChartSpec;
-  warnings: VisualizationWarning[];
-}
-
 /** tool_result Event 로부터 만들어지는 Tool 결과 항목. */
 export interface ToolResult {
   id: string;

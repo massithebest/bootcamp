@@ -1,6 +1,6 @@
 import { DataTable, Disclosure, StatusDot } from "../primitives";
 import { ResultSummaryCard } from "./result-summary";
-import { asRecord, asRecords, asRows, asStrings, isLargeResult, isPreviewResult, num, str, toneOf } from "./shared";
+import { asRecord, asRecords, asRows, asStrings, isPreviewResult, num, str, toneOf } from "./shared";
 
 /** 레코드 배열(`[{line, workMonth, qty}]` 등)의 컬럼명을 첫 원소의 key 순서로 뽑는다. */
 function columnsOfRecords(records: Record<string, unknown>[]): string[] {
@@ -24,7 +24,7 @@ export function SimulationResult({ data }: { data: Record<string, unknown> }) {
   const results = asRecords(data.results);
   const resultColumns = columnsOfRecords(results);
   const resultRows = results.map((r) => resultColumns.map((c) => String(r[c] ?? "")));
-  const large = isLargeResult(data) || isPreviewResult(data);
+  const large = isPreviewResult(data);
   const simulations = asRecords(data.simulations);
 
   return (

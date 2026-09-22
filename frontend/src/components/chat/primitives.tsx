@@ -8,9 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { TABLE_DISPLAY_ROW_LIMIT } from "@/lib/table-tool";
-
-export { TABLE_DISPLAY_ROW_LIMIT } from "@/lib/table-tool";
+export const TABLE_DISPLAY_ROW_LIMIT = 100;
 
 export type Tone = "neutral" | "ok" | "warn" | "block" | "accent";
 
