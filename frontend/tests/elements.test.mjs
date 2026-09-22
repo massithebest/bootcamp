@@ -17,7 +17,7 @@ before(async () => {
   ({ ToolResultCard } = await server.ssrLoadModule('/src/components/chat/tool-result-card.tsx'));
   ({ VisualizationToolUI } = await server.ssrLoadModule('/src/components/chat/tool-results/visualization-tool-ui.tsx'));
   ({ TableToolUI } = await server.ssrLoadModule('/src/components/chat/tool-results/table-tool-ui.tsx'));
-  ({ productionPlanningToolkit } = await server.ssrLoadModule('/src/components/chat/toolkit.tsx'));
+  ({ productionPlanningToolkit } = await server.ssrLoadModule('/src/components/chat/toolkit/index.tsx'));
 });
 after(async () => { await server.close(); });
 

@@ -1,15 +1,15 @@
 /**
  * `ChatMessage` (우리 상태) -> `ThreadMessageLike` (assistant-ui) 어댑터.
  *
- * 메시지 상태의 소유권은 계속 `hooks/use-agent-chat.ts` 가 갖는다. assistant-ui 는
- * `useExternalStoreRuntime` 으로 이 변환 결과만 읽는다.
+ * 메시지 저장·스트리밍 표시는 assistant-ui LocalRuntime이 맡고, `lib/chat-model-adapter.ts`가
+ * 이 변환 결과를 `ChatModelAdapter`의 yield로 넘긴다.
  *
  * 일반 Tool part는 실행 과정으로 앞에 모은다. 그 뒤의 설명과 standalone 표·차트는
  * AgentEvent에서 발생한 순서를 보존해 각 Tool UI와 해석을 같은 문맥에 표시한다.
  * assistant-ui GroupedParts는 일반 Tool만 하나의 ToolGroup으로 표현한다.
  */
 
-import type { MessageStatus, ThreadMessageLike } from "@assistant-ui/react";
+import type { ChatModelRunResult, MessageStatus, ThreadMessageLike } from "@assistant-ui/react";
 import type { ReadonlyJSONObject } from "assistant-stream/utils";
 
 import type {
@@ -21,9 +21,9 @@ import type {
 } from "@/types/chat";
 import { visualizationIdFromToolResult } from "./chart-marker";
 import { tablePayloadFromToolResult, type StandaloneTablePayload } from "./table-tool";
+import { isStandaloneTool } from "./standalone-tools";
 import { toolResultError } from "./tool-result";
 
-const STANDALONE_TOOL_NAMES = new Set(["prepare_table", "prepare_visualization"]);
 
 const MARKDOWN_TABLE_DELIMITER =
   /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/;
@@ -79,7 +79,7 @@ export function removeMarkdownTables(text: string, tables: readonly StandaloneTa
 export interface AgentMessageMetadata {
   /** Tool 호출과 별개로 Backend가 공개한 사용자용 업무 진행 단계. */
   statuses: StatusStep[];
-  /** 현재 실행 Tool 직전에 공개된 안내 문구. Provider thinking은 포함하지 않는다. */
+  /** 현재 실행 Tool 직전에 공개된 안내 문구. */
   progressText?: string;
   observedTiming?: ObservedTiming;
   toolTimings?: Record<string, ObservedTiming>;
@@ -128,11 +128,15 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
 
   const toolParts = message.parts.filter(
     (part): part is Extract<MessagePart, { kind: "tool" }> =>
-      part.kind === "tool" && !STANDALONE_TOOL_NAMES.has(part.toolName),
+      part.kind === "tool" && !isStandaloneTool(part.toolName),
+  );
+  // 실행 과정 = 일반 Tool을 도착 순서대로 앞에 모은다(assistant-ui GroupedParts가 묶는다).
+  const processParts = message.parts.filter(
+    (part) => part.kind === "tool" && !isStandaloneTool(part.toolName),
   );
   const allStandaloneParts = message.parts.filter(
     (part): part is Extract<MessagePart, { kind: "tool" }> =>
-      part.kind === "tool" && STANDALONE_TOOL_NAMES.has(part.toolName),
+      part.kind === "tool" && isStandaloneTool(part.toolName),
   );
   const standaloneParts = allStandaloneParts.filter((part, index) =>
     shouldShowStandalonePart(part, index, allStandaloneParts),
@@ -144,7 +148,7 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
   let segment: MessagePart[] = [];
   let progressText: string | undefined;
   for (const part of message.parts) {
-    if (part.kind === "tool" && !STANDALONE_TOOL_NAMES.has(part.toolName)) {
+    if (part.kind === "tool" && !isStandaloneTool(part.toolName)) {
       if (segment.some((item) => item.kind === "tool")) {
         responseParts.push(...segment);
         progressText = undefined;
@@ -183,15 +187,16 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
   const contextualParts: MessagePart[] = [];
   for (const part of responseParts) {
     if (part.kind === "tool") {
-      if (STANDALONE_TOOL_NAMES.has(part.toolName) && visibleStandaloneIds.has(part.toolCallId)) {
+      if (isStandaloneTool(part.toolName) && visibleStandaloneIds.has(part.toolCallId)) {
         contextualParts.push(part);
       }
       continue;
     }
+    if (part.kind !== "text") continue;
     const text = successfulTables.length ? removeMarkdownTables(part.text, successfulTables) : part.text;
     if (text.length > 0) contextualParts.push({ ...part, text });
   }
-  const visibleParts = [...toolParts, ...contextualParts];
+  const visibleParts = [...processParts, ...contextualParts];
   // Tool에 연결된 status는 Tool part가 직접 표현한다. metadata에는 독립적인
   // 공개 진행 단계만 전달해 ToolGroup 안에서 중복 없이 함께 렌더링한다.
   const independentStatuses = message.statuses.filter(
@@ -241,6 +246,28 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
   };
 }
 
+/**
+ * LocalRuntime `ChatModelAdapter`가 yield하는 assistant 스냅샷. `convertMessage`와 같은 변환을
+ * 재사용하고, 분기 경로에서 Backend fork 지점을 찾을 수 있게 `turnId`를 metadata.custom에 싣는다.
+ */
+export function toRunResult(message: ChatMessage): ChatModelRunResult {
+  const like = convertMessage(message);
+  const content = typeof like.content === "string"
+    ? [{ type: "text" as const, text: like.content }]
+    : like.content;
+  return {
+    content: content as ChatModelRunResult["content"],
+    status: like.status,
+    metadata: {
+      custom: {
+        ...(like.metadata?.custom ?? {}),
+        ...(message.turnId ? { turnId: message.turnId } : {}),
+        ...(message.suggestions ? { suggestions: message.suggestions } : {}),
+      },
+    },
+  };
+}
+
 /** 같은 Tool/result_id의 후속 성공으로 보정된 실패 호출은 standalone UI에서 숨긴다. */
 function shouldShowStandalonePart(
   part: Extract<MessagePart, { kind: "tool" }>,
@@ -248,6 +275,13 @@ function shouldShowStandalonePart(
   parts: Extract<MessagePart, { kind: "tool" }>[],
 ): boolean {
   if (isSuccessfulStandalonePart(part)) return true;
+  if (part.toolName === "present") {
+    // 모델이 오류를 고쳐 다시 호출해 성공했다면 앞선 실패 호출은 숨긴다.
+    // 전부 실패했다면 오류 알림 표면을 그대로 보여 준다.
+    return !parts.slice(index + 1).some(
+      (later) => later.toolName === "present" && isSuccessfulStandalonePart(later),
+    );
+  }
   const resultId = typeof part.args?.result_id === "string" ? part.args.result_id : null;
   if (!resultId) return true;
   return !parts.slice(index + 1).some(
@@ -261,6 +295,9 @@ function shouldShowStandalonePart(
 function isSuccessfulStandalonePart(
   part: Extract<MessagePart, { kind: "tool" }>,
 ): boolean {
+  if (part.toolName === "present") {
+    return part.result !== undefined && toolResultError(part.result) === null;
+  }
   if (part.toolName === "prepare_visualization") {
     return visualizationIdFromToolResult(part.result) !== null;
   }

@@ -1,28 +1,24 @@
 /**
  * 워크스페이스 셸 — 좌측 사이드바 / 중앙 대화 / 우측 인스펙터.
- * 대화 상태 · Streaming · AgentEvent 처리는 `useAgentChat` 훅이 담당한다
- * (hooks/use-agent-chat.ts). 이 컴포넌트는 레이아웃·패널 토글·세션 선택만
- * 다룬다. 상태관리는 React 기본(useState)만 사용한다.
+ * 대화 상태 · Streaming · thread 목록은 assistant-ui runtime이 소유한다
+ * (hooks/use-agent-runtime.ts). 이 컴포넌트는 레이아웃·패널 토글·지식 관리 화면 전환만
+ * 다루며 runtime 상태는 `useAui`·`useAuiState`로 읽는다.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PanelLeftOpenIcon, PanelRightOpenIcon } from "lucide-react";
+import { useAui, useAuiState } from "@assistant-ui/react";
 
 import { Thread } from "@/components/assistant-ui/elements/thread.aui";
 import { TooltipIconButton } from "@/components/assistant-ui/elements/tooltip-icon-button";
-import { SEED_CONVERSATION, SESSIONS } from "@/lib/dummy";
-import type { UseAgentChatResult } from "@/hooks/use-agent-chat";
 import { AppSidebar } from "./app-sidebar";
 import { ContextInspector } from "./context-inspector";
-import { ConnectionBanner } from "./connection-banner";
 import { KnowledgeManager, type KnowledgeManagerHandle } from "@/components/knowledge/knowledge-manager";
 import { KnowledgeNavigation } from "@/components/knowledge/navigation";
 import type { KnowledgeTarget } from "@/types/knowledge";
-import type { Session } from "@/types/workspace";
 import { EmptyState, ExampleSuggestions } from "./empty-state";
 import { AssistantMessage } from "./thread-messages";
 
-const SEED_SESSION_ID = SESSIONS[0]?.id ?? null;
 const INSPECTOR_MIN_WIDTH = 16 * 16;
 const INSPECTOR_MAX_WIDTH = 35 * 16;
 const CHAT_MIN_WIDTH = 32.5 * 16;
@@ -34,15 +30,12 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
 
 const THREAD_COMPONENTS = { Welcome: EmptyState, Suggestions: ExampleSuggestions, AssistantMessage };
 
-export function ChatWindow({ chat }: { chat: UseAgentChatResult }) {
-  const {
-    runtime,
-    streaming,
-    retryPrompt,
-    handleRetry,
-    resetConversation,
-  } = chat;
-
+export function ChatWindow() {
+  const aui = useAui();
+  const streaming = useAuiState((s) => s.thread.isRunning);
+  const activeTitle = useAuiState(
+    (s) => s.threads.threadItems.find((item) => item.id === s.threads.mainThreadId)?.title,
+  );
   const [view, setView] = useState<"chat" | "knowledge">("chat");
   const managerRef = useRef<KnowledgeManagerHandle>(null);
   const chatRef = useRef<HTMLDivElement>(null);
@@ -74,11 +67,6 @@ export function ChatWindow({ chat }: { chat: UseAgentChatResult }) {
     });
   }), [go]);
 
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(
-    SEED_SESSION_ID,
-  );
-  const [sessions, setSessions] = useState<Session[]>(SESSIONS);
-  const localSessionSequence = useRef(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
@@ -211,30 +199,25 @@ export function ChatWindow({ chat }: { chat: UseAgentChatResult }) {
 
   const handleNewChat = useCallback(() => {
     setView("chat");
-    const id = `local-current-${Date.now()}-${localSessionSequence.current++}`;
-    runtime.thread.composer.setText("");
-    resetConversation([]);
-    setSessions((current) => [
-      { id, title: "새 대화", lastActivity: "방금 전", group: "today", traces: [] },
-      ...current.filter((session) => !session.id.startsWith("local-current-")),
-    ]);
-    setActiveSessionId(id);
-  }, [resetConversation, runtime]);
+    // 이미 빈 새 대화라면 전환할 thread가 없으므로 입력 중이던 초안을 지워 초기화한다.
+    // 대화가 있는 thread의 초안은 그 thread에 남는다.
+    if (aui.thread.getState().isEmpty) aui.thread.composer().setText("");
+    aui.threads.switchToNewThread();
+  }, [aui]);
 
   const handleSelectSession = useCallback(
-    (id: string) => {
-      setView("chat");
-      // 더미: 시드 세션만 대화를 갖는다. 나머지는 빈 대화로 연다.
-      runtime.thread.composer.setText("");
-      resetConversation(id === SEED_SESSION_ID ? SEED_CONVERSATION : []);
-      setSessions((current) => current.filter((session) => !session.id.startsWith("local-current-")));
-      setActiveSessionId(id);
+    (id: string, active: boolean) => {
+      if (active) {
+        if (view === "knowledge") backToChat();
+        return;
+      }
+      go(() => {
+        setView("chat");
+        aui.threads.item({ id }).switchTo();
+      });
     },
-    [resetConversation, runtime],
+    [aui, backToChat, go, view],
   );
-
-  const activeSession =
-    sessions.find((s) => s.id === activeSessionId) ?? null;
 
   return (
     <KnowledgeNavigation.Provider value={openKnowledge}><div className="relative grid h-screen w-full grid-cols-[auto_minmax(0,1fr)_auto] overflow-hidden bg-canvas text-ink">
@@ -251,14 +234,7 @@ export function ChatWindow({ chat }: { chat: UseAgentChatResult }) {
       >
         <div className={`h-full w-[15.5rem] ${sidebarOpen ? "" : "invisible"}`}>
           <AppSidebar
-            sessions={sessions}
-            activeSessionId={activeSessionId}
-            onSelectSession={(id) => {
-              if (id === activeSessionId) {
-                if (view === "knowledge") backToChat();
-              }
-              else go(() => handleSelectSession(id));
-            }}
+            onSelectSession={handleSelectSession}
             onNewChat={() => go(() => handleNewChat())}
             onOpenKnowledge={() => openKnowledge()}
             knowledgeActive={view === "knowledge"}
@@ -280,7 +256,7 @@ export function ChatWindow({ chat }: { chat: UseAgentChatResult }) {
           )}
           <div className="min-w-0 flex-1">
             <h1 ref={managementTitle} tabIndex={-1} className="truncate text-ui font-semibold text-ink outline-none">
-              {view === "knowledge" ? "지식 관리" : activeSession ? activeSession.title : "새 대화"}
+              {view === "knowledge" ? "지식 관리" : activeTitle || "새 대화"}
             </h1>
             <p className="text-2xs text-ink-2">
               {streaming
@@ -301,7 +277,7 @@ export function ChatWindow({ chat }: { chat: UseAgentChatResult }) {
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
           {/* Preserve measured viewport geometry: display:none resets bottom-follow intent. */}
           <div ref={chatRef} style={view === "knowledge" ? { position: "absolute", inset: "0 auto 0 0", width: chatWidth.current, visibility: "hidden", pointerEvents: "none" } : undefined} className="flex min-h-0 min-w-0 flex-1 flex-col" aria-hidden={view !== "chat"}>
-            <Thread components={THREAD_COMPONENTS} autoScroll={view === "chat"} notice={retryPrompt ? <ConnectionBanner onRetry={handleRetry} retrying={streaming} /> : null} />
+            <Thread components={THREAD_COMPONENTS} autoScroll={view === "chat"} />
           </div>
           <div style={{ display: view === "knowledge" ? "flex" : "none" }} className="min-h-0 min-w-0 flex-1 flex-col" aria-hidden={view !== "knowledge"}>
             <KnowledgeManager ref={managerRef} />

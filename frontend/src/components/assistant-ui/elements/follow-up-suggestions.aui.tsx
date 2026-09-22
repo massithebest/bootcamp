@@ -1,80 +1,39 @@
 "use client";
 
-import { AuiIf, useAuiState, ThreadPrimitive } from "@assistant-ui/react";
-import { useCallback, useEffect, useRef, useState, type FC } from "react";
+import { AuiIf, ThreadPrimitive, useAuiState } from "@assistant-ui/react";
+import type { FC } from "react";
 
+/**
+ * 성공한 응답 뒤의 후속질문. 값은 Backend가 보낸 검증된 `done.data.suggestions`이며,
+ * 없거나 오류·취소·실행 중이면 표시하지 않는다. 클릭하면 바로 전송한다.
+ */
 const FollowupSuggestionsRow: FC = () => {
   const suggestions = useAuiState((s) => s.thread.suggestions);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const rtlRef = useRef<boolean | null>(null);
-  const [fades, setFades] = useState({ left: false, right: false });
-
-  const updateFades = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const maxScroll = el.scrollWidth - el.clientWidth;
-    // scrollLeft runs 0..-max in RTL; normalize to hidden width per physical edge.
-    const fromStart = Math.abs(el.scrollLeft);
-    // getComputedStyle forces a style recalc per scroll event; direction is stable, read it once.
-    const rtl = (rtlRef.current ??= getComputedStyle(el).direction === "rtl");
-    const [left, right] = rtl
-      ? [maxScroll - fromStart, fromStart]
-      : [fromStart, maxScroll - fromStart];
-    setFades((prev) => {
-      const next = { left: left > 1, right: right > 1 };
-      return prev.left === next.left && prev.right === next.right ? prev : next;
-    });
-  }, []);
-
-  useEffect(() => {
-    updateFades();
-    const el = scrollRef.current;
-    if (!el?.firstElementChild) return undefined;
-    const observer = new ResizeObserver(updateFades);
-    observer.observe(el);
-    observer.observe(el.firstElementChild);
-    return () => observer.disconnect();
-  }, [updateFades]);
-
-  const maskImage = `linear-gradient(to right, ${
-    fades.left ? "transparent, black 2rem" : "black"
-  }, ${fades.right ? "black calc(100% - 2rem), transparent" : "black"})`;
-
   return (
-    <div
-      ref={scrollRef}
-      onScroll={updateFades}
-      // overflow-x clips both axes; py-1/-my-1 gives focus rings vertical room without changing outer height.
-      className="aui-thread-followup-suggestions -my-1 w-full overflow-x-auto py-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      style={{ maskImage, WebkitMaskImage: maskImage }}
+    <ul
+      aria-label="후속 질문 제안"
+      data-slot="followup-suggestions"
+      className="flex flex-wrap gap-2 pb-2"
     >
-      <div className="mx-auto flex min-h-8 w-max items-center gap-2 px-0.5">
-        {suggestions.map((suggestion, idx) => (
+      {suggestions.map((suggestion) => (
+        <li key={suggestion.prompt}>
           <ThreadPrimitive.Suggestion
-            key={idx}
-            className="aui-thread-followup-suggestion bg-background hover:bg-muted/80 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors ease-in"
             prompt={suggestion.prompt}
             send
+            className="rounded-lg border border-line-strong bg-canvas px-3 py-1.5 text-left text-ui text-ink-2 transition-colors hover:bg-surface hover:text-ink"
           >
             {suggestion.title ?? suggestion.prompt}
-            {suggestion.label && (
-              <span className="aui-thread-followup-suggestion-label text-muted-foreground ms-1">
-                {suggestion.label}
-              </span>
-            )}
           </ThreadPrimitive.Suggestion>
-        ))}
-      </div>
-    </div>
+        </li>
+      ))}
+    </ul>
   );
 };
 
 export const ThreadFollowupSuggestions: FC = () => (
   <AuiIf
     condition={(s) =>
-      !s.thread.isEmpty &&
-      !s.thread.isRunning &&
-      s.thread.suggestions.length > 0
+      !s.thread.isEmpty && !s.thread.isRunning && s.thread.suggestions.length > 0
     }
   >
     <FollowupSuggestionsRow />

@@ -1,15 +1,23 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { fetchDocument, fetchKnowledgeEntries, fetchKnowledgeEntry, saveDocument, changeDocument } from "@/lib/knowledge-api";
+import { fetchChanges, fetchDocument, fetchKnowledgeEntries, fetchKnowledgeEntry, fetchMe, saveDocument, changeDocument } from "@/lib/knowledge-api";
+import { formatTime } from "@/lib/format-time";
 import { useKnowledgeResource } from "@/hooks/use-knowledge-resource";
-import { KNOWLEDGE_LABELS, STATUS_LABELS, type DocumentFields, type KnowledgeDocument, type KnowledgeEntry, type KnowledgeTarget } from "@/types/knowledge";
+import { KNOWLEDGE_LABELS, PERMISSION_WRITE, STATUS_LABELS, STRUCTURED_KINDS, type ChangeSummary, type DocumentFields, type KnowledgeDocument, type KnowledgeEntry, type KnowledgeTarget, type StructuredKind } from "@/types/knowledge";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { buttonClass, controlClass, EntryStatus, ResourceState } from "./shared";
 import { StructuredDetail } from "./structured-detail";
+import { ChangeStateBadge } from "./editor/change-badge";
+import { EntryEditor, type EditorTarget, type EntryEditorHandle } from "./editor/entry-editor";
+import { UserSwitcher } from "./editor/user-switcher";
 
 export interface KnowledgeManagerHandle { requestLeave: (next: () => void) => void; open: (target?: KnowledgeTarget) => void }
 type Form = Omit<DocumentFields, "tags"> & { tagsText: string };
 const emptyForm: Form = { title: "", content: "", category: "업무 지식", tagsText: "", owner: "", source: "" };
 const formFrom = (fields: DocumentFields): Form => ({ title: fields.title, content: fields.content, category: fields.category, tagsText: fields.tags.join(", "), owner: fields.owner, source: fields.source });
+const loadMine = (signal: AbortSignal) => fetchChanges({ mine: true }, signal);
+const loadQueue = (signal: AbortSignal) => fetchChanges({ state: "submitted" }, signal);
+type Segment = "all" | "mine" | "queue";
+const SEGMENTS: { id: Segment; label: string }[] = [{ id: "all", label: "전체" }, { id: "mine", label: "내 요청" }, { id: "queue", label: "검토 대기" }];
 const ACTION_LABELS: Record<string, string> = { save: "초안 저장", review: "검토 완료", activate: "활성화", deactivate: "비활성화", archive: "보관" };
 
 export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function KnowledgeManager(_, ref) {
@@ -32,14 +40,23 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
   const [status, setStatus] = useState("");
   const [active, setActive] = useState("");
   const [pending, setPending] = useState<(() => void) | null>(null);
+  const me = useKnowledgeResource(fetchMe);
+  const mine = useKnowledgeResource(loadMine);
+  const queue = useKnowledgeResource(loadQueue);
+  const [segment, setSegment] = useState<Segment>("all");
+  const [edit, setEdit] = useState<EditorTarget | null>(null);
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [session, setSession] = useState(0);
+  const editorRef = useRef<EntryEditorHandle>(null);
+  const canWrite = !!me.data?.knowledge_management && me.data.permissions.includes(PERMISSION_WRITE);
   const formRef = useRef<HTMLFormElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
+  const dirty = JSON.stringify(form) !== JSON.stringify(baseline) || (edit !== null && editorDirty);
   const requestLeave = useCallback((next: () => void) => {
     if (busy) return;
     if (dirty) setPending(() => next); else next();
   }, [busy, dirty]);
-  useImperativeHandle(ref, () => ({ requestLeave, open: target => { setSelection(target ?? null); setNotice(""); } }), [requestLeave]);
+  useImperativeHandle(ref, () => ({ requestLeave, open: target => { setSelection(target ?? null); setEdit(null); setNotice(""); } }), [requestLeave]);
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => { if (dirty) { event.preventDefault(); event.returnValue = ""; } };
     window.addEventListener("beforeunload", handler);
@@ -93,13 +110,23 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
     finally { setBusy(false); }
   }
   const rows = list.data?.filter(e => (!kind || e.type === kind) && (!status || e.status === status) && (!active || (active === "archived" ? e.archived : !e.archived && e.active === (active === "active"))));
-  const navigate = (next: KnowledgeTarget | "new" | null) => requestLeave(() => { setSelection(next); setNotice(""); });
+  const navigate = (next: KnowledgeTarget | "new" | null) => requestLeave(() => { setSelection(next); setEdit(null); setEditorDirty(false); setNotice(""); });
+  const openEditor = (target: EditorTarget, next: KnowledgeTarget | null) => requestLeave(() => { setSelection(next); setEdit(target); setSession(v => v + 1); setEditorDirty(false); setNotice(""); });
+  const closeEditor = () => requestLeave(() => { setEdit(null); setEditorDirty(false); setReload(v => v + 1); });
+  const hasPane = selection !== null || edit !== null;
+  const changeRows = segment === "mine" ? mine : queue;
+  const startNew = (kind: string) => { if (kind) openEditor({ type: "new", kind: kind as StructuredKind }, null); };
+  const changeRow = (c: ChangeSummary) => <li key={c.id}><button type="button" aria-current={edit?.type === "change" && edit.id === c.id ? "true" : undefined} className={`w-full space-y-1.5 border-l-2 px-3 py-3 text-left transition-colors hover:bg-surface-2 ${edit?.type === "change" && edit.id === c.id ? "border-accent bg-accent-weak" : "border-transparent"}`} onClick={() => openEditor({ type: "change", id: c.id }, null)}><span className="flex items-start justify-between gap-2"><span className="text-2xs font-medium text-ink-2">{KNOWLEDGE_LABELS[c.kind]}{c.is_new ? " · 새 지식" : ""}</span><ChangeStateBadge state={c.state} /></span><span className="block break-words text-ui font-semibold text-ink">{c.key}</span><span className="block text-2xs text-ink-2">작성 {c.author.name} · <span className="tabular-nums">{formatTime(c.updated_at)}</span></span></button></li>;
   const field = (name: keyof Form, label: string, max: number, multiline = false) => <label className="block space-y-1 text-ui" key={name}><span className="text-ink-2">{label}{name !== "tagsText" && " *"}</span>{multiline ? <textarea name={name} className={`${controlClass} min-h-64 resize-y`} required readOnly={!editable} maxLength={max} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })} /> : <input name={name} className={controlClass} required={name !== "tagsText"} readOnly={!editable} maxLength={max} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })} />}</label>;
   return <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-    <div className="shrink-0 border-b border-line px-5 py-3"><p className="text-ui text-ink-2">공용 지식 · 활성화 변경은 모든 대화의 이후 검색에 적용됩니다.</p><p className="mt-1 text-2xs text-ink-3">YAML 구조화 지식은 파일의 활성 상태를 읽기 전용으로 표시합니다. 작성자와 검토자 이름은 기록용입니다.</p></div>
+    <div className="shrink-0 border-b border-line px-5 py-3"><div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2"><div className="min-w-0"><p className="text-ui text-ink-2">공용 지식 · 활성화와 승인은 모든 대화의 이후 검색에 적용됩니다.</p><p className="mt-1 text-2xs text-ink-3">구조화 지식은 수정 요청을 만들고 승인 권한자가 승인하면 반영됩니다. 텍스트 지식의 작성자와 검토자 이름은 기록용입니다.</p></div>{me.data && <UserSwitcher me={me.data} />}</div></div>
     <div className="flex min-h-0 flex-1 overflow-hidden">
-      <section aria-label="지식 목록" className={`${selection ? "hidden lg:flex" : "flex"} thin-scroll w-full shrink-0 flex-col gap-3 overflow-y-auto border-r border-line p-4 lg:w-72`}>
+      <section aria-label="지식 목록" className={`${hasPane ? "hidden lg:flex" : "flex"} thin-scroll w-full shrink-0 flex-col gap-3 overflow-y-auto border-r border-line p-4 lg:w-72`}>
         <button className={buttonClass} disabled={busy} onClick={() => navigate("new")}>텍스트 지식 등록</button>
+        {canWrite && <select className={controlClass} aria-label="구조화 지식 추가" value="" disabled={busy} onChange={e => startNew(e.target.value)}><option value="">구조화 지식 추가…</option>{STRUCTURED_KINDS.map(k => <option key={k} value={k}>{KNOWLEDGE_LABELS[k]} 추가</option>)}</select>}
+        <div role="group" aria-label="목록 보기" className="flex gap-1">{SEGMENTS.map(item => { const count = item.id === "mine" ? mine.data?.filter(c => c.state === "draft" || c.state === "submitted" || c.state === "rejected").length : item.id === "queue" ? queue.data?.length : undefined; return <button key={item.id} type="button" aria-pressed={segment === item.id} className={`flex-1 rounded border px-2 py-1.5 text-ui focus-visible:outline-2 focus-visible:outline-accent ${segment === item.id ? "border-accent bg-accent-weak font-semibold text-accent" : "border-line-strong text-ink-2 hover:bg-surface-2"}`} onClick={() => setSegment(item.id)}>{item.label}{count ? <span className="ml-1 tabular-nums">{count}</span> : null}</button>; })}</div>
+        {segment !== "all" && <><ResourceState {...changeRows} retry={changeRows.reload} />{changeRows.data && changeRows.data.filter(c => segment === "queue" || ["draft", "submitted", "rejected"].includes(c.state)).length === 0 && <p className="text-ui text-ink-3">{segment === "queue" ? "검토를 기다리는 요청이 없습니다." : "진행 중인 내 요청이 없습니다. 지식을 열어 수정 요청을 만들 수 있습니다."}</p>}<ul className="divide-y divide-line">{changeRows.data?.filter(c => segment === "queue" || ["draft", "submitted", "rejected"].includes(c.state)).map(changeRow)}</ul></>}
+        {segment === "all" && <>
         <input className={controlClass} aria-label="관리 지식 검색" placeholder="제목·본문·출처 검색" value={query} onChange={e => setQuery(e.target.value)} />
         <select className={controlClass} aria-label="관리 지식 유형" value={kind} onChange={e => setKind(e.target.value)}><option value="">전체 유형</option>{Object.entries(KNOWLEDGE_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>
         <div className="flex gap-2"><select aria-label="검토 상태" className={controlClass} value={status} onChange={e => setStatus(e.target.value)}><option value="">전체 검토 상태</option><option value="draft">미검토</option><option value="verified">검토 완료</option></select><select aria-label="활성 여부" className={controlClass} value={active} onChange={e => setActive(e.target.value)}><option value="">전체 사용 상태</option><option value="active">검색 반영</option><option value="inactive">검색 제외</option><option value="archived">보관됨</option></select></div>
@@ -107,17 +134,20 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
         {rows?.length === 0 && <p className="text-ui text-ink-3">일치하는 지식이 없습니다.</p>}
         <ul className="divide-y divide-line">{rows?.map(e => {
           const selected = selection && selection !== "new" && selection.id === e.id && selection.kind === e.type;
-          return <li key={`${e.type}:${e.id}`}><button type="button" aria-current={selected ? "true" : undefined} className={`w-full space-y-1.5 border-l-2 px-3 py-3 text-left transition-colors hover:bg-surface-2 ${selected ? "border-accent bg-accent-weak" : "border-transparent"}`} onClick={() => navigate({ kind: e.type, id: e.id })}><span className="flex items-start justify-between gap-2"><span className="text-2xs font-medium text-ink-2">{KNOWLEDGE_LABELS[e.type]}</span><EntryStatus entry={e} /></span><span className="block break-words text-ui font-semibold text-ink">{e.title}</span><span className="block line-clamp-2 text-2xs leading-relaxed text-ink-2">{e.summary || "요약 없음"}</span></button></li>;
+          return <li key={`${e.type}:${e.id}`}><button type="button" aria-current={selected ? "true" : undefined} className={`w-full space-y-1.5 border-l-2 px-3 py-3 text-left transition-colors hover:bg-surface-2 ${selected ? "border-accent bg-accent-weak" : "border-transparent"}`} onClick={() => navigate({ kind: e.type, id: e.id })}><span className="flex items-start justify-between gap-2"><span className="text-2xs font-medium text-ink-2">{KNOWLEDGE_LABELS[e.type]}</span><EntryStatus entry={e} /></span><span className="block break-words text-ui font-semibold text-ink">{e.title}</span><span className="block line-clamp-2 text-2xs leading-relaxed text-ink-2">{e.summary || "요약 없음"}</span>{e.pending_change && <span className="flex items-center gap-1.5 text-2xs text-ink-2">변경 요청 <ChangeStateBadge state={e.pending_change.state} /></span>}</button></li>;
         })}</ul>
+        </>}
       </section>
-      <section aria-label="지식 상세" className={`${selection ? "flex" : "hidden lg:flex"} thin-scroll min-w-0 flex-1 flex-col overflow-y-auto p-4 sm:p-6`}>
-        {selection && <button className={`${buttonClass} mb-4 self-start lg:hidden`} onClick={() => navigate(null)}>← 목록으로</button>}
-        {!selection && <p className="my-auto text-center text-ui text-ink-3">지식을 선택해 내용을 확인하거나 텍스트 지식을 등록하세요.</p>}
+      <section aria-label="지식 상세" className={`${hasPane ? "flex" : "hidden lg:flex"} thin-scroll min-w-0 flex-1 flex-col overflow-y-auto p-4 sm:p-6`}>
+        {hasPane && <button className={`${buttonClass} mb-4 self-start lg:hidden`} onClick={() => navigate(null)}>← 목록으로</button>}
+        {!hasPane && <p className="my-auto text-center text-ui text-ink-3">지식을 선택해 내용을 확인하거나 텍스트 지식을 등록하세요.</p>}
         <div className="mx-auto w-full max-w-4xl space-y-4">
+          {edit && <EntryEditor key={session} ref={editorRef} target={edit} me={me.data} onDirtyChange={setEditorDirty} onTarget={setEdit} onClose={closeEditor} />}
+          {!edit && <>
           {selection && <h2 ref={titleRef} tabIndex={-1} className="text-ui-lg font-semibold outline-none">{selection === "new" ? "텍스트 지식 등록" : entry?.title ?? selectedVersion?.title ?? "지식 상세"}</h2>}
           <ResourceState loading={loading} error={error} retry={() => requestLeave(() => setReload(v => v + 1))} />
           {notice && <p role="status" className="border-l-2 border-ok-ink bg-ok-weak p-3 text-ui">{notice}</p>}
-          {entry && <><EntryStatus entry={entry} /><p className="text-ui text-ink-2">구조화 지식 · 읽기 전용 · 담당: {entry.owner || "미기록"} · 출처: {entry.source || "미기록"}</p><StructuredDetail data={entry.detail ?? {}} /></>}
+          {entry && <><div className="flex flex-wrap items-center justify-between gap-3"><EntryStatus entry={entry} />{entry.pending_change ? <span className="flex flex-wrap items-center gap-3 text-ui text-ink-2">진행 중인 변경 요청 <ChangeStateBadge state={entry.pending_change.state} /><button type="button" className={buttonClass} onClick={() => openEditor({ type: "change", id: entry.pending_change!.id }, selection === "new" ? null : selection)}>요청 열기</button></span> : canWrite && entry.type !== "document" ? <button type="button" className={buttonClass} onClick={() => openEditor({ type: "entry", kind: entry.type as StructuredKind, key: entry.id }, selection === "new" ? null : selection)}>수정 요청</button> : <span className="text-2xs text-ink-3">{me.data ? "작성 권한이 없어 볼 수만 있습니다." : ""}</span>}</div><p className="text-ui text-ink-2">구조화 지식 · 담당: {entry.owner || "미기록"} · 출처: {entry.source || "미기록"}</p><StructuredDetail data={entry.detail ?? {}} /></>}
           {(selection === "new" || doc) && !loading && <>
             {doc && selectedVersion && <><div className="flex flex-wrap items-center gap-3"><EntryStatus entry={{ status: selectedVersion.status, active: doc.active_version !== null, archived: doc.archived }} /><span className="text-2xs text-ink-2">표시 v{selectedVersion.version} · 검색 버전 {doc.active_version ? `v${doc.active_version}` : "없음"}</span>{historical && <button className={buttonClass} onClick={() => navigate({ kind: "document", id: doc.id })}>최신 버전 열기</button>}</div>{historical && <p className="text-ui text-ink-2">인용한 버전의 보존된 내용입니다. 최신 내용 및 현재 검색 상태와 다를 수 있습니다.</p>}</>}
             <form ref={formRef} onSubmit={e => { e.preventDefault(); void save(); }} className="space-y-4">
@@ -136,9 +166,10 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
               <details className="border-t border-line pt-4"><summary className="cursor-pointer text-ui font-semibold">버전 및 변경 이력 ({doc.versions.length}개 버전)</summary><div className="my-3 flex flex-wrap gap-2">{doc.versions.map(v => <button key={v.version} className={buttonClass} onClick={() => navigate({ kind: "document", id: doc.id, version: v.version })}>v{v.version} · {STATUS_LABELS[v.status]}</button>)}</div><ul className="space-y-2">{doc.history.map(h => <li key={h.revision} className="text-2xs text-ink-2">{h.at} · {ACTION_LABELS[h.action] ?? h.action} {h.version && `v${h.version}`} · {h.actor}<p>{h.note}</p></li>)}</ul></details>
             </>}
           </>}
+          </>}
         </div>
       </section>
     </div>
-    <Dialog open={pending !== null} onOpenChange={open => { if (!open && !busy) setPending(null); }}><DialogContent showCloseButton={!busy}><DialogTitle>저장하지 않은 변경</DialogTitle><DialogDescription>이동하기 전에 초안을 저장하거나 변경을 취소하세요.</DialogDescription><div className="flex flex-wrap gap-2"><button className={buttonClass} disabled={busy} onClick={async () => { const next = pending; if (await save()) { setPending(null); next?.(); } }}>저장 후 이동</button><button className={buttonClass} disabled={busy} onClick={() => { const next = pending; setForm(baseline); setPending(null); next?.(); }}>변경 취소 후 이동</button><button className={buttonClass} disabled={busy} onClick={() => setPending(null)}>계속 편집</button></div></DialogContent></Dialog>
+    <Dialog open={pending !== null} onOpenChange={open => { if (!open && !busy) setPending(null); }}><DialogContent showCloseButton={!busy}><DialogTitle>저장하지 않은 변경</DialogTitle><DialogDescription>이동하기 전에 초안을 저장하거나 변경을 취소하세요.</DialogDescription><div className="flex flex-wrap gap-2"><button className={buttonClass} disabled={busy} onClick={async () => { const next = pending; if (await (edit ? editorRef.current?.save() : save())) { setPending(null); next?.(); } }}>저장 후 이동</button><button className={buttonClass} disabled={busy} onClick={() => { const next = pending; setForm(baseline); setEditorDirty(false); setPending(null); next?.(); }}>변경 취소 후 이동</button><button className={buttonClass} disabled={busy} onClick={() => setPending(null)}>계속 편집</button></div></DialogContent></Dialog>
   </div>;
 });

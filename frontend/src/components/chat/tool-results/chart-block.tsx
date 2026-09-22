@@ -1,4 +1,6 @@
 import type { ChartSpec, VisualizationWarning } from "@/types/chat";
+import { TYPE_LABEL, chartSummary } from "@/lib/chart-summary";
+import { AreaChartView } from "./charts/area-chart-view";
 import { BarChartView } from "./charts/bar-chart-view";
 import { LineChartView } from "./charts/line-chart-view";
 import { DataTable, Disclosure } from "../primitives";
@@ -7,14 +9,16 @@ import { DataTable, Disclosure } from "../primitives";
 export function ChartBlock({
   chart,
   warnings = [],
+  alwaysLegend = false,
 }: {
   chart: ChartSpec;
   warnings?: VisualizationWarning[];
+  alwaysLegend?: boolean;
 }) {
   return (
     <section
       className="flex flex-col gap-2 rounded border border-line bg-surface p-3"
-      aria-label={chart.title ?? `${chart.type === "line" ? "선" : "막대"} 차트`}
+      aria-label={chart.title ?? `${TYPE_LABEL[chart.type]} 차트`}
     >
       {(chart.title || chart.unit) && (
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -22,10 +26,12 @@ export function ChartBlock({
           {chart.unit && <span className="text-2xs text-ink-2">단위: {chart.unit}</span>}
         </div>
       )}
+      <p className="sr-only">{chartSummary(chart)}</p>
       <div className="thin-scroll overflow-x-auto">
         <div className="min-w-[32rem]">
-          {chart.type === "bar" && <BarChartView chart={chart} />}
-          {chart.type === "line" && <LineChartView chart={chart} />}
+          {chart.type === "bar" && <BarChartView chart={chart} alwaysLegend={alwaysLegend} />}
+          {chart.type === "line" && <LineChartView chart={chart} alwaysLegend={alwaysLegend} />}
+          {chart.type === "area" && <AreaChartView chart={chart} alwaysLegend={alwaysLegend} />}
         </div>
       </div>
       <Disclosure summary="차트 데이터 표로 보기" dense>

@@ -93,9 +93,10 @@ body {
     animation-duration: 0.01ms !important;
   }
 
-  /* The adjacent status text still communicates activity without motion. */
+  /* 실행 중 표시(회전)는 진행 상태를 알리는 신호라 모션 감소에서도 유지한다. */
   .execution-activity-spinner {
-    animation: none !important;
+    animation-duration: 0.6s !important;
+    animation-iteration-count: infinite !important;
   }
 }
 
@@ -199,3 +200,29 @@ body {
  */
 
 @custom-variant data-closed (&:where([data-state="closed"], [data-closed]:not([data-closed="false"])));
+
+/*
+ * `present` Generative UI의 unstyled `data-aui` hook을 semantic token에 매핑한다.
+ * 카드·그림자로 꾸미지 않고 간격과 1px 룰로 구획한다. 색은 token만 쓴다.
+ */
+[data-aui="root"] {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+[data-aui="card"] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+[data-aui="card"] + [data-aui="card"] {
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+[data-aui="card-title"] {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ink);
+}

@@ -1,0 +1,138 @@
+{
+  "$comment": "Backend services/present_service.py VOCABULARY의 사본. Backend 계약을 바꾸면 함께 갱신한다.",
+  "components": {
+    "Card": {
+      "children": "any",
+      "props": {
+        "padding": {
+          "maximum": 8,
+          "minimum": 0,
+          "type": "number"
+        },
+        "title": {
+          "maxLength": 120,
+          "type": "string"
+        }
+      },
+      "required": []
+    },
+    "QueryChart": {
+      "children": "none",
+      "props": {
+        "aggregation": {
+          "enum": [
+            "sum",
+            "avg",
+            "count",
+            "min",
+            "max"
+          ],
+          "type": "string"
+        },
+        "chartType": {
+          "enum": [
+            "bar",
+            "line",
+            "area"
+          ],
+          "type": "string"
+        },
+        "groupByColumn": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resultId": {
+          "pattern": "^[0-9a-f]{32}$",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 120,
+          "type": "string"
+        },
+        "xColumn": {
+          "maxLength": 200,
+          "type": "string"
+        },
+        "yColumn": {
+          "maxLength": 200,
+          "type": "string"
+        }
+      },
+      "required": [
+        "resultId",
+        "chartType",
+        "xColumn",
+        "yColumn"
+      ]
+    },
+    "QueryTable": {
+      "children": "none",
+      "props": {
+        "columns": {
+          "maxItems": 50,
+          "type": "array"
+        },
+        "resultId": {
+          "pattern": "^[0-9a-f]{32}$",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 120,
+          "type": "string"
+        }
+      },
+      "required": [
+        "resultId"
+      ]
+    },
+    "SimulationSummary": {
+      "children": "result",
+      "props": {
+        "kpis": {
+          "maxItems": 12,
+          "type": "array"
+        },
+        "resultId": {
+          "pattern": "^[0-9a-f]{32}$",
+          "type": "string"
+        },
+        "scenario": {
+          "maxLength": 200,
+          "type": "string"
+        },
+        "summary": {
+          "maxLength": 2000,
+          "type": "string"
+        }
+      },
+      "required": [
+        "scenario",
+        "summary",
+        "kpis"
+      ]
+    },
+    "SqlPreview": {
+      "children": "none",
+      "props": {
+        "sql": {
+          "maxLength": 20000,
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 120,
+          "type": "string"
+        }
+      },
+      "required": [
+        "sql"
+      ]
+    }
+  }
+}

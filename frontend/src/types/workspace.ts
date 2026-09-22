@@ -4,20 +4,6 @@
  * 향후 Backend Memory / History / Skills API 와 연결할 때의 인터페이스 형태를 잡아 둔다.
  */
 
-/** 세션에서 주로 쓰인 도구 흔적. 사이드바 세션 항목에 표식으로 노출한다. */
-export type ToolTrace = "query" | "document" | "simulation";
-
-export interface Session {
-  id: string;
-  title: string;
-  /** 마지막 활동 시각 (표시용 문자열). */
-  lastActivity: string;
-  /** 시간 그룹핑 키. */
-  group: "today" | "week" | "earlier";
-  /** 이 세션에서 실제 실행된 도구 종류. */
-  traces: ToolTrace[];
-}
-
 /**
  * 에이전트가 선택해 쓰는 Skill. `GET /api/knowledge/skills` 응답 형태다.
  *

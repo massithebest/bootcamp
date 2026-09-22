@@ -1,4 +1,5 @@
-/** 순수 AgentEvent 상태 전이. 상태·요청 수명주기의 소유자는 useAgentChat이다. */
+/** 순수 AgentEvent 상태 전이. 상태·요청 수명주기의 소유자는 assistant-ui LocalRuntime과 lib/chat-model-adapter.ts다. */
+import { parseSuggestions } from "./suggestions";
 import type {
   AgentEvent, ChatMessage, StatusStep, StepStatus, ToolResult,
 } from "@/types/chat";
@@ -88,6 +89,8 @@ export function applyAgentEvent(m: ChatMessage, event: AgentEvent, partId: strin
         observedTiming: finishObservedTiming(m.observedTiming, observedAt),
         runState: m.runState.type === "running" ? { type: "complete" } : m.runState,
         turnId: asString(event.data?.turn_id) ?? m.turnId,
+        // 오류·취소 뒤의 done에는 후속질문을 붙이지 않는다.
+        ...(m.runState.type === "running" ? { suggestions: parseSuggestions(event.data?.suggestions) } : {}),
       };
   }
 }

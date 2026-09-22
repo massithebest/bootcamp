@@ -56,7 +56,8 @@ export function parseAgentEvent(payload: string): AgentEvent {
   const event = value as Record<string, unknown>;
   const type = event.type;
   if (type !== "text" && type !== "status" && type !== "tool_call" &&
-      type !== "tool_result" && type !== "error" && type !== "done") {
+      type !== "tool_result" && type !== "error" &&
+      type !== "done") {
     throw new Error("Invalid AgentEvent type");
   }
   if ((event.content != null && typeof event.content !== "string") ||

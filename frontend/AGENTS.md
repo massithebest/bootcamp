@@ -21,9 +21,12 @@ Vite 7, React 18, strict TypeScript 기반의 라우터 없는 SPA다. 코드 �
   primitive는 `components/ui`, assistant-ui Elements 복사·조정 소스는
   `components/assistant-ui/elements`, 기능 UI는 `components/chat`, 동작과
   상태는 `hooks`, 통신·adapter는 `lib`, 계약은 `types`에 둔다.
-- assistant-ui는 thread, composer, viewport, action bar와 Markdown UI를 맡는다.
-  애플리케이션 메시지와 SSE·retry·cancel·edit·regenerate 상태는
-  `hooks/use-agent-chat.ts`가 소유하고 `useExternalStoreRuntime`으로 노출한다.
+- assistant-ui는 thread 목록·메시지 저장·분기·취소·편집·재생성, composer, viewport,
+  action bar와 Markdown UI를 맡는다. `hooks/use-agent-runtime.ts`가
+  `useRemoteThreadListRuntime` + thread별 `useLocalRuntime`을 조립하고,
+  `lib/chat-model-adapter.ts`가 Backend SSE를 `ChatModelAdapter`로 감싼다.
+  thread 목록·메시지(history)는 `lib/agent-threads.ts`의 메모리 저장소이며 브라우저
+  세션 동안만 유지된다. 영속 API가 생기면 이 파일의 adapter만 교체한다.
 - `@ai-sdk/react`, `useChat`, `streamdown`, AI SDK streaming protocol을 도입하지
   않는다. 브라우저 통신은 `lib/chat-api.ts`의 `fetch`/`ReadableStream` SSE를
   유지하고 외부 LLM provider를 직접 호출하지 않는다.
@@ -35,13 +38,19 @@ Vite 7, React 18, strict TypeScript 기반의 라우터 없는 SPA다. 코드 �
 - 현재 설치 기준은 `@assistant-ui/react` 0.15.19와
   `@assistant-ui/react-markdown` 0.14.15다. 변경 전 공식 문서와 설치된 타입 선언을
   함께 확인한다. 문서: <https://www.assistant-ui.com/llms-full.txt>
-- 앱 루트의 `AssistantRuntimeProvider`, 전체 화면 `Thread`,
-  `useExternalStoreRuntime` 조합을 유지한다. `useChatRuntime`과 AI SDK transport로
+- 앱 루트의 `AssistantRuntimeProvider`, 전체 화면 `Thread`, LocalRuntime
+  (`ChatModelAdapter`) 조합을 유지한다. `useChatRuntime`과 AI SDK transport로
   전환하려면 별도 Frontend 계획과 streaming 기대 계약 변경이 필요하다.
+- Generative UI는 Python Backend가 실행한 `present` Tool args를
+  `@assistant-ui/react-generative-ui`의 `renderGenerativeUI`로 그린다. `defineGenerativeComponents`는
+  compiler 없이 실행 시 예외를 던지므로 쓰지 않고
+  `components/chat/generative/library.tsx`에 같은 형태의 일반 객체 library를 둔다.
+  `@assistant-ui/vite`·`"use generative"`는 도입하지 않는다.
 - floating `AssistantModal`은 현재 제품 구조가 아니며 3-pane에 중복 채팅 UI를
   추가하지 않는다.
 - 공통 UI는 공식 Elements를 우선 사용하고 도메인 기능은 슬롯으로 확장한다.
-  standalone `ThreadList`는 예시 세션 UI이며 영속 저장 기능을 의미하지 않는다.
+  대화 목록은 `ThreadListPrimitive`(`app-sidebar.tsx`)이며 이번 브라우저 세션 동안만
+  유지된다. 영속 저장 기능을 의미하지 않는다.
 - MCP·Skill·registry는 개발 참고 도구다. 실행 앱에 원격 MCP·Cloud·CDN 연결을
   추가하지 않는다. 반입 소스와 변경 이유는 [전환 결정](docs/decisions.md)에 남긴다.
 
@@ -59,9 +68,17 @@ Vite 7, React 18, strict TypeScript 기반의 라우터 없는 SPA다. 코드 �
   앞선 표·차트와 해석을 버리지 않는다. 일반 Tool 직전의 공개 `text`는 해당
   Tool이 실행 중인 동안만 `progressText`로 유지하고, ToolGroup 상단이 아닌
   현재 Tool 행 바로 위에 표시한다. 결과·다음 공개 출력·종료에서 제거한다.
-  SDK thinking은 이 경로에 넣지 않는다.
   `AgentEvent`, `done.data.turn_id`, `fork_from_turn_id`와 tool result kind는
   백엔드 계약과 동기화한다.
+- `present`(`RESULT_UI_MODE=present`)의 standalone Tool UI는 모델이 만든 `$type` 트리를
+  `components/chat/generative`의 vocabulary(`SqlPreview`·`QueryChart`·`QueryTable`·
+  `SimulationSummary` + 여러 결과를 묶는 `Card`)로 그린다. 트리에는 `resultId`와 표시
+  설정만 있고 표·차트는 `/api/query-results/{resultId}/table|chart`를 서버 page·집계
+  단위로 조회한다(`lib/query-result-api.ts`). `QueryTable`은 TanStack Table 수동 모드로
+  저장된 최대 1,000건에 대한 서버 검색·열 정렬·pagination을 사용하고 기본 10행만 받는다.
+  Backend `present` vocabulary와 prop 이름·
+  타입을 같게 유지하고 `tests/fixtures/present-vocabulary.json`(Backend 사본)을 함께
+  갱신한다. 새 결과 API의 404는 없음·만료·접근 불가를 구분하지 않는다.
 - `prepare_visualization`의 standalone Tool UI는 성공 결과의 `visualization_id`만
   읽고 `/api/visualizations/{id}` 응답을 검증한 뒤 bar/line으로 렌더링한다.
   기존 `chart` fence는 과거 메시지 호환용이며 새 응답에는 생성하지 않는다.
@@ -106,4 +123,8 @@ npm run preview
   개발 서버의 `/tests/chat-browser.html`, `/tests/knowledge-browser.html`,
   `/tests/workbench-browser.html`을 목적에 맞게 사용한다. formatter는 아직 없다.
 - UI 변경은 loading·empty·error, 키보드·focus·label, tool card와 chart/table
-  fallback, 좁은 화면부터 desktop까지 수동 확인한다.
+  fallback을 데스크톱 브라우저에서 수동 확인한다.
+- **모바일 환경은 검증하지 않는다.** 이 앱은 모바일에서 구동하지 않는다. 검증·테스트에서
+  휴대폰·태블릿 viewport(예: ~400px)로 창을 줄이거나 device emulation·터치 시뮬레이션을
+  쓰지 않고, 그런 검증 항목을 문서나 테스트에 추가하지 않는다. 브라우저 확인은
+  1280px 이상 데스크톱 폭(예: 1440×900)에서 한다.

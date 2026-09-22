@@ -22,11 +22,12 @@
 - **실제로 연결되지 않은 기능을 동작하는 것처럼 표현하지 않는다.** 버튼을
   누르면 정말 무언가 바뀌어야 한다. 저장·설정처럼 아직 백엔드 계약이 없는
   기능은 읽기 전용으로 보여주거나 명시적으로 비활성화하고 이유를 밝힌다
-  (`app-sidebar.tsx`의 설정 버튼 참고). 지식 변경은 서버에서 관리 기능을 켠 경우에만 제공한다.
-- **비공개 chain-of-thought를 노출하지 않는다.** `status` 이벤트는 모델의
-  내부 reasoning이 아니라 사용자용 업무 진행 단계(질문 분석→데이터 확인→
-  SQL 조회→시뮬레이션→결과 분석→답변)다. Tool과 독립적인 공개 단계는
-  실행 과정 안의 `AgentPlan`으로만 표현한다.
+  (`app-sidebar.tsx`의 설정 버튼 참고). 지식 변경은 서버(`GET /api/me`의 `knowledge_management`와 권한)가 허용한 경우에만 제공한다.
+- **모델 추론(reasoning)과 업무 단계를 구분한다.** `status` 이벤트는 모델의
+  reasoning이 아니라 사용자용 업무 진행 단계(질문 분석→데이터 확인→
+  SQL 조회→시뮬레이션→결과 분석→답변)이며 실행 과정 안의 `AgentPlan`으로만 표현한다.
+  모델 thinking(chain-of-thought)은 어떤 경우에도 공개하지 않는다(추정 추론·`status`를
+  추론처럼 위장하는 표시 금지).
 
 ## Layout 기준
 
@@ -44,9 +45,10 @@
   않는다) — 그래야 사용자가 임계값 아래에서 직접 펼친 pane을 창 드래그 중
   발생하는 연속 resize 이벤트가 다시 강제로 닫지 않는다
   (`chat-window.tsx`의 `prevWidthRef` 패턴 참고).
-- 모바일 최적화는 비범위이지만, ~400px까지 가로 스크롤이나 잘리는 컨트롤이
-  없어야 한다. Sidebar/Inspector가 접힌 상태에서 Chat 컬럼과 Composer만으로
-  구성이 성립해야 한다.
+- **모바일 환경은 지원하지 않으며 검증하지 않는다.** 이 앱은 데스크톱 브라우저에서만
+  구동한다. 휴대폰·태블릿 폭(예: ~400px) 확인, 터치 조작, 모바일 device emulation,
+  모바일 가상 키보드는 검증 항목이 아니다. 창 폭 임계값(860/1180px) 동작은
+  데스크톱 창을 줄였을 때의 제품 동작이므로 유지한다.
 - 각 pane은 독립적으로 스크롤한다. `min-h-0`/`min-w-0`/`overflow-hidden`/
   `shrink-0`으로 만든 스크롤 체인을 건드리지 않는다.
 - 100행 이하 inline 표(도구 결과 표, Markdown 표)는 가로 스크롤에 더해
@@ -133,8 +135,7 @@
   `text`는 해당 Tool이 실행 중일 때만 현재 Tool 행 바로 위에 일반 텍스트로
   유지한다. ToolGroup 상단의 별도 강조 블록으로 올리지 않고, Tool 결과가
   도착하면 즉시 제거한다. 일반 모션 환경에서 실행 중 헤더의 좌측 아이콘은 계속 회전하고,
-  reduced-motion에서는 정적 아이콘과 상태 텍스트를 사용한다. 한글 라벨과 아이콘의 광학적 중심을 맞춘다. 비공개 SDK thinking을 이
-  UI에 연결하지 않는다.
+  reduced-motion에서도 실행 중 아이콘 회전은 유지한다(진행 신호이며 상태 텍스트를 함께 둔다). 한글 라벨과 아이콘의 광학적 중심을 맞춘다.
 - **Tool 결과**(`tool-result-card.tsx`): 개별 Tool 상세는 종류와 관계없이
   기본 접힘이며 ToolGroup 안에서 두 번째 disclosure 단계가 된다. 접힌 헤더는
   `tool_name · 요약`(예: `execute_sql · 10행`) 형식을 유지한다. 결과가 도착하기
@@ -143,7 +144,15 @@
   보이는 trigger로 복원하며 외부 입력 포커스는 유지한다.
   브라우저에서 실제로 측정한 시간만 `응답 시간`으로 표시하고 서버 처리 시간으로
   표현하지 않는다.
-- **Standalone 표**(`interactive-data-table.tsx`): `prepare_table`이 검증해 보낸
+- **조합형 결과**(`components/chat/generative/`): `present`가 만든 트리는 `SqlPreview`(기본 접힘·복사),
+  `QueryChart`(서버 집계 chart, 항상 보이는 범례·`sr-only` 요약·표 대안·reduced-motion 시 animation 없음),
+  `QueryTable`(TanStack Table 수동 모드, 서버 검색·열 정렬·page, 기본 10행,
+  loading 중에도 직전 표 유지), `SimulationSummary`로 그린다. `QueryTable`은 저장된 최대
+  1,000건 전체에 서버에서 검색·정렬을 적용하고 현재 page만 받는다.
+  package의 unstyled `data-aui` hook은 `globals.css`에서 semantic token에 매핑한다.
+  새 결과 API 오류는 "결과를 찾을 수 없습니다(만료되었거나 접근할 수 없음)" 한 상태로 알리고 재시도는
+  network·형식 오류에만 둔다.
+- **Standalone 표**(`interactive-data-table.tsx`, legacy `prepare_table`): Backend가 검증해 보낸
   최대 100행 안에서 검색·열 정렬·페이지 크기 10/25/50/100과 이전/다음 이동을
   제공한다. 원본 건수와 실제 포함 건수를 함께 표시하고 잘린 결과를 알린다.
   표 본문은 최대 `32rem` 높이에서 내부 스크롤한다.
@@ -153,9 +162,11 @@
   긴 본문·링크·inline code는 줄바꿈하고 표·코드 블록의 내부 스크롤은 보존한다.
   표 중복 제거는 standalone payload와 컬럼·행이 확인된 경우에만 적용한다.
 - **메시지 액션**: Copy/Edit/Reload primitives를 유지하며 hover 없이도 키보드로
-  접근하도록 액션 DOM을 유지한다. 재생성은 손실 영향을 먼저 확인하고 취소 시
-  대화를 보존한다. 사용자 요청에 따라 새 채팅·예시 세션 교체에는 확인창을 띄우지 않는다.
-  지식 편집의 미저장 변경 보호는 별도로 유지한다. DB 세션 관리는 후속 범위다.
+  접근하도록 액션 DOM을 유지한다. 편집·재생성은 이전 내용을 지우지 않고 새 분기로
+  남기므로 확인창을 띄우지 않고, 대안이 둘 이상일 때만 `BranchPickerPrimitive`
+  (`이전/다음 질문·답변`, `n / m`)를 보인다. 분기는 이번 브라우저 세션 동안만 유지된다.
+  새 채팅·대화 전환에도 확인창을 띄우지 않는다. 지식 편집의 미저장 변경 보호는
+  별도로 유지한다. DB 세션 관리는 후속 범위다.
 - **좁은 화면 패널**: 기존 860/1180px 접힘 임계값을 유지한다. 임계값 아래 재개방은
   Chat 폭을 줄이지 않는 비모달 overlay이며 Escape/닫기 시 여는 조작으로 복귀한다.
   Tab으로 패널을 벗어나면 닫되 이동한 포커스를 빼앗지 않는다.
@@ -166,14 +177,15 @@
   Shift+Enter/자동 높이/실행 중 비활성을 소유한다. Send/Stop은 `AuiIf`로
   전환하고 직접 상태를 구독해 조건부 렌더하지 않는다. Input에는 반드시
   `aria-label`을 둔다(placeholder만으로 접근성 이름을 대신하지 않는다).
-- **Sidebar**(`app-sidebar.tsx`): 세션 목록이 아직 영속 저장소가 아니므로
-  상단 전역 메뉴는 `새 채팅` → `지식 관리`, 그 아래는 최근 대화 목록으로
+- **Sidebar**(`app-sidebar.tsx`): 대화 목록은 assistant-ui `ThreadListPrimitive`이고
+  이번 브라우저 세션 동안만 유지되므로 상단 전역 메뉴는 `새 채팅` → `지식 관리`, 그 아래는 최근 대화 목록으로
   구성한다. 지식 관리에서 채팅으로 돌아갈 때 중앙 헤더에 별도 복귀 버튼이나
   `채팅` 메뉴를 두지 않고, 현재로 표시된 최근 대화 항목을 사용한다. 같은 항목을
-  누르면 Composer·스트리밍·스크롤을 보존해 복귀한다. `새 채팅`은 대화를
-  초기화하고 현재 실행 동안 `새 대화 · 방금 전` 항목을 최근 목록에 추가한다.
-  세션 목록이 아직 영속 저장소가 아니므로
-  "예시 세션 · 현재 대화만 유지됩니다" 같은 안내를 목록 위에 유지한다.
+  누르면 Composer·스트리밍·스크롤을 보존해 복귀한다. `새 채팅`은 새 thread로 전환하고
+  (이미 빈 새 대화라면 초안을 지운다) 첫 질문 전에는 `새 대화` 항목이 현재로 표시된다.
+  대화가 있는 thread의 Composer 초안은 그 thread에 남는다. 다른 thread가 응답 중이어도
+  전환할 수 있으며 목록에 `응답 중…`으로 표시한다. 제목은 첫 질문을 줄인 값이다.
+  "현재 브라우저 세션 동안만 유지됩니다" 같은 안내를 목록 위에 유지한다.
   실제 persistence 계약이 생기기 전까지 이 안내를 지우지 않는다. 실제로
   연결되지 않은 액션(설정 등)은 `disabled` + `title`로 이유를 밝힌다.
 - **Inspector**(`context-inspector.tsx`): 도구 → 스킬 → 지식 순의 읽기 전용 조회다.
@@ -192,8 +204,14 @@
   생략한다. `query_rules`, `aggregation_rules`, `visualization_hints`는 각각 조회 규칙·
   집계 규칙·시각화 안내로 표시하고, table/recipe의 `sample_queries`는 질문·SQL만
   렌더링한다. 좁은 폭에서는 1열로 재배치하며 전체 페이지 가로 스크롤을 만들지 않는다.
+- **구조화 지식 편집**(`knowledge/editor/`): 상세(`StructuredDetail`)는 읽기 전용으로 두고 "수정 요청"·"구조화 지식 추가"로만 편집기를 연다.
+  편집기는 `입력 폼 | 원문 YAML | 변경 검토` 탭(`role="tablist"`, 방향키·Home/End)으로 구성한다. 폼은 서버 가이드 명세의 `widget`으로 재귀 렌더링하고
+  카드 대신 좌측 룰(`border-l`)과 그룹 제목의 하단 룰로 구분한다. 필수는 "필수" 텍스트, 오류는 필드 아래 문장과 `aria-invalid`로 알리며
+  색만으로 전달하지 않는다. 식별자(key) 필드와 `status`·`updated`는 읽기 전용이다. 검증 요약은 polite live region, 승인·반려는 근거 필수 Dialog다.
+  diff는 mono `text-data`, 추가·삭제를 `+`/`−`와 sr-only 텍스트로 함께 표시하고 변경 없는 구간은 접는다.
+  상태 배지(초안·검토 대기·승인됨·반려됨·철회됨)는 점 + 텍스트다. 임시 사용자 선택기는 인증 연동 전임을 밝히는 문구를 유지한다.
 - **Empty/loading/error 상태**: 오류는 항상 "무엇이 실패했고 무엇을 하면
-  되는지"까지 문장으로 설명한다(`ConnectionBanner` 참고). 로딩은
+  되는지"까지 문장으로 설명한다(`MessageError`·`ErrorState` 참고). 로딩은
   스켈레톤보다 짧은 문구("불러오는 중…")나 `role="status"` pulse 블록을
   우선한다(차트 로딩 등 형태가 예측 가능한 경우만 스켈레톤 사용).
 - **Button/icon**: Lucide 아이콘 `size-3~3.5`. 1차 액션(전송)만 `bg-accent`
@@ -213,8 +231,7 @@
 - Backend 계약(`AgentEvent`, tool payload, Result Store, `tool_call_id`
   등)에 없는 데이터를 추측해 표시하거나 새로 만들어내기.
 - 결과·근거를 항상 펼쳐 놓아 최종 답변보다 시각적으로 우세하게 두기.
-- `status` 이벤트를 비공개 reasoning처럼(또는 반대로 숨겨야 할 정보를
-  노출하는 방식으로) 표현하기.
+- `status` 이벤트를 모델 reasoning처럼 표현하거나 모델 thinking을 꾸며 표시하기.
 - 이유 없는 신규 UI 라이브러리·패키지 추가. 현재 카탈로그(shadcn 소스,
   assistant-ui Elements, Recharts, Lucide)로 해결되지 않는
   화면이 생기면 먼저 결정 기록(`docs/decisions.md`)에 근거를 남긴다.
@@ -227,8 +244,8 @@
   맞춘다. Thread의 읽기 폭은 47.5rem, composer는 sticky ViewportFooter다.
 - 빈 대화는 중앙 welcome·예시 질문·composer로 구성한다. 메시지 편집창에도
   접근성 이름을 둔다. 접힌 pane은 마운트를 유지하되 `invisible`로 포커스에서 제외한다.
-- 공개 진행 단계는 AgentPlan, 도구 결과는 ToolCall을 사용한다. 추정 reasoning,
-  가짜 tool args나 미연결 버튼을 만들지 않는다. 실제 완료된 단계만 완료로 센다.
+- 공개 진행 단계는 AgentPlan, 도구 결과는 ToolCall을 사용한다. 가짜 tool args나
+  미연결 버튼을 만들지 않는다. 실제 완료된 단계만 완료로 센다.
 - 원격 이미지·첨부·음성·Cloud 기능은 현재 계약에 없다. 공식 예제의
   useChatRuntime은 현재 SSE에 적용하지 않는다. 상세 예외는 [AGENTS.md](AGENTS.md),
   전환 근거는 [기술 결정](docs/decisions.md)을 따른다.

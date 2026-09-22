@@ -103,3 +103,13 @@ Result를 보여준다. 실행 중에는 전체 그룹을 열어 진행 상황�
 ToolCall은 실행 결과가 오기 전에도 표시하며 오류가 있어도 Parameters/Result
 상세를 확인할 수 있다. 호출 입력과 결과의 연결에는 Backend의 stable
 `tool_call_id`를 사용한다.
+
+
+## 2026-09-22 정리와 추가
+
+LocalRuntime 전환과 함께 사용하지 않는 반입 소스를 삭제했다: `image`, `file`, `attachment.aui`, `reasoning`,
+`reasoning.aui`, `tool-fallback.aui`, `thread-list`, `thread-list.aui`(위 반입 이력의 해당 항목은 이력으로만 남는다).
+사이드바 대화 목록은 `ThreadListPrimitive`를 직접 조합한 `components/chat/app-sidebar.tsx`다.
+`follow-up-suggestions.aui`는 semantic token 스타일로 다시 써 Thread에 연결했다(`done.data.suggestions` 표시).
+`message-actions.aui`에 `BranchPickerPrimitive`를 추가했고 `edit-message.aui`의 문구는 "새 버전이 만들어지고 이전 버전은
+남는다"로 바꿨다. 새 npm 의존성은 `@assistant-ui/react-generative-ui`·`zod`(Generative UI 결과)뿐이다.

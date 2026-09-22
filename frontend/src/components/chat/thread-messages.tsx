@@ -25,11 +25,17 @@ import {
   ToolGroupTrigger,
 } from "@/components/assistant-ui/elements/tool-group.aui";
 import { readAgentMetadata } from "@/lib/chat-runtime";
+import { isStandaloneTool } from "@/lib/standalone-tools";
 import type { StatusStep, ToolResult } from "@/types/chat";
-import { ToolResultCard } from "./tool-result-card";
+import { RegisteredToolUI } from "./toolkit/tool-ui";
 
+/**
+ * 일반 Tool 호출을 도착 순서대로 하나의 실행 과정(`group-thought`)으로 묶고,
+ * 그 안에서 연속한 Tool은 `group-tool`로 다시 묶는다.
+ * 표·차트·`present`는 `standalone-tool-call`로 그룹 밖에 둔다.
+ */
 const groupMessageParts = groupPartByType({
-  "tool-call": ["group-tool"],
+  "tool-call": ["group-thought", "group-tool"],
   "standalone-tool-call": [],
 });
 
@@ -43,6 +49,7 @@ export function AssistantMessage() {
   const messageRunning = useAuiState((s) => s.message.status?.type === "running");
   const messageStatus = useAuiState((s) => s.message.status);
   const parts = useAuiState((s) => s.message.parts);
+  const lastToolIndex = parts.findLastIndex((part) => part.type === "tool-call" && !isStandaloneTool(part.toolName));
   const customMetadata = useAuiState((s) => s.message.metadata.custom);
   const agentMetadata = readAgentMetadata(customMetadata);
   const publicStatuses = agentMetadata?.statuses ?? [];
@@ -70,21 +77,30 @@ export function AssistantMessage() {
         <MessagePrimitive.GroupedParts groupBy={groupMessageParts} indicator="never">
           {({ part, children }) => {
             switch (part.type) {
-              case "group-tool":
+              case "group-thought":
                 return (
                   <ExecutionToolGroup
-                    count={part.indices.length}
+                    indices={part.indices}
                     toolRunning={part.status.type === "running"}
                     statuses={publicStatuses}
-                    progressText={progressText}
                   >
                     {children}
                   </ExecutionToolGroup>
                 );
+              case "group-tool":
+                // 공개 진행 문구는 실행 중인 마지막 Tool 행 바로 위에 둔다(DOM 형제 순서 유지를 위해 Fragment).
+                return (
+                  <ToolList
+                    progressText={part.indices.at(-1) === lastToolIndex ? progressText : undefined}
+                  >
+                    {children}
+                  </ToolList>
+                );
               case "text":
                 return <AssistantText />;
               case "tool-call":
-                return part.toolUI ?? <ToolPart {...part} />;
+                // 등록된 Tool UI(toolkit)가 있으면 그것을, 알 수 없는 도구는 generic 카드를 쓴다.
+                return part.toolUI ?? <RegisteredToolUI {...(part as ToolCallMessagePartProps<Record<string, unknown>, ToolResult>)} />;
               default:
                 return null;
             }
@@ -96,7 +112,7 @@ export function AssistantMessage() {
         {!messageRunning && messageStatus?.type === "complete" && isEmpty && (
           <p data-slot="empty-response" className="text-ui text-ink-2">응답 내용 없이 종료되었습니다. 질문을 구체화하거나 재생성으로 다시 시도하세요.</p>
         )}
-        {!parts.some(part => part.type === "tool-call" && !["prepare_table", "prepare_visualization"].includes(part.toolName)) &&
+        {!parts.some(part => part.type === "tool-call" && !isStandaloneTool(part.toolName)) &&
           <ObservedDuration timing={agentMetadata?.observedTiming} running={messageRunning} />}
         <MessageActions />
       </div>
@@ -126,16 +142,14 @@ function PendingExecution({ writing }: { writing: boolean }) {
  * Tool 목록을 접는다. 이후에는 사용자가 원하는 단계까지만 다시 펼칠 수 있다.
  */
 function ExecutionToolGroup({
-  count,
+  indices,
   toolRunning,
   statuses,
-  progressText,
   children,
 }: {
-  count: number;
+  indices: readonly number[];
   toolRunning: boolean;
   statuses: readonly StatusStep[];
-  progressText?: string;
   children: ReactNode;
 }) {
   const messageStatus = useAuiState((s) => s.message.status);
@@ -146,15 +160,16 @@ function ExecutionToolGroup({
   const { rootRef, open, setOpen } = useExecutionDisclosure(messageRunning);
   const parts = useAuiState((s) => s.message.parts);
   const metadata = useAuiState((s) => s.message.metadata.custom);
-  const summary = executionSummary(parts.filter(part => part.type !== "tool-call" || !["prepare_table", "prepare_visualization"].includes(part.toolName)), messageRunning);
-  const toolChildren = Children.toArray(children);
+  const summary = executionSummary(parts.filter(part => part.type !== "tool-call" || !isStandaloneTool(part.toolName)), messageRunning);
+  const count = indices.filter((index) => parts[index]?.type === "tool-call").length;
+  const used = count > 0 ? `툴 ${count}개 사용` : "";
 
-  let label = `응답 작성 완료 · 툴 ${count}개 사용`;
+  let label = `응답 작성 완료 · ${used}`;
   if (toolRunning && messageRunning) label = `툴 ${count}개 실행 중`;
-  else if (messageRunning) label = `응답 작성 중 · 툴 ${count}개 사용`;
-  else if (isFailed) label = `툴 ${count}개 사용 · 오류`;
-  else if (isCancelled) label = `툴 ${count}개 사용 · 중단`;
-  else if (!messageRunning && summary.issues) label = `응답 종료 · 툴 ${count}개 사용`;
+  else if (messageRunning) label = `응답 작성 중 · ${used}`;
+  else if (isFailed) label = `${used} · 오류`;
+  else if (isCancelled) label = `${used} · 중단`;
+  else if (!messageRunning && summary.issues) label = `응답 종료 · ${used}`;
   if (summary.issues) label += ` · ${summary.issues}`;
 
   return (
@@ -176,13 +191,21 @@ function ExecutionToolGroup({
         {statuses.length > 0 && (
           <AgentPlan steps={toPlanSteps(statuses, messageRunning, isFailed, isCancelled)} />
         )}
-        {toolChildren.slice(0, -1)}
-        {toolRunning && progressText && toolChildren.length > 0 && (
-          <ExecutionProgressText text={progressText} />
-        )}
-        {toolChildren.slice(-1)}
+        {children}
       </ToolGroupContent>
     </ToolGroupRoot></div>
+  );
+}
+
+/** 연속한 Tool 행. 실행 중인 마지막 Tool 바로 위에 공개 작업 안내를 둔다(Fragment로 DOM 형제 순서 유지). */
+function ToolList({ progressText, children }: { progressText?: string; children: ReactNode }) {
+  const rows = Children.toArray(children);
+  return (
+    <>
+      {rows.slice(0, -1)}
+      {progressText && rows.length > 0 && <ExecutionProgressText text={progressText} />}
+      {rows.slice(-1)}
+    </>
   );
 }
 
@@ -273,27 +296,4 @@ function AssistantText() {
       </MessagePartPrimitive.InProgress>
     </div>
   );
-}
-
-/** A second disclosure level for one tool's public parameters and result. */
-function ToolPart(props: ToolCallMessagePartProps) {
-  const result = props.result as ToolResult | undefined;
-  const args = isRecord(props.args) ? props.args : {};
-  const messageRunning = useAuiState((s) => s.message.status?.type === "running");
-  const metadata = useAuiState((s) => s.message.metadata.custom);
-
-  return (
-    <ToolResultCard
-      toolName={props.toolName}
-      args={args}
-      result={result}
-      running={props.status.type === "running"}
-      messageRunning={messageRunning}
-      observedTiming={readAgentMetadata(metadata)?.toolTimings?.[props.toolCallId]}
-    />
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

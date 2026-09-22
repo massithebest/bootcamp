@@ -127,20 +127,26 @@ export async function runWorkbenchRegressions() {
         check(document.activeElement?.getAttribute("aria-label") === "인스펙터 펼치기", "Escape did not return focus");
       } else await click("인스펙터 접기");
     });
-    await run("F08 new chat and example session navigation do not request confirmation", async () => {
+    await run("F08 new chat keeps drafts per thread and never requests confirmation", async () => {
       await openSidebar(); await fill(composer(), "전환 전 초안");
       let confirmations = 0;
       window.confirm = () => { confirmations++; return false; };
       await click("새 채팅");
       check(confirmations === 0, "new chat requested confirmation");
-      check(composer().value === "", "new chat did not clear draft");
+      check(composer().value === "", "new chat did not clear the draft of an empty conversation");
+      await send();
+      await emit({ type: "text", content: "첫 대화 답변" }, { type: "done" }); await pause();
+      await fill(composer(), "대화 A 초안");
+      await click("새 채팅");
+      check(composer().value === "", "new thread inherited the previous draft");
       check(!host.querySelector('[data-slot="aui_message-group"]')?.textContent?.trim(), "new chat retained old messages");
-      await fill(composer(), "세션 선택 전 초안");
-      const other = [...host.querySelectorAll<HTMLButtonElement>('nav[aria-label="최근 대화"] button')].find(b => b.getAttribute("aria-current") !== "true")!;
+      const other = [...host.querySelectorAll<HTMLButtonElement>('nav[aria-label="최근 대화"] button')].find((button) => button.getAttribute("aria-current") !== "true")!;
       await act(async () => other.click());
+      await pause();
       check(confirmations === 0, "session selection requested confirmation");
       check(other.getAttribute("aria-current") === "true", "session selection did not complete");
-      check(composer().value === "", "session selection did not clear draft");
+      check(composer().value === "대화 A 초안", "thread draft was not kept with its thread: value=" + JSON.stringify(composer().value));
+      check(host.textContent?.includes("첫 대화 답변"), "thread messages were not restored");
       window.confirm = () => true;
       if (innerWidth < 860) await click("사이드바 접기");
     });
@@ -165,16 +171,17 @@ export async function runWorkbenchRegressions() {
       check(timer.textContent === finished, "completed timer kept ticking");
       check(!live?.textContent?.includes("초"), "timer leaked into live announcement");
     });
-    await run("F03/F08 actions remain keyboard reachable and cancelled regeneration preserves answer", async () => {
+    await run("F03/F08 actions remain keyboard reachable and regeneration keeps the previous answer as a branch", async () => {
       const copies = [...host.querySelectorAll<HTMLButtonElement>('button[aria-label="복사"]')];
       check(copies.length >= 2, "earlier copy action is unmounted");
       await act(async () => copies[0].focus());
       check(document.activeElement === copies[0], "copy cannot receive keyboard focus");
       const before = requests.length;
-      window.confirm = () => false;
-      await click("재생성");
-      check(requests.length === before && host.textContent?.includes("일부 조회를 완료하지 못했습니다."), "cancel regenerated answer");
-      window.confirm = () => true;
+      await click("재생성"); await pause();
+      check(requests.length === before + 1, "regeneration did not start without a confirmation");
+      check(host.querySelector('[aria-label="답변 버전 이동"]')?.textContent?.includes("2 / 2"), "previous answer was not kept as a branch");
+      await emit({ type: "text", content: "재생성 답변" }, { type: "done" }); await pause();
+      check(host.querySelector('[aria-label="답변 버전 이동"]'), "branch picker disappeared after regeneration");
     });
     await run("F12 empty done has explicit feedback", async () => {
       await newChat(); await send(); await emit({ type: "done" });
@@ -225,7 +232,8 @@ export async function runWorkbenchRegressions() {
       check(host.textContent?.includes("GLM-5.3-Flash") && host.textContent?.includes("중간"), "requested model metadata is absent");
       await newChat(); await send();
       const spinner = host.querySelector('[data-slot="execution-pending-spinner"]')!;
-      check(getComputedStyle(spinner).animationName === (matchMedia('(prefers-reduced-motion: reduce)').matches ? "none" : "spin"), "motion preference ignored");
+      const spinnerStyle = getComputedStyle(spinner);
+      check(spinnerStyle.animationName === "spin" && spinnerStyle.animationDuration === "0.6s", "running spinner must keep rotating even with reduced motion");
       await click("중단");
       const elapsed = host.querySelector('[data-slot="observed-duration"]')?.textContent;
       await pause(1100);

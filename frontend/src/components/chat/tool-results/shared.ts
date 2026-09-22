@@ -25,6 +25,20 @@ export function asRows(v: unknown): string[][] {
     .map((row) => row.map((cell) => String(cell)));
 }
 
+/** 조회 preview의 `sample_rows`는 객체 배열, legacy large_result는 배열의 배열이다. */
+export function asSampleRows(v: unknown, columnNames: string[]): string[][] {
+  if (!Array.isArray(v)) return [];
+  return v.flatMap((row): string[][] => {
+    if (Array.isArray(row)) return [row.map((cell) => String(cell ?? "—"))];
+    if (typeof row === "object" && row !== null) {
+      const record = row as Record<string, unknown>;
+      const names = columnNames.length > 0 ? columnNames : Object.keys(record);
+      return [names.map((name) => (record[name] == null ? "—" : String(record[name])))];
+    }
+    return [];
+  });
+}
+
 export function asRecords(v: unknown): Record<string, unknown>[] {
   if (!Array.isArray(v)) return [];
   return v.filter(
@@ -46,6 +60,20 @@ export function toneOf(v: unknown): ResultTone {
  */
 export function isLargeResult(data: Record<string, unknown>): boolean {
   return data.type === "large_result";
+}
+
+/**
+ * `RESULT_UI_MODE=present`의 `execute_sql`·`run_simulation` 결과는 전체 행 대신
+ * bounded preview(`sample_rows`, `statistics` …)만 담는다.
+ */
+export function isPreviewResult(data: Record<string, unknown>): boolean {
+  return (
+    typeof data.result_id === "string" &&
+    Array.isArray(data.sample_rows) &&
+    typeof data.statistics === "object" &&
+    data.statistics !== null &&
+    !Array.isArray(data.statistics)
+  );
 }
 
 export interface ResultColumn {
@@ -91,7 +119,7 @@ export function asResultSummary(v: unknown): Record<string, ResultColumnSummary>
     out[key] = {
       min: num(s.min) ?? str(s.min),
       max: num(s.max) ?? str(s.max),
-      mean: num(s.mean),
+      mean: num(s.mean) ?? num(s.avg),
       nullCount: num(s.null_count),
     };
   }

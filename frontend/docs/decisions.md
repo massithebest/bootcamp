@@ -54,6 +54,10 @@ dev·preview 포트는 CORS 계약과 맞춘 3100으로 고정한다.
 
 ## assistant-ui
 
+> 2026-09-22 갱신: 아래 초기 결정 중 External Store·선형 대화·`use-agent-chat.ts`·예시 세션·
+> BranchPicker 보류·재생성 확인창은 [assistant-ui 통합 전환](#assistant-ui-통합-전환-2026-09-22-활성)으로
+> 대체되었다. 이력으로 남기며 현재 기준은 그 절이다.
+
 assistant-ui는 thread, viewport, composer, message, action bar와 Markdown rendering을
 담당한다. 애플리케이션 메시지 상태와 SSE transport는
 `hooks/use-agent-chat.ts`가 소유하고 `useExternalStoreRuntime`으로 연결한다.
@@ -513,13 +517,13 @@ thinking/signature/tool input delta는 계속 폐기하며 reasoning UI로 변�
   빈 응답, 0행 성공, 결과 누락은 별도 문구로 표시한다. 자동 접힘은 유지하되
   숨겨질 상세에 포커스가 있으면 보이는 trigger로 돌리고 외부 포커스는 유지한다.
 - 실행 단계는 안정적인 polite 상태 영역으로 알린다. 오류 alert와 중복하지 않고
-  토큰·타이머는 알림에 포함하지 않는다. reduced-motion에서는 회전을 멈춘다.
+  토큰·타이머는 알림에 포함하지 않는다. 2026-09-22부터 reduced-motion에서도 실행 중 아이콘 회전은 유지한다(진행 신호).
 - 경과 시간은 performance.now로 관측한 프론트 로컬 metadata다.
   요청 시작→종료/오류/취소, 동일 Tool 호출 수신→결과 수신만 측정하며 과거 값은 합성하지 않는다.
   서버 시간과 별개이며 작은 표시 컴포넌트만 초 단위로 갱신한다.
 - 기존 860/1180px 임계값 아래 재개방은 같은 DOM을 쓰는 비모달 overlay로 처리한다.
   Escape/닫기는 trigger로 복귀하고 Tab 이탈은 패널을 닫되 외부 포커스를 유지한다.
-  400px에서도 Chat 400px/입력창 334px을 유지한다. 확대 시 패널을 자동으로 펼치지 않는다.
+  확대 시 패널을 자동으로 펼치지 않는다.
 - 핵심 메타·표 헤더는 ink-2, 긴 본문은 overflow-wrap:anywhere,
   SQL/CTE는 max-h-96 내부 스크롤을 쓴다. main·명명된 aside·답변 h2와 내용 h3~h6으로
   의미를 전달하되 글자 크기는 기존 dense type scale을 유지한다.
@@ -528,7 +532,7 @@ thinking/signature/tool input delta는 계속 폐기하며 reasoning UI로 변�
   모델·추론 제어는 실제 설정으로 표시하지 않고 준비 중·미연결임을 명시한다.
 
 새 라이브러리나 API는 추가하지 않았다. 서버 timing·모델 설정 API·대화 영속 저장은
-별도 계약 검토로 보류한다. 실제 스크린리더·모바일 가상 키보드·대규모 대화 성능은
+별도 계약 검토로 보류한다. 실제 스크린리더·대규모 대화 성능은
 브라우저 DOM/키보드·fixture 통과와 구분해 운영 인수에서 확인한다.
 
 근거: [계획 이력 요약](../plan/Todo.md),
@@ -583,3 +587,100 @@ Inspector의 각 탭 스크롤 영역은 `scrollbar-gutter: stable`로 세로 �
 항상 예약한다. Skill 상세가 길어져 스크롤바가 생겨도 기존 설명의 가용 폭과 줄바꿈이
 바뀌지 않는다. 이 예약 공간은 도구·스킬·지식 탭에 동일하게 적용한다. 좁은 화면의
 Inspector는 `absolute` overlay만 적용해 중앙 Chat의 grid 폭을 소비하지 않는다.
+
+## 모바일 환경 비지원 (2026-09-21, 활성)
+
+이 앱은 모바일 환경에서 구동하지 않는다. 휴대폰·태블릿 폭(~400px) 검증, 터치 조작,
+모바일 device emulation과 가상 키보드 확인을 검증·테스트 항목으로 두지 않는다. 기존
+문서의 "~400px까지 가로 스크롤 없음"과 "모바일 가상 키보드" 검증 요구를 삭제했다.
+브라우저 확인은 1280px 이상 데스크톱 폭에서 한다. 데스크톱 창을 줄였을 때의 패널
+접힘 임계값(Sidebar 860px, Inspector 1180px)은 모바일 지원이 아니라 창 크기 대응이므로
+제품 동작과 회귀 테스트로 유지한다.
+
+## 구조화 지식 편집·검토·승인 화면 (2026-09-21, 활성)
+
+구조화 YAML(table·KPI·recipe·simulation·용어·시나리오)을 이 화면에서 수정하고, 작성자가
+검토를 요청하면 승인 권한자가 승인해 검색·Tool에 반영한다. 직접 수정 API는 없고 변경
+요청만 존재한다. 이전 결정(구조화 상세 읽기 전용)은 이 항목으로 대체한다. 상세 조회
+화면(`StructuredDetail`)은 그대로 읽기 전용이며 편집은 별도 편집기에서만 한다.
+
+- 라우터와 새 패키지 없이 기존 `KnowledgeManager` 안에서 편집기(`knowledge/editor/`)를
+  연다. 폼 라이브러리·YAML 파서·코드 편집기·diff 라이브러리는 도입하지 않는다(폐쇄망 반입
+  부담). 프론트는 YAML을 파싱하지 않고 서버 `validate`에 위임한다.
+- 입력 폼은 서버가 내려주는 가이드 명세(`GET /api/knowledge/guides/{kind}`)로 그린다.
+  구조(필수·타입·enum)는 백엔드 모델이, 라벨·도움말·예시는 가이드가 소유하므로 종류가
+  늘어도 화면 코드는 늘지 않는다. 폼과 원문 YAML은 같은 내용의 두 표현이며 전환은
+  서버 변환으로 한다. YAML 문법 오류가 있으면 폼 전환을 막고 오류를 보여준다.
+- 검증은 입력을 멈춘 뒤 서버 dry-run(모델 + 참조 정합성)으로 하고 필드 경로별로 인라인
+  표시한다. 검증을 통과해야 검토를 요청할 수 있다. 저장·전이 실패 시 입력은 지우지
+  않고, 서버 문구는 노출하지 않으며 상태 코드별 한국어 문구로만 안내한다.
+- 변경 검토는 자체 줄 단위 diff로 현재 승인본과 비교한다. 추가·삭제는 색과 기호(+/−),
+  스크린 리더용 텍스트를 함께 쓴다. 이전 줄이 이후 줄 위에 온다.
+- 권한은 `GET /api/me`의 `permissions`·`knowledge_management`만 보고 버튼을 켜고 끈다.
+  화면에 역할 이름 분기를 두지 않아 실제 인증이 연결돼도 화면은 바뀌지 않는다.
+  자기 승인이 막힌 경우 승인 버튼을 비활성화하고 이유를 밝힌다.
+- 인증 전(`mode: "stub"`)에만 임시 사용자 선택기를 보이고, 실제 인증이 아니며 작성자·승인자를
+  구분해 기록할 뿐이라고 화면에 밝힌다. 선택값은 localStorage에 보관하되 접근 실패에도
+  동작하며 `X-User-Id` 헤더로 보낸다. 인증이 붙으면 선택기와 `lib/knowledge-user.ts`를 제거한다.
+- 승인은 되돌리기 어려운 공용 변경이므로 `window.confirm` 대신 Dialog로 근거 메모를 필수로
+  받고 "이후 모든 대화의 검색·Tool에 바로 반영"됨을 명시한다.
+- 미저장 변경 보호(`requestLeave`, `beforeunload`, 저장 후 이동·변경 취소 후 이동·계속 편집)는
+  텍스트 지식과 같은 경로를 쓴다.
+
+근거: 백엔드가 초안·검토 이력은 SQLite에, 최종 내용은 `knowledge/` YAML에 두어 단일 기준을 유지한다.
+
+
+## assistant-ui 통합 전환 (2026-09-22, 활성)
+
+`present` Generative UI 결과 전환과 LocalRuntime 전환을 한 계획으로 수행했다. Backend `/api/chat` SSE 계약은
+바뀌지 않는다.
+
+### 결정
+
+- **Runtime**: `useExternalStoreRuntime`(직접 소유한 메시지 상태)을 `useRemoteThreadListRuntime` + thread별
+  `useLocalRuntime`으로 바꿨다. `lib/chat-model-adapter.ts`의 async generator가 기존 `sendChatMessage`·
+  `applyAgentEvent`·`convertMessage`를 그대로 쓰고, 메시지 저장·취소·편집·재생성·분기는 runtime이 맡는다.
+  `hooks/use-agent-chat.ts`와 `ConnectionBanner`, 재생성 `window.confirm`은 삭제했다(연결 실패 재시도는
+  `MessageError`의 Reload).
+- **fork 규칙**(`planTurn`): 분기 경로에서 가장 가까운 성공 assistant의 `turnId`가 anchor다. 대화 head(마지막 성공
+  turn)와 같으면 `fork_from_turn_id`를 생략(이어쓰기), 다르면 anchor에서 fork, anchor가 없고 head가 있으면 `""`.
+  head는 성공 종료 상태를 yield하는 순간 갱신한다(마무리 대기 중 다음 질문이 시작돼도 어긋나지 않게).
+- **분기·다중 thread**: 편집·재생성은 이전 내용을 지우지 않고 BranchPicker로 남긴다. thread 목록·메시지는
+  `lib/agent-threads.ts`의 메모리 저장소(`RemoteThreadListAdapter`·`ThreadHistoryAdapter`)이며 브라우저 세션 동안만
+  유지된다. 다른 thread가 응답 중이어도 전환할 수 있고 실행은 계속된다(런타임이 thread를 유지). 계획의
+  `RemoteThreadList({backgroundThreads})`는 runtime hook 경로에서 옵션이 없어 쓰지 않았다. Backend 앵커는 프로세스
+  메모리이므로 재시작 후 fork는 Backend `error`로 돌아올 수 있다.
+- **Generative UI**: Python Backend가 검증·실행한 `present` Tool의 `$type` 트리를
+  `@assistant-ui/react-generative-ui@0.0.19`의 `renderGenerativeUI`로 렌더한다. package의
+  `present()`는 frontend Tool(`execute` 포함)이라 LocalRuntime이 결과를 클라이언트에서 추가해 재실행을
+  유발할 수 있으므로 생성하지 않고 toolkit에는 `type: "backend"`로 등록했다.
+  `defineGenerativeComponents`는 compiler 없이 실행 시 예외를 던지므로 같은 형태의 일반 객체 library를 쓴다
+  (`@assistant-ui/vite`·`"use generative"` 미도입).
+- **Tool wire 경계**: provider에 노출되는 `present` Tool은 재귀 `$ref` 호환성을 위해
+  `tree` JSON 문자열 하나를 받는다. 문자열 안의 node와 Backend가 공개하는
+  `tool_call` AgentEvent args는 둘 다 assistant-ui 표준 `$type`/`$key`를 쓴다.
+- **결과 데이터**: 트리에는 `resultId`와 표시 설정만 있다. `QueryTable`은
+  `@tanstack/react-table` 9.2.4 수동 모드로 `/api/query-results/{id}/table`에 page·전체 셀 검색·
+  단일 열 정렬을 보낸다. Result Store의 최대 1,000건에 서버가 먼저 검색·정렬을 적용하고
+  기본 10행의 현재 page만 반환한다. 차트는 `/chart` 서버 집계 응답을 조회한다
+  (요청 공유·abort·성공만 cache). 전체 행은 브라우저에 한 번에 오지 않는다.
+- **Vocabulary 계약**: FE Zod와 Backend `present` vocabulary는 `tests/fixtures/present-vocabulary.json`(Backend 사본)으로
+  비교한다. 허용 목록은 여러 결과를 묶는 `Card`와 `SqlPreview`·`QueryChart`·`QueryTable`·`SimulationSummary`로 제한한다.
+  일반 설명은 Assistant Markdown이 담당하고 로딩·경고·오류는 도메인 component 내부에서 표시한다. 공유 prop(`title`·`resultId`)은 모두 같은 타입을 유지한다.
+- **실패한 `present`**: 같은 메시지에서 이후 `present`가 성공하면 실패 호출은 숨기고, 전부 실패하면 오류 알림 표면을
+  그대로 보여 준다(계획의 "ToolGroup 안 표시"에서 단순화).
+- **두 결과 모드**: `RESULT_UI_MODE=legacy|present` 플래그는 Backend가 소유한다. `DatabaseResult`·`SimulationResult`는
+  legacy 인라인 표와 preview(`sample_rows` 객체, `statistics`)를 모두 받는다. 표 중복 제거(`removeMarkdownTables`)는
+  legacy 메시지 전용이다(`present`에는 행이 없어 비교 불가).
+- **Tool UI**: 실행 과정 그룹의 12개 도구를 toolkit에 등록하고(`RegisteredToolUI`) 표·차트·`present`는 standalone으로
+  등록했다. 종류별 본문 선택(`TOOL_META`)은 `ToolResultCard`에 남겼다.
+- **후속질문**: `done.data.suggestions`(2~4개·각 120자 이하·중복 제거)를 엄격히 검증해 `metadata.custom`에 싣고
+  `adapters.suggestion`이 그대로 돌려준다(모델 호출 없음). Backend가 보내지 않으면 표시되지 않는다.
+- **정리**: 미사용 복사 소스(image·file·attachment·reasoning·tool-fallback·thread-list 2종)와 더미 세션·시드 대화를
+  삭제했다.
+
+### 알려진 한계
+
+- 취소된 응답은 소요 시간을 표시하지 않는다(runtime이 취소 뒤 스냅샷을 받지 않아 종료 시각을 기록할 수 없음).
+- 새로고침하면 대화·분기·목록이 사라진다. 영속 대화 API가 필요하다.
+- legacy `prepare_*` renderer·`/api/visualizations` client는 호환을 위해 유지한다. 삭제는 별도 계획이다.

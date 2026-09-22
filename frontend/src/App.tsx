@@ -7,8 +7,8 @@ import {
 } from "@assistant-ui/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { productionPlanningToolkit } from "@/components/chat/toolkit";
-import { useAgentChat } from "@/hooks/use-agent-chat";
-import { EXAMPLE_QUESTIONS, SEED_CONVERSATION } from "@/lib/dummy";
+import { useAgentRuntime } from "@/hooks/use-agent-runtime";
+import { EXAMPLE_QUESTIONS } from "@/lib/dummy";
 
 const assistantConfig = AuiConfig({
   tools: Tools({ toolkit: productionPlanningToolkit }),
@@ -16,11 +16,11 @@ const assistantConfig = AuiConfig({
 });
 
 export default function App() {
-  const chat = useAgentChat(SEED_CONVERSATION);
+  const runtime = useAgentRuntime();
   return (
-    <AssistantRuntimeProvider runtime={chat.runtime} config={assistantConfig}>
+    <AssistantRuntimeProvider runtime={runtime} config={assistantConfig}>
       <TooltipProvider>
-        <ChatWindow chat={chat} />
+        <ChatWindow />
       </TooltipProvider>
     </AssistantRuntimeProvider>
   );

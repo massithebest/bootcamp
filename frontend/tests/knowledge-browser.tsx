@@ -14,8 +14,30 @@ export async function runKnowledgeWorkspaceRegressions() {
   let stream: ReadableStreamDefaultController<Uint8Array> | undefined;
   const encoder = new TextEncoder();
   let failSave = false;
+  // 구조화 지식 편집 시나리오용 고정 응답. 켜기 전에는 기존 회귀와 같은 빈 응답을 돌려준다.
+  const editorFixture = { on: false, permissions: ["knowledge:write"], conflict: false };
+  const entryRow = { type: "table", id: "wip", title: "wip", summary: "재공", status: "verified", source: "", owner: "", updated: "", active: true, archived: false, pending_change: null };
+  const guide = { kind: "table", key_field: "table", immutable: ["table"], template: { table: "", description: "", active: true }, fields: [
+    { name: "table", path: "table", label: "테이블명", help: "", required: true, readonly: false, widget: "string", group: "기본 정보" },
+    { name: "description", path: "description", label: "설명", help: "", required: true, readonly: false, widget: "text", group: "기본 정보" },
+  ] };
+  const editorApi = (url: string, init?: RequestInit): Response | undefined => {
+    if (!editorFixture.on) return undefined;
+    const path = url.replace(/^.*\/api/, "");
+    if (path === "/me") return Response.json({ id: "user", name: "사용자", permissions: editorFixture.permissions, mode: "stub", knowledge_management: true, allow_self_approval: false, stub_users: [{ id: "user", name: "사용자" }] });
+    if (path.startsWith("/knowledge/entries/table/wip")) return Response.json({ ...entryRow, detail: { table: "wip" } });
+    if (path.startsWith("/knowledge/entries")) return Response.json([entryRow]);
+    if (path === "/knowledge/guides/table") return Response.json(guide);
+    if (path === "/knowledge/source/table/wip") return Response.json({ kind: "table", key: "wip", yaml: "table: wip\n", data: { table: "wip", description: "기존 설명", active: true } });
+    if (path === "/knowledge/validate") return Response.json({ ok: true, parsed: true, yaml: "table: wip\n", data: {}, key: "wip", errors: [] });
+    if (path === "/knowledge/changes" && init?.method === "POST") return editorFixture.conflict ? new Response("conflict", { status: 409 }) : Response.json({}, { status: 500 });
+    if (path.startsWith("/knowledge/changes")) return Response.json([]);
+    return undefined;
+  };
   window.fetch = async (input, init) => {
     const url = String(input);
+    const fixture = editorApi(url, init);
+    if (fixture) return fixture;
     if (url.endsWith("/api/chat")) return new Response(new ReadableStream({ start(c) { stream = c; } }));
     if (url.includes("/documents") && init?.method === "POST") {
       if (failSave) return new Response("internal error", { status: 503 });
@@ -91,6 +113,46 @@ export async function runKnowledgeWorkspaceRegressions() {
       await clickCurrentChat(); await frame();
       await waitFor(() => host.textContent?.includes("관리 중 수신한 마지막 응답") === true);
       check(Math.abs(viewport.scrollTop - saved) < 2, `scroll changed: ${saved} -> ${viewport.scrollTop}`);
+    });
+    await run("structured knowledge opens an editor and a conflicting save keeps the draft", async () => {
+      Object.assign(editorFixture, { on: true, permissions: ["knowledge:write"], conflict: true });
+      await act(async () => { window.dispatchEvent(new Event("knowledge-changed")); });
+      await click("지식 관리");
+      await waitFor(() => Array.from(host.querySelectorAll('section[aria-label="지식 목록"] li button')).some(b => b.textContent?.includes("wip")));
+      await act(async () => Array.from(host.querySelectorAll<HTMLButtonElement>('section[aria-label="지식 목록"] li button')).find(b => b.textContent?.includes("wip"))!.click());
+      await waitFor(() => Array.from(host.querySelectorAll("button")).some(b => b.textContent?.trim() === "수정 요청"));
+      await click("수정 요청");
+      await waitFor(() => !!host.querySelector("#field-description"));
+      check((host.querySelector<HTMLInputElement>("#field-table"))!.readOnly, "existing identifier should be locked");
+      const description = host.querySelector<HTMLTextAreaElement>("#field-description")!;
+      check(description.value === "기존 설명", "current approved content was not loaded");
+      await fill(description, "저장에 실패해도 남아야 하는 설명");
+      await waitFor(() => host.textContent?.includes("검증을 통과했습니다") === true);
+      await click("초안 저장");
+      await waitFor(() => host.textContent?.includes("최신 내용을 다시 불러오세요") === true);
+      check(host.querySelector<HTMLTextAreaElement>("#field-description")!.value === "저장에 실패해도 남아야 하는 설명", "failed save erased the draft");
+      check(!host.textContent?.includes("conflict"), "server text leaked into the UI");
+      await clickCurrentChat();
+      check(document.querySelector('[role="dialog"]'), "unsaved editor changes were not guarded");
+      const dialogButton = (text: string) => Array.from(document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')).find(b => b.textContent === text)!;
+      await act(async () => dialogButton("계속 편집").click());
+      check(host.querySelector("#field-description"), "editor closed although the user chose to keep editing");
+      await click("편집 닫기");
+      await act(async () => dialogButton("변경 취소 후 이동").click());
+      await frame();
+      check(!host.querySelector("#field-description"), "editor stayed open after discarding");
+    });
+    await run("without write permission structured knowledge stays read-only", async () => {
+      Object.assign(editorFixture, { on: true, permissions: [], conflict: false });
+      await act(async () => { window.dispatchEvent(new Event("knowledge-changed")); });
+      await waitFor(() => Array.from(host.querySelectorAll('section[aria-label="지식 목록"] li button')).some(b => b.textContent?.includes("wip")));
+      await act(async () => Array.from(host.querySelectorAll<HTMLButtonElement>('section[aria-label="지식 목록"] li button')).find(b => b.textContent?.includes("wip"))!.click());
+      await waitFor(() => host.textContent?.includes("작성 권한이 없어 볼 수만 있습니다") === true);
+      check(!Array.from(host.querySelectorAll("button")).some(b => b.textContent?.trim() === "수정 요청"), "edit request offered without permission");
+      check(!host.querySelector('[aria-label="구조화 지식 추가"]'), "new structured knowledge offered without permission");
+      editorFixture.on = false;
+      await act(async () => { window.dispatchEvent(new Event("knowledge-changed")); });
+      await clickCurrentChat(); await frame();
     });
     await run("dirty navigation supports stay and discard", async () => {
       await click("지식 관리"); await click("텍스트 지식 등록");

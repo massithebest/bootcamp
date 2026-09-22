@@ -85,12 +85,21 @@ npm run preview
 - browser Network 탭이나 사내 proxy 로그에서 허용된 Backend 외 outbound 요청이
   없어야 한다.
 
+## 2026-09-22 반입 항목: Generative UI
+
+- `@assistant-ui/react-generative-ui@0.0.19`(MIT, pre-1.0): install script가 없고 dist의 외부 URL은
+  Adaptive Card 스키마 문자열뿐이다(fetch하지 않음). 전이 의존성 `assistant-stream`은
+  `0.3.42`에서 `0.3.44`로 올라간다(`@assistant-ui/react@0.15.19`의 `^0.3.42` 범위 안, react 버전은 유지).
+- `zod@4.6.5`를 직접 의존성으로 고정한다(기존 전이 `4.6.2`).
+- 사내 registry에 위 정확한 버전과 lockfile의 전이 의존성이 있는지 반입 전에 확인한다.
+  `npm view <package>@<version> dependencies peerDependencies`와 `dist` URL grep 절차를 따른다.
+
 ## 현재 확인된 주의점
 
 - shadcn 초기화는 font나 registry 의존 설정을 자동 추가할 수 있으므로 생성 결과를
   그대로 반입하지 않는다.
 - AI SDK gateway는 외부 endpoint 기본값을 포함할 수 있어 의존성에서 제거했다.
-- assistant-ui는 현재 `useExternalStoreRuntime` 경로만 사용한다. 설치 트리에 cloud
+- assistant-ui는 `useRemoteThreadListRuntime`(메모리 adapter) + `useLocalRuntime` 경로만 사용한다. 설치 트리에 cloud
   관련 코드가 있어도 production bundle과 runtime network에 포함되지 않는지 새 버전마다
   다시 확인한다.
 - native package가 준비 환경과 폐쇄망의 OS·CPU에 맞지 않으면 설치 또는 build가

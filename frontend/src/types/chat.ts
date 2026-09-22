@@ -50,7 +50,7 @@ export interface StatusStep {
 }
 
 export interface ChartSpec {
-  type: "bar" | "line";
+  type: "bar" | "line" | "area";
   x: string;
   series: { key: string; label: string }[];
   categories: (string | number)[];
@@ -136,9 +136,11 @@ export interface ChatMessage {
    * assistant 메시지에만 있다. 편집/재생성이 "이 턴 직전까지" 를 계산할 때
    * (바로 앞 assistant 메시지의 turnId 를) 쓴다. 더미 시드 대화처럼 실제
    * 백엔드 턴이 없었던 메시지는 이 필드가 없다 — 그 경우 편집/재생성은
-   * 이 대화를 처음부터 새로 시작한다(hooks/use-agent-chat.ts 참고).
+   * 이 대화를 처음부터 새로 시작한다(lib/chat-model-adapter.ts 참고).
    */
   turnId?: string;
+  /** 성공한 `done.data.suggestions`(2~4개, 검증됨). 없으면 후속질문을 표시하지 않는다. */
+  suggestions?: string[];
 }
 
 export interface ChatRequestBody {

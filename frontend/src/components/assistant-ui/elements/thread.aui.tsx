@@ -1,7 +1,7 @@
 /**
  * Adapted from https://r.assistant-ui.com/thread.json (2026-09-16).
  * Official Thread/ViewportFooter/composer/message composition, localized and
- * limited to the capabilities of the existing ExternalStoreRuntime.
+ * limited to the capabilities of the LocalRuntime used by this app.
  */
 import { useEffect, useReducer, useRef, type ComponentProps, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import { AuiIf, ComposerPrimitive, MessagePartPrimitive, MessagePrimitive, ThreadPrimitive } from "@assistant-ui/react";
@@ -10,6 +10,7 @@ import { MessageActions, MessageError } from "./message-actions.aui";
 import { TooltipIconButton } from "./tooltip-icon-button";
 import { EditMessage } from "./edit-message.aui";
 import { MarkdownText } from "./markdown-text";
+import { ThreadFollowupSuggestions } from "./follow-up-suggestions.aui";
 
 export interface ThreadComponents {
   Welcome?: ComponentType;
@@ -55,6 +56,7 @@ export function Thread({ components = EMPTY_COMPONENTS, notice, autoFocus = true
               }}
             </ThreadPrimitive.Messages>
           </div>
+          <ThreadFollowupSuggestions />
           {notice && <div className="pb-4">{notice}</div>}
           <AuiIf condition={(s) => !s.thread.isEmpty}>
             <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mt-auto flex flex-col gap-2 bg-canvas pb-5 pt-3">

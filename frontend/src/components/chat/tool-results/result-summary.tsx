@@ -1,8 +1,9 @@
 import { DataTable, Tag } from "../primitives";
 import {
   asResultColumns,
+  asRecord,
   asResultSummary,
-  asRows,
+  asSampleRows,
   asStrings,
   num,
   type ResultColumnSummary,
@@ -30,9 +31,14 @@ function formatStat(v: ResultColumnSummary["min"] | ResultColumnSummary["mean"])
 export function ResultSummaryCard({ data }: { data: Record<string, unknown> }) {
   const rowCount = num(data.row_count);
   const columns = asResultColumns(data.columns);
-  const sampleRows = asRows(data.sample_rows);
-  const summary = asResultSummary(data.summary);
   const columnNames = columns.map((c) => c.name);
+  const sampleRows = asSampleRows(data.sample_rows, columnNames);
+  // preview는 `statistics`, legacy large_result는 `summary`가 컬럼별 통계다.
+  const preview = typeof data.statistics === "object" && data.statistics !== null;
+  const summary = asResultSummary(preview ? data.statistics : data.summary);
+  const dateRanges = asRecord(data.date_ranges);
+  const distinctCounts = asRecord(data.distinct_counts);
+  const topGroups = asRecord(data.top_groups);
 
   return (
     <div className="flex flex-col gap-2 rounded border border-line bg-surface-2/50 p-3">
@@ -60,6 +66,19 @@ export function ResultSummaryCard({ data }: { data: Record<string, unknown> }) {
                   <span className="font-mono text-ink-2">{col.name}</span>
                   {col.role && <Tag>{ROLE_LABEL[col.role] ?? col.role}</Tag>}
                 </dt>
+                {!stat && dateRanges[col.name] !== undefined && (
+                  <dd className="font-mono text-2xs tabular-nums text-ink-2">
+                    기간 {String(asRecord(dateRanges[col.name]).min ?? "—")} ~ {String(asRecord(dateRanges[col.name]).max ?? "—")}
+                  </dd>
+                )}
+                {!stat && distinctCounts[col.name] !== undefined && dateRanges[col.name] === undefined && (
+                  <dd className="text-2xs text-ink-2">
+                    고유값 {String(distinctCounts[col.name])}개
+                    {Array.isArray(topGroups[col.name]) && (topGroups[col.name] as unknown[]).length > 0 && (
+                      <> · 상위 {(topGroups[col.name] as unknown[]).slice(0, 3).map((g) => String(asRecord(g).value ?? "")).join(", ")}</>
+                    )}
+                  </dd>
+                )}
                 {stat && (
                   <dd className="font-mono text-2xs tabular-nums text-ink-2">
                     min {formatStat(stat.min)} · max {formatStat(stat.max)} · 평균{" "}

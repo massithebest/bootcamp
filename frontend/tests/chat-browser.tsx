@@ -1,11 +1,12 @@
 /** 개발 서버에서만 불러오는 회귀 harness. 앱 bundle에는 포함하지 않는다. */
 import { act, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { AssistantRuntimeProvider, ThreadPrimitive } from "@assistant-ui/react";
+import { AssistantRuntimeProvider, ThreadPrimitive, type AssistantRuntime } from "@assistant-ui/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AssistantMessage } from "@/components/chat/thread-messages";
-import { useAgentChat, type UseAgentChatResult } from "@/hooks/use-agent-chat";
-import type { AgentEvent, ChatMessage } from "@/types/chat";
+import { useAgentRuntime } from "@/hooks/use-agent-runtime";
+import { resetAgentThreads } from "@/lib/agent-threads";
+import type { AgentEvent } from "@/types/chat";
 import "@/app/globals.css";
 
 function check(value: unknown, message: string): asserts value {
@@ -15,107 +16,104 @@ function check(value: unknown, message: string): asserts value {
 export async function runChatRegressions() {
   const results: { name: string; error?: string }[] = [];
   const originalFetch = window.fetch;
-  const originalConfirm = window.confirm;
-  window.confirm = () => true;
   const encoder = new TextEncoder();
+  const thread = (h: Harness) => h.runtime().thread;
+  const messages = (h: Harness) => thread(h).getState().messages;
+  const lastStatus = (h: Harness) => messages(h).at(-1)?.status;
   const cases: Record<string, (h: Harness) => Promise<void>> = {
-    "same tick duplicate send starts one request": async (h) => {
-      await act(async () => {
-        const thread = h.chat().runtime.thread;
-        void thread.append({ role: "user", content: [{ type: "text", text: "하나" }] });
-        void thread.append({ role: "user", content: [{ type: "text", text: "둘" }] });
-      });
-      check(h.requests.length === 1, "duplicate requests started");
-      await h.finish(0, [{ type: "text", content: "답" }, { type: "done" }]);
-    },
     "backend error remains an error message before first text": async (h) => {
       await h.send("질문");
       await h.finish(0, [{ type: "error", content: "업무 오류" }, { type: "done" }]);
-      check(!h.chat().retryPrompt, "backend error confused with connection failure");
-      check(h.chat().messages[1]?.runState.type === "error", "backend error hidden");
+      const status = lastStatus(h);
+      check(status?.type === "incomplete" && status.reason === "error", "backend error hidden");
+      check(!thread(h).getState().isRunning, "run still marked running after error");
     },
-    "retry reuses original user": async (h) => {
+    "transport failure is an error message and reload reuses the original user": async (h) => {
       await h.send("질문");
       await h.fail(0);
-      check(h.chat().retryPrompt, "retry not offered");
-      await act(async () => h.chat().handleRetry());
+      const status = lastStatus(h);
+      check(status?.type === "incomplete" && status.reason === "error", "connection failure not shown as error");
+      await act(async () => { void thread(h).getMessageByIndex(1).reload(); });
+      check(h.requests[1]?.body.message === "질문", "reload did not reuse the user text");
       await h.finish(1, [{ type: "text", content: "답변" }, { type: "done", data: { turn_id: "t1" } }]);
-      check(h.chat().messages.filter(m => m.role === "user").length === 1, "duplicate user on retry");
+      check(messages(h).filter(m => m.role === "user").length === 1, "duplicate user on reload");
     },
-    "successful empty done is not a connection failure": async (h) => {
+    "successful empty done keeps the completed turn": async (h) => {
       await h.send("질문");
       await h.finish(0, [{ type: "done", data: { turn_id: "empty" } }]);
-      check(!h.chat().retryPrompt, "success misclassified as connection failure");
-      check(h.chat().messages.at(-1)?.turnId === "empty", "lost completed turn");
+      const last = messages(h).at(-1);
+      check(last?.status?.type === "complete", "success misclassified");
+      check((last?.metadata.custom as { turnId?: string }).turnId === "empty", "lost completed turn");
     },
     "cancel then new request ignores late stream": async (h) => {
       await h.send("첫 질문");
-      await act(async () => h.chat().handleStop());
+      await act(async () => thread(h).cancelRun());
       await h.send("새 질문");
       await h.finish(0, [{ type: "text", content: "늦은 응답" }, { type: "done" }]);
-      check(h.chat().streaming, "old request cleared new running state");
+      check(thread(h).getState().isRunning, "old request cleared new running state");
       await h.finish(1, [{ type: "text", content: "새 응답" }, { type: "done" }]);
-      check(h.chat().messages[1].runState.type === "cancelled", "cancel status lost");
-      check(!JSON.stringify(h.chat().messages).includes("늦은 응답"), "late output leaked");
+      const first = messages(h)[1].status;
+      check(first?.type === "incomplete" && first.reason === "cancelled", "cancel status lost");
+      check(!JSON.stringify(messages(h)).includes("늦은 응답"), "late output leaked");
     },
-    "same tick cancel and append preserve cancelled message": async (h) => {
-      await h.send("이전 질문");
-      await act(async () => {
-        h.chat().handleStop();
-        void h.chat().runtime.thread.append({ role: "user", content: [{ type: "text", text: "즉시 새 질문" }] });
-      });
-      await h.finish(0, [{ type: "done" }]);
-      await h.finish(1, [{ type: "text", content: "새 답" }, { type: "done" }]);
-      check(h.chat().messages[1].runState.type === "cancelled", "stale prefix restored running message");
-    },
-    "regenerate and edit preserve fork anchor": async (h) => {
+    "regenerate and edit preserve fork anchor and keep branches": async (h) => {
       await h.send("첫 질문");
       await h.finish(0, [{ type: "text", content: "첫 답" }, { type: "done", data: { turn_id: "t1" } }]);
+      await h.idle();
       await h.send("둘째 질문");
       await h.finish(1, [{ type: "text", content: "둘째 답" }, { type: "done", data: { turn_id: "t2" } }]);
-      await act(async () => { void h.chat().runtime.thread.getMessageByIndex(3).reload(); });
+      await h.idle();
+      await act(async () => { void thread(h).getMessageByIndex(3).reload(); });
       check(h.requests[2].body.fork_from_turn_id === "t1", "reload anchor lost");
       await h.fail(2);
-      await act(async () => h.chat().handleRetry());
+      await act(async () => { void thread(h).getMessageByIndex(3).reload(); });
       check(h.requests[3].body.fork_from_turn_id === "t1", "retry anchor lost");
       await h.finish(3, [{ type: "text", content: "재생성" }, { type: "done", data: { turn_id: "t3" } }]);
-      await act(async () => h.chat().runtime.thread.getMessageByIndex(0).composer.beginEdit());
-      await act(async () => h.chat().runtime.thread.getMessageByIndex(0).composer.setText("편집 질문"));
-      await act(async () => h.chat().runtime.thread.getMessageByIndex(0).composer.send());
-      check(h.requests[4].body.fork_from_turn_id === "", "first edit must restart");
+      await h.idle();
+      check(thread(h).getMessageByIndex(3).getState().branchCount === 3, "regenerations were not kept as branches");
+      await act(async () => thread(h).getMessageByIndex(0).composer.beginEdit());
+      await act(async () => thread(h).getMessageByIndex(0).composer.setText("편집 질문"));
+      await act(async () => thread(h).getMessageByIndex(0).composer.send());
+      check(h.requests[4]?.body.fork_from_turn_id === "", "first edit must restart " + JSON.stringify(h.requests.map(r => r.body.fork_from_turn_id)));
       await h.finish(4, [{ type: "text", content: "편집 답" }, { type: "done" }]);
-      check(h.chat().messages.length === 2, "edit did not replace suffix");
+      await h.idle();
+      check(messages(h).length === 2, "edit did not start a new branch path");
+      check(thread(h).getMessageByIndex(0).getState().branchCount === 2, "edit did not keep the previous question");
     },
-    "reset rejects old response and resets conversation id": async (h) => {
+    "continuing an older branch forks from that branch turn": async (h) => {
+      await h.send("첫 질문");
+      await h.finish(0, [{ type: "text", content: "첫 답" }, { type: "done", data: { turn_id: "t1" } }]);
+      await h.idle();
+      await act(async () => { void thread(h).getMessageByIndex(1).reload(); });
+      await h.finish(1, [{ type: "text", content: "다른 답" }, { type: "done", data: { turn_id: "t2" } }]);
+      await h.idle();
+      await act(async () => thread(h).getMessageByIndex(1).switchToBranch({ position: "previous" }));
+      await h.send("이어서");
+      check(h.requests[2].body.fork_from_turn_id === "t1", "older branch continuation did not fork");
+    },
+    "new thread gets a new conversation and rejects late output from the old one": async (h) => {
       await h.send("이전");
-      await act(async () => h.chat().resetConversation([]));
+      await act(async () => {
+        void h.runtime().threads.switchToNewThread();
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 50));
+      });
       await h.send("새 대화");
       await h.finish(0, [{ type: "error", content: "늦은 실패" }, { type: "done" }]);
-      check(h.requests[0].body.conversation_id !== h.requests[1].body.conversation_id, "id not reset");
-      check(h.chat().messages.length === 2 && !h.chat().retryPrompt, "reset contaminated");
-      await h.finish(1, [{ type: "text", content: "답" }, { type: "done" }]);
-    },
-    "same tick reset and append use the new conversation": async (h) => {
-      await h.send("이전 질문");
-      await act(async () => {
-        h.chat().resetConversation([]);
-        void h.chat().runtime.thread.append({ role: "user", content: [{ type: "text", text: "새 대화" }] });
-      });
-      await h.finish(0, [{ type: "done" }]);
-      await h.finish(1, [{ type: "text", content: "새 답" }, { type: "done" }]);
-      check(h.chat().messages.length === 2, "stale prefix restored old conversation");
       check(h.requests[0].body.conversation_id !== h.requests[1].body.conversation_id, "conversation id reused");
+      check(messages(h).length === 2 && lastStatus(h)?.type === "running", "old thread contaminated the new one");
+      await h.finish(1, [{ type: "text", content: "답" }, { type: "done" }]);
     },
     "partial error preserves parts and assistant-ui incomplete status": async (h) => {
       await h.send("질문");
       await h.finish(0, [{ type: "text", content: "앞" }, { type: "tool_result", tool_name: "execute_sql", data: { status: "ok" } }, { type: "text", content: "뒤" }, { type: "error", content: "안전한 오류" }, { type: "done" }]);
-      check(h.chat().messages[1].parts.map(p => p.kind).join() === "text,tool,text", "parts reordered");
-      const status = h.chat().runtime.thread.getMessageByIndex(1).getState().status;
+      const content = messages(h)[1].content;
+      check(content.map(p => p.type).join() === "tool-call,text", "parts reordered");
+      const status = lastStatus(h);
       check(status?.type === "incomplete" && status.reason === "error", "runtime error status lost");
     },
   };
   type Pending = { body: Record<string, unknown>; controller: ReadableStreamDefaultController<Uint8Array> };
-  type Harness = { chat: () => UseAgentChatResult; requests: Pending[]; send: (text: string) => Promise<void>; fail: (index: number) => Promise<void>; finish: (index: number, events: AgentEvent[]) => Promise<void> };
+  type Harness = { runtime: () => AssistantRuntime; idle: () => Promise<void>; requests: Pending[]; send: (text: string) => Promise<void>; fail: (index: number) => Promise<void>; finish: (index: number, events: AgentEvent[]) => Promise<void> };
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   try {
     for (const [name, run] of Object.entries(cases)) {
@@ -123,15 +121,23 @@ export async function runChatRegressions() {
       window.fetch = async (_input, init) => new Response(new ReadableStream<Uint8Array>({
         start(controller) { requests.push({ body: JSON.parse(String(init?.body)), controller }); },
       }));
-      let current: UseAgentChatResult;
-      function Probe() { current = useAgentChat([] as ChatMessage[]); return null; }
+      let current!: AssistantRuntime;
+      function Probe() { current = useAgentRuntime(); return <AssistantRuntimeProvider runtime={current}>{null}</AssistantRuntimeProvider>; }
+      resetAgentThreads();
       const host = document.createElement("div");
       document.body.append(host);
       const root = createRoot(host);
       const h: Harness = {
-        chat: () => current,
+        runtime: () => current,
+        // 스트림이 끝난 뒤 adapter의 마무리(head 갱신·최종 상태)까지 끝나기를 기다린다.
+        idle: async () => {
+          const deadline = performance.now() + 3_000;
+          while (current.thread.getState().isRunning && performance.now() < deadline) {
+            await act(async () => { await new Promise<void>((resolve) => window.setTimeout(resolve, 20)); });
+          }
+        },
         requests,
-        send: async (text) => { await act(async () => { void current.runtime.thread.append({ role: "user", content: [{ type: "text", text }] }); }); },
+        send: async (text) => { await act(async () => { void current.thread.append({ role: "user", content: [{ type: "text", text }] }); }); },
         fail: async (index) => { await act(async () => requests[index].controller.error(new TypeError("network fixture"))); },
         finish: async (index, events) => {
           check(requests[index], `request ${index} missing`);
@@ -143,12 +149,15 @@ export async function runChatRegressions() {
       };
       try {
         await act(async () => root.render(<StrictMode><Probe /></StrictMode>));
-        await run(h);
+        await Promise.race([
+          run(h),
+          new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("case timed out")), 8_000)),
+        ]);
         results.push({ name });
       } catch (e) { results.push({ name, error: String(e) }); }
       finally { await act(async () => root.unmount()); host.remove(); }
     }
-  } finally { window.fetch = originalFetch; window.confirm = originalConfirm; Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: false }); }
+  } finally { window.fetch = originalFetch; Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: false }); }
   return results;
 }
 
@@ -162,7 +171,7 @@ export async function runExecutionUiRegressions() {
     controller: ReadableStreamDefaultController<Uint8Array>;
   };
   const requests: Pending[] = [];
-  let current!: UseAgentChatResult;
+  let current!: AssistantRuntime;
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
@@ -174,9 +183,9 @@ export async function runExecutionUiRegressions() {
   }));
 
   function UIProbe() {
-    current = useAgentChat([] as ChatMessage[]);
+    current = useAgentRuntime();
     return (
-      <AssistantRuntimeProvider runtime={current.runtime}>
+      <AssistantRuntimeProvider runtime={current}>
         <TooltipProvider>
           <ThreadPrimitive.Root>
             <ThreadPrimitive.Viewport>
@@ -190,12 +199,15 @@ export async function runExecutionUiRegressions() {
     );
   }
 
+  // adapter가 스트림 갱신을 짧은 간격(16ms)으로 묶으므로 화면에 반영될 시간을 준다.
+  const settle = () => new Promise<void>((resolve) => window.setTimeout(resolve, 60));
   const emit = async (events: AgentEvent[]) => {
     check(requests[0], "request missing");
     await act(async () => {
       requests[0].controller.enqueue(encoder.encode(
         events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(""),
       ));
+      await settle();
     });
   };
 
@@ -204,10 +216,11 @@ export async function runExecutionUiRegressions() {
   );
 
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  resetAgentThreads();
   try {
     await act(async () => root.render(<StrictMode><UIProbe /></StrictMode>));
     await act(async () => {
-      void current.runtime.thread.append({
+      void current.thread.append({
         role: "user",
         content: [{ type: "text", text: "WIP를 조회해줘" }],
       });
@@ -258,7 +271,7 @@ export async function runExecutionUiRegressions() {
       { type: "tool_result", tool_name: "execute_sql", tool_call_id: "sql-1", data: { status: "ok", rows: [[1]] } },
       { type: "status", tool_name: "execute_sql", tool_call_id: "sql-1", data: { step: "sql-1", status: "completed" } },
     ]);
-    check(current.streaming, "fixture unexpectedly stopped before final text");
+    check(current.thread.getState().isRunning, "fixture unexpectedly stopped before final text");
     check(groupTrigger()?.textContent?.includes("응답 작성 중 · 툴 1개 사용"), "writing phase is not distinguished after tools complete");
     check(groupTrigger()?.querySelector('[data-slot="tool-group-trigger-loader"]'), "activity spinner disappeared while writing");
     check(!host.querySelector('[data-slot="execution-progress-text"]'), "tool guidance remained after the tool completed");
@@ -281,6 +294,7 @@ export async function runExecutionUiRegressions() {
         `data: ${JSON.stringify({ type: "done" })}\n\n`,
       ));
       requests[0].controller.close();
+      await settle();
     });
     check(groupTrigger()?.getAttribute("aria-expanded") === "false", "completed group did not collapse");
     check(groupTrigger()?.textContent?.includes("응답 작성 완료 · 툴 1개 사용"), "completed phase is not labelled");

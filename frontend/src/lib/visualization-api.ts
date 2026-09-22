@@ -39,7 +39,7 @@ function isCategory(value: unknown): value is string | number {
   );
 }
 
-function parseWarnings(value: unknown): VisualizationWarning[] | null {
+export function parseWarnings(value: unknown): VisualizationWarning[] | null {
   if (!Array.isArray(value)) return null;
   const warnings: VisualizationWarning[] = [];
   for (const warning of value) {
@@ -55,8 +55,12 @@ function parseWarnings(value: unknown): VisualizationWarning[] | null {
   return warnings;
 }
 
-function parseChart(value: unknown): ChartSpec | null {
-  if (!isRecord(value) || (value.type !== "bar" && value.type !== "line")) {
+/** legacy 시각화 API는 bar/line만, 새 Result chart API는 area까지 허용한다. */
+export function parseChartSpec(
+  value: unknown,
+  allowed: readonly ChartSpec["type"][] = ["bar", "line"],
+): ChartSpec | null {
+  if (!isRecord(value) || !allowed.includes(value.type as ChartSpec["type"])) {
     return null;
   }
   if (
@@ -111,7 +115,7 @@ function parseChart(value: unknown): ChartSpec | null {
   }
 
   return {
-    type: value.type,
+    type: value.type as ChartSpec["type"],
     x: value.x,
     series,
     categories: value.categories,
@@ -138,7 +142,7 @@ export function parseVisualizationResponse(
   ) {
     return null;
   }
-  const chart = parseChart(value.chart);
+  const chart = parseChartSpec(value.chart);
   const warnings = parseWarnings(value.warnings);
   if (!chart || !warnings) return null;
   return {

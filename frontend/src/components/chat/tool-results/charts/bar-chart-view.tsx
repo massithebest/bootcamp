@@ -7,6 +7,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import type { ChartSpec } from "@/types/chat";
 
 const PALETTE = [
@@ -17,7 +18,14 @@ const PALETTE = [
   "var(--chart-5)",
 ];
 
-export function BarChartView({ chart }: { chart: ChartSpec }) {
+export function BarChartView({
+  chart,
+  alwaysLegend = false,
+}: {
+  chart: ChartSpec;
+  alwaysLegend?: boolean;
+}) {
+  const reduced = useReducedMotion();
   const config: ChartConfig = Object.fromEntries(
     chart.series.map((s, i) => [
       s.key,
@@ -52,13 +60,14 @@ export function BarChartView({ chart }: { chart: ChartSpec }) {
           }
         />
         <ChartTooltip content={<ChartTooltipContent />} />
-        {chart.series.length > 1 && <ChartLegend content={<ChartLegendContent />} />}
+        {(alwaysLegend || chart.series.length > 1) && <ChartLegend content={<ChartLegendContent />} />}
         {chart.series.map((s, i) => (
           <Bar
             key={s.key}
             dataKey={s.key}
             fill={PALETTE[i % PALETTE.length]}
             radius={2}
+            isAnimationActive={!reduced}
           />
         ))}
       </BarChart>
