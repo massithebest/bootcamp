@@ -12,6 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes_chat import router as chat_router
 from api.routes_knowledge import router as knowledge_router
+from api.routes_me import router as me_router
+from api.routes_query_results import router as query_results_router
 from api.routes_visualizations import router as visualizations_router
 from core.config import CORS_ALLOW_ORIGINS
 from services.result_store import cleanup_expired
@@ -77,6 +79,16 @@ app.include_router(
 
 app.include_router(
     knowledge_router,
+    prefix="/api",
+)
+
+app.include_router(
+    me_router,
+    prefix="/api",
+)
+
+app.include_router(
+    query_results_router,
     prefix="/api",
 )
 

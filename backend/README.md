@@ -24,9 +24,13 @@ Windows PowerShell에서는 `py -3.11 -m venv .venv`와
 
 - `ENV=dev|prod`: `prod`에서는 real service와 별도 운영 지식 경로를 강제
 - `SERVICE_MODE=mock|real`: SQL·RAG·simulation service 선택. `prod`는 `real`만 허용
+- `RESULT_UI_MODE=legacy|present`: 결과 표시 방식(기본 `legacy`). `present`는 bounded preview와 `present`
+  Generative UI Tool, `/api/query-results/*` 조회를 사용하고 `prepare_table`·`prepare_visualization`은 등록하지 않는다
 - `LLM_PROVIDER`, `AGENT_MODEL`, provider key: 실제 Agent SDK 설정
 - `KNOWLEDGE_DIR`, `KNOWLEDGE_DB_PATH`: 구조화 YAML과 텍스트 지식 SQLite 위치
 - `KNOWLEDGE_SEARCH_BACKEND=local|service`: `search_documents`가 로컬 SQLite 또는 사내 RAG 어댑터를 쓸지 선택
+- `KNOWLEDGE_MANAGEMENT_ENABLED`, `KNOWLEDGE_ALLOW_SELF_APPROVAL`, `KNOWLEDGE_PRINCIPALS`,
+  `KNOWLEDGE_DEFAULT_PRINCIPAL`: 구조화 지식 변경 요청·승인의 스텁 권한 설정(값은 `.env.example` 참고)
 - `RESULT_STORE_DIR`, `VISUALIZATION_STORE_DIR`: 조회 결과와 차트 명세 위치
 - `CORS_ALLOW_ORIGINS`: 쿠키를 허용할 명시적 Frontend origin 목록
 
@@ -75,10 +79,16 @@ SDK `query`를 대체해 Agent 이벤트 흐름을 검증한다. `services/real`
 - `GET /api/knowledge/tools|skills|entries|catalog|kpis`: Tool·Skill·구조화 지식 탐색
   (`catalog`·`kpis`는 활성 table·KPI 요약)
 - `/api/knowledge/documents`: 텍스트 지식 등록·버전·검토·활성화 관리
-- `GET /api/visualizations/{visualization_id}`: 검증된 bar/line 차트 데이터
+- `/api/knowledge/changes`, `/validate`, `/guides/{kind}`, `/source/{kind}/{key}`: 구조화 YAML
+  변경 요청·검증·승인. 직접 수정 API는 없고 승인된 변경만 `KNOWLEDGE_DIR` YAML에 반영
+- `GET /api/me`: 현재 principal, 권한과 관리 기능 플래그
+- `GET /api/visualizations/{visualization_id}`: 검증된 bar/line 차트 데이터(legacy)
+- `GET /api/query-results/{result_id}/preview|table|chart`: 저장 결과의 bounded preview,
+  저장된 최대 1,000건을 검색·정렬한 page 단위 표(≤100행), 서버 집계
+  chart(bar/line/area, series ≤8·point ≤500). 없음·만료·타 세션은 동일한 404
 - `GET /health`: 상태 확인
 
-Result Store와 `prepare_table`, `prepare_visualization`은 세션 범위 쿠키
+Result Store와 `prepare_table`, `prepare_visualization`, `/api/query-results/*`는 세션 범위 쿠키
 `pp_session_scope`를 사용한다. 내부 파일 경로와 접근 scope는 모델 입력이나 Tool
 payload에 노출하지 않는다.
 

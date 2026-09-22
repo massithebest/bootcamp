@@ -49,7 +49,9 @@ updated: 2026-09-15
   목록에서 제외하고 상세 조회는 비활성 원천 table 이름을 알리는 오류를 반환한다.
   KPI는 `sources`만 기준으로 하며 `recipe_refs`의 recipe가 비활성이어도 사용할 수 있다.
 - 필드를 생략한 기존 YAML은 하위 호환을 위해 `active: true`로 처리한다.
-- YAML은 시작 시 메모리에 로드되므로 값을 바꾼 뒤 Backend를 재시작한다.
+- YAML은 시작 시 메모리에 로드되므로 파일을 직접 바꾼 경우 Backend를 재시작한다.
+  관리 화면의 변경 요청을 승인하면 서버가 파일을 쓰고 즉시 다시 읽으므로 재시작이
+  필요 없다([구조화 지식 변경 요청과 승인](#구조화-지식-변경-요청과-승인) 참고).
 - `draft`는 구조 검증만 통과했거나 업무 담당자가 확인하지 않은 상태다.
 - `verified`는 실제 테이블·업무 정의·단위와 비교 기준을 담당자가 확인한 상태다.
 - 테스트 통과는 `verified`의 근거가 아니다.
@@ -514,6 +516,63 @@ join 및 입력 관계 unmatched 건수를 포함한다.
 전체 설치와 real 서비스 이식은 [폐쇄망 배포 및 이식 가이드](CLOSED_NETWORK_SETUP.md)를
 따른다.
 
+## 구조화 지식 변경 요청과 승인
+
+table·KPI·recipe·simulation·glossary·scenario YAML은 관리 화면에서 변경 요청으로
+수정한다. YAML 파일이 계속 런타임 단일 기준이며, 초안·검토·이력만 텍스트 지식과
+같은 SQLite(`KNOWLEDGE_DB_PATH`)의 `change_requests`, `change_history`에 둔다.
+
+### 흐름과 상태
+
+`draft → submitted → approved | rejected`, `draft|submitted|rejected → withdrawn`.
+반려된 요청은 작성자가 수정하면 `draft`로 돌아간다. `approved`, `withdrawn`은 종료
+상태다. 같은 (종류, 식별자)에는 진행 중인 요청이 하나만 있다.
+
+- 작성자만 자기 요청을 수정·제출·철회한다. 승인 권한자는 승인·반려한다.
+- 제출은 모델 검증과 정합성 검사를 통과해야 한다. 승인 시점에 다시 검사한다.
+- 정합성 검사는 `services/knowledge_integrity.py`의 규칙(참조 table·KPI sources·recipe
+  cte_sql·diagnostics·scenario·용어집 링크 등)을 쓴다. 변경 전에 이미 있던 문제는
+  막지 않고 **이번 변경이 새로 만든 문제**만 막는다.
+- 승인·반려는 근거 메모가 필수다. 작성자 본인 승인은 기본 차단이며
+  `KNOWLEDGE_ALLOW_SELF_APPROVAL=true`일 때만 허용하고 이력에 `self_approved`를 남긴다.
+- 승인은 `status: verified`, `updated: 오늘`을 기록하고 비어 있는 `owner`는 작성자로
+  채운다. 작성자가 낸 `status`·`updated`는 무시된다(`verified`는 승인만 만든다).
+- 기준 YAML이 요청 생성 이후 바뀌었으면(내용 해시 불일치) 제출·승인을 409로 막는다.
+  최신 내용으로 다시 작성한다.
+- 비활성화는 삭제가 아니라 `active: false` 변경 요청이다. 삭제 기능은 없다.
+
+### 파일 반영
+
+승인하면 서버가 정규화한 YAML을 임시 파일에 쓰고 `os.replace`로 교체한 뒤 store를
+다시 읽는다. reload가 실패하면 원래 파일 내용으로 복구하고(신규 파일은 삭제) 요청은
+`submitted`로 남는다. 기존 파일은 파일명이 아니라 항목 키로 찾아 그 파일을 덮어쓴다.
+새 항목은 종류별 디렉터리에 `<식별자>.yaml`로 만들며 식별자는 문자·숫자·밑줄·
+하이픈 100자 이하만 허용한다. glossary는 `glossary.yaml` 목록에서 해당 용어만 교체하거나
+끝에 추가한다.
+
+정규화 직렬화는 기본값을 생략하고 관리 메타를 끝에 두며 주석·flow 스타일을 보존하지
+않는다. 처음 승인하는 파일은 서식 차이 때문에 git diff가 클 수 있다. 값은 바뀌지
+않으며 번들 YAML 전체가 정규화 후에도 같은 모델로 다시 읽히는 것을 테스트로 고정한다.
+
+### 권한과 인증 전환
+
+권한은 역할 이름이 아니라 `knowledge:write`, `knowledge:approve` 단위로 검사한다.
+인증 체계가 없는 지금은 `X-User-Id` 헤더를 `KNOWLEDGE_PRINCIPALS` 설정과 대조하는
+스텁이며 **보안 경계가 아니다**. 내부 공용 기능에서 작성자·승인자를 구분해 기록하기 위한
+값이고 헤더는 위조할 수 있다. 실제 인증이 생기면 `core/principal.py::current_principal`만
+교체한다. 라우트와 화면은 `GET /api/me`의 `permissions`, `mode`만 보므로 바뀌지 않는다.
+
+### 운영 전제
+
+- 승인 즉시 reload는 uvicorn 단일 워커를 전제한다. 다중 워커면 다른 워커의 메모리
+  store가 갱신되지 않으므로 파일 변경 감지 등 별도 설계 전에는 사용하지 않는다.
+- `KNOWLEDGE_DIR`는 서비스 계정이 쓸 수 있어야 한다. 개발에서 번들 `backend/knowledge/`를
+  쓰면 승인이 git 변경으로 나타난다. 시험은 복사본 디렉터리를 `KNOWLEDGE_DIR`로 지정한다.
+- `KNOWLEDGE_DIR`(YAML)와 `KNOWLEDGE_DB_PATH`(요청·이력)는 함께 백업한다. 승인 이력의
+  근거 메모와 최종 YAML이 서로 다른 시점이면 감사가 어긋난다.
+- `KNOWLEDGE_MANAGEMENT_ENABLED=false`면 변경 요청의 쓰기 동작이 403이며 조회는 가능하다.
+- 로그에는 YAML 본문, 경로, 사용자 식별자를 남기지 않는다.
+
 ## 텍스트 지식 관리 (2026-09-16)
 
 텍스트 지식은 별도 SQLite(`KNOWLEDGE_DB_PATH`, 기본 `backend/data/knowledge.sqlite3`)에
@@ -521,7 +580,7 @@ join 및 입력 관계 unmatched 건수를 포함한다.
 자료가 있으므로 소스와 함께 커밋하지 않는다. 배포 볼륨으로 영속 보관한다.
 
 구조화 지식은 `backend/knowledge/` YAML의 `active` 값으로 Agent 검색 반영 여부를
-정하며 관리 화면에서는 계속 읽기 전용으로 조회한다. 텍스트 지식의
+정하며, 관리 화면에서는 변경 요청과 승인으로만 수정한다(아래 절). 텍스트 지식의
 작성·검토·활성화·보관은 이 폐쇄망 앱의
 내부 공용 관리 기능으로 바로 제공한다. 작성자·검토자 이름은 기록용이며 인증된
 사용자 신원이나 조직 권한을 의미하지 않는다. 기존 pp_session_scope도 인증으로

@@ -3,14 +3,24 @@
 import re
 from pathlib import Path
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+from pydantic_core import to_jsonable_python
 from typing import Literal
 
 from agent.sdk_tools import tool_catalog
 from api.schemas import (KnowledgeDocumentInput, KnowledgeDocumentUpdate, KnowledgeActionInput,
-    KnowledgeDocumentResponse, KnowledgeVersion, KnowledgeEntryResponse, KnowledgeEntryDetail, KnowledgeToolResponse)
+    KnowledgeDocumentResponse, KnowledgeVersion, KnowledgeEntryResponse, KnowledgeEntryDetail, KnowledgeToolResponse,
+    ChangeStateName, KnowledgeChangeAction, KnowledgeChangeDetail, KnowledgeChangeInput, KnowledgeChangeSummary,
+    KnowledgeChangeUpdate, KnowledgeKindName, KnowledgeSourceResponse, KnowledgeValidateInput,
+    KnowledgeValidationResponse)
+from core.config import KNOWLEDGE_PERMISSION_APPROVE, KNOWLEDGE_PERMISSION_WRITE
+from core.principal import Principal, current_principal, require
+from services import knowledge_writer
 from services.document_store import KnowledgeError, get_document_store
 from services.knowledge_browser import entries
+from services.knowledge_change_store import get_change_store
+from services.knowledge_guides import guide
+from services.knowledge_yaml import model_to_data
 
 from agent.agent import AGENT_SDK_CWD
 from services.knowledge_service import get_store
@@ -130,3 +140,74 @@ def document_version(document_id: str, version: int):
 def document_action(document_id: str, action: Literal["review", "activate", "deactivate", "archive"], body: KnowledgeActionInput):
     return get_document_store().transition(document_id, action, body.expected_revision,
                                          version=body.version, actor=body.actor, note=body.note)
+
+
+# ---- 구조화 지식 변경 요청 (초안 → 제출 → 승인). YAML 은 승인으로만 바뀐다. ----
+
+
+@router.get("/guides/{kind}")
+def knowledge_guide(kind: KnowledgeKindName) -> dict:
+    return guide(kind)
+
+
+@router.get("/source/{kind}/{key}", response_model=KnowledgeSourceResponse)
+def knowledge_source(kind: KnowledgeKindName, key: str):
+    """수정 요청을 시작할 현재 지식의 정규화 YAML 과 폼 데이터."""
+
+    item = knowledge_writer.find_item(knowledge_writer.load_disk_store(), kind, key)
+    if item is None:
+        raise KnowledgeError(404, "지식을 찾을 수 없습니다.")
+    return {"kind": kind, "key": key, "yaml": knowledge_writer.normalized_yaml(item),
+            "data": to_jsonable_python(model_to_data(item))}
+
+
+@router.post("/validate", response_model=KnowledgeValidationResponse)
+def validate_change(body: KnowledgeValidateInput, _: Principal = Depends(require(KNOWLEDGE_PERMISSION_WRITE))):
+    return knowledge_writer.validate(body.kind, yaml_text=body.yaml, data=body.data, key=body.key)
+
+
+@router.get("/changes", response_model=list[KnowledgeChangeSummary])
+def list_changes(state: ChangeStateName | None = None, kind: KnowledgeKindName | None = None,
+                 mine: bool = False, principal: Principal = Depends(current_principal)):
+    return get_change_store().list(state=state, kind=kind, author_id=principal.id if mine else None)
+
+
+@router.post("/changes", status_code=201, response_model=KnowledgeChangeDetail)
+def create_change(body: KnowledgeChangeInput, principal: Principal = Depends(require(KNOWLEDGE_PERMISSION_WRITE))):
+    return get_change_store().create(principal, body.kind, yaml_text=body.yaml, data=body.data, key=body.key)
+
+
+@router.get("/changes/{change_id}", response_model=KnowledgeChangeDetail)
+def change_detail(change_id: str):
+    return get_change_store().get(change_id)
+
+
+@router.put("/changes/{change_id}", response_model=KnowledgeChangeDetail)
+def update_change(change_id: str, body: KnowledgeChangeUpdate,
+                  principal: Principal = Depends(require(KNOWLEDGE_PERMISSION_WRITE))):
+    return get_change_store().update(principal, change_id, body.expected_revision,
+                                     yaml_text=body.yaml, data=body.data)
+
+
+@router.post("/changes/{change_id}/submit", response_model=KnowledgeChangeDetail)
+def submit_change(change_id: str, body: KnowledgeChangeAction,
+                  principal: Principal = Depends(require(KNOWLEDGE_PERMISSION_WRITE))):
+    return get_change_store().transition(principal, change_id, "submit", body.expected_revision, body.note)
+
+
+@router.post("/changes/{change_id}/withdraw", response_model=KnowledgeChangeDetail)
+def withdraw_change(change_id: str, body: KnowledgeChangeAction,
+                    principal: Principal = Depends(require(KNOWLEDGE_PERMISSION_WRITE))):
+    return get_change_store().transition(principal, change_id, "withdraw", body.expected_revision, body.note)
+
+
+@router.post("/changes/{change_id}/approve", response_model=KnowledgeChangeDetail)
+def approve_change(change_id: str, body: KnowledgeChangeAction,
+                   principal: Principal = Depends(require(KNOWLEDGE_PERMISSION_APPROVE))):
+    return get_change_store().transition(principal, change_id, "approve", body.expected_revision, body.note)
+
+
+@router.post("/changes/{change_id}/reject", response_model=KnowledgeChangeDetail)
+def reject_change(change_id: str, body: KnowledgeChangeAction,
+                  principal: Principal = Depends(require(KNOWLEDGE_PERMISSION_APPROVE))):
+    return get_change_store().transition(principal, change_id, "reject", body.expected_revision, body.note)

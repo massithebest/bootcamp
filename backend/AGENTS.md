@@ -47,8 +47,9 @@ SDK 이벤트를 SSE로 전달한다. 코드 변경 전 `plan/Todo.md`와 대상
   `tool_call_id`를 사용한다. `tool_call.data.args`에는 공개 가능한 모델 입력만
   넣고 access scope, provider 설정과 내부 SDK 이벤트는 노출하지 않는다.
 - partial `text_delta`만 `text`로 전달하고 같은 provider message의 최종 누적
-  `TextBlock`을 중복 전송하지 않는다. thinking/signature/불완전 tool JSON은
-  공개 이벤트로 변환하지 않는다.
+  `TextBlock`을 중복 전송하지 않는다. signature/불완전 tool JSON과 모델 thinking
+  (`ThinkingBlock`)은 어떤 경우에도 공개 이벤트로 변환하지 않는다. 지침의
+  "내부 추론 과정은 노출하지 않는다"는 답변 text 규칙이다.
 - 포크 anchor에는 transcript에 존재하는 `AssistantMessage` 또는 `UserMessage`
   UUID만 사용한다. `ResultMessage.uuid`를 `resume_session_at`에 전달하지 않는다.
   fork ID 생략은 계속 진행, 빈 문자열은 새 대화, 알 수 없는 ID는 오류 후 안전한
@@ -56,18 +57,32 @@ SDK 이벤트를 SSE로 전달한다. 코드 변경 전 `plan/Todo.md`와 대상
 - streaming 오류는 내부 예외를 숨기고 `error` 다음 `done` 이벤트를 보낸다.
 - 조회 결과는 `services/result_store.py`로 저장하며 내부 parquet 경로를 tool
   payload에 노출하지 않는다.
-- 차트는 `prepare_visualization`이 실제 `result_id`와 grain을 검증해 등록한다.
-  `/api/visualizations/{id}`만 조회 진입점으로 사용하고 SQL·시뮬레이션 결과에
-  자동 차트를 붙이지 않는다.
-- 독립 표는 `prepare_table`이 실제 `result_id`, access scope와 선택 컬럼을
-  검증해 최대 100행만 반환한다. 원본 행 배열을 모델 입력으로 받지 않는다.
-- 표 요청 또는 Markdown 표 응답에서 모델이 호출을 빠뜨리면 `run_agent`가 마지막
-  접근 가능한 Result Store 결과로 `prepare_table` 이벤트를 보완한다.
+- 결과 표시 방식은 `RESULT_UI_MODE`(`core/config.py`)가 정한다. 값은 payload 형태·
+  등록 Tool(`sdk_tools.planning_tools(mode=)`)·Agent 지침 디렉터리(`agent_sdk/` ↔
+  `agent_sdk_present/`)·자동 표 보완을 함께 바꾼다. 기본은 `legacy`다.
+- `legacy`: 차트는 `prepare_visualization`이 실제 `result_id`와 grain을 검증해 등록하고
+  `/api/visualizations/{id}`로 조회한다. 독립 표는 `prepare_table`이 `result_id`, access
+  scope와 선택 컬럼을 검증해 최대 100행만 반환한다. 표 요청 또는 Markdown 표 응답에서
+  모델이 호출을 빠뜨리면 `run_agent`가 마지막 접근 가능한 Result Store 결과로
+  `prepare_table` 이벤트를 보완한다. SQL·시뮬레이션 결과에 자동 차트를 붙이지 않는다.
+- `present`: `execute_sql`·`run_simulation`은 전체 행 없이 bounded preview
+  (`services/query_result_service.tool_preview`)만 반환하고, 모델은 `present`
+  (`services/present_service.py` vocabulary·검증)로 `resultId`와 표시 설정만 담은 UI
+  트리를 조합한다. 표·차트·preview는 `/api/query-results/{result_id}/…`가 저장 없이
+  조회하며(`services/query_result_service.py`, `chart_projection.py`) 없음·만료·타 scope는
+  모두 404 `RESULT_NOT_FOUND`다. 자동 표 보완은 하지 않는다. vocabulary를 바꾸면 소비자의
+  schema fixture와 `agent_sdk_present/` 지침을 같은 작업에서 갱신한다.
+- `agent_sdk_present/`는 `agent_sdk/`와 결과 표시 절차만 다르다. `kpi-shortfall-analysis`
+  Skill은 같은 내용을 유지하며 테스트가 일치를 검사한다.
 - 환경변수는 `core/config.py`에서만 읽는다. 새 키는 실제 값 없이
   `.env.example`에도 추가한다.
 - 작성형 텍스트 지식은 `services/document_store.py`의 로컬 SQLite에서 버전·검토·
-  활성화 상태를 관리한다. 구조화 YAML은 계속 읽기 전용이며 두 저장소를 섞어
-  수정하지 않는다.
+  활성화 상태를 관리한다. 구조화 YAML은 직접 수정하는 API가 없고, 변경 요청
+  (`services/knowledge_change_store.py`)의 승인으로만 `knowledge_writer`가 파일을
+  바꾼다. 텍스트 지식과 구조화 YAML 저장소를 섞어 수정하지 않는다.
+- 변경 요청·승인의 권한은 `core/principal.py`의 `require(permission)`만 검사한다.
+  인증 체계가 생기면 `current_principal`만 교체하며 라우트에 사용자·역할 분기를
+  넣지 않는다. 현재 스텁은 보안 경계가 아니다.
 
 ## 폐쇄망과 지식 관리
 

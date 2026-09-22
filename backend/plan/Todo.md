@@ -20,8 +20,8 @@ Backend가 소유하는 범위는 다음과 같다.
 - Result Store, 표 payload, 시각화 명세와 access scope·TTL
 - 폐쇄망 실행·운영 문서, 오류 은닉과 service logging
 
-운영 데이터 쓰기, 근거 없는 업무 수치 생성, 원시 chain-of-thought 공개는 범위
-밖이다. 실제 사내 DB·RAG·simulation 연동은 아직 후속 작업이다.
+운영 데이터 쓰기와 근거 없는 업무 수치 생성은 범위 밖이다. 모델 thinking(chain-of-thought)은
+어떤 경우에도 공개하지 않는다. 실제 사내 DB·RAG·simulation 연동은 아직 후속 작업이다.
 
 ## 현재 구현 상태
 
@@ -31,11 +31,13 @@ Backend가 소유하는 범위는 다음과 같다.
 | Tool trace | 완료 | 동일 호출의 `tool_call_id`, 공개 가능한 args와 결과 연결 |
 | 구조화 지식 | 완료 | table·KPI·recipe·scenario·simulation·glossary YAML 검증과 조회 Tool |
 | 텍스트 지식 | 완료 | SQLite 버전·revision 충돌·검토·활성화·보관·local 검색 |
+| 구조화 지식 변경·승인 | 완료 | 변경 요청(초안·제출·승인·반려)·정합성 게이트·승인 시 YAML 원자 반영·즉시 reload, principal 스텁 |
 | SQL | Mock 완료 / Real 미구현 | 등록 table만 허용하는 SELECT/WITH, 1,000행 저장 상한 |
 | Simulation | Mock 완료 / Real 미구현 | SMT2020 HVLM/LVHM 입력 관계·정합성 검증 |
 | Result Store | 1차 완료 | parquet+metadata, TTL·용량 정리, browser access scope |
 | 표 | 완료 | 검증된 결과에서 선택 컬럼과 최대 100행 payload |
-| 시각화 | 완료 | 검증된 bar/line 명세, 최대 500 points·8 series |
+| 시각화 | 완료 | 검증된 bar/line 명세, 최대 500 points·8 series (legacy) |
+| 결과 API·`present` | 구현(기본 `legacy`) | `/api/query-results/{id}/preview|table|chart`, `present` Tool·검증, `RESULT_UI_MODE` 플래그, `agent_sdk_present/` 지침 |
 | RAG | Local 완료 / Vector 미구현 | 활성 검토 문서 local 검색; Milvus·문서 색인 후속 |
 | 실행 환경 | 완료 | Python 3.11 `.venv`, Backend 기본 포트 8100 |
 | Service logging | 완료 | 공개 작업 시작·완료·실패, 소요 시간, 중첩 DEBUG와 민감정보 비노출 |
@@ -51,7 +53,7 @@ Backend가 소유하는 범위는 다음과 같다.
 - `tool_call.data.args`에는 공개 가능한 모델 입력만 포함한다.
 - 성공한 `done.data.turn_id`만 이후 포크 anchor로 사용한다.
 - streaming 실패는 내부 예외를 숨긴 `error` 다음 terminal `done`을 보낸다.
-- `thinking`, signature와 불완전 Tool JSON은 공개하지 않는다.
+- 모델 thinking(`ThinkingBlock`), signature와 불완전 Tool JSON은 공개하지 않는다.
 
 ### 결과와 시각화
 
@@ -61,6 +63,21 @@ Backend가 소유하는 범위는 다음과 같다.
   `visualization_id`를 반환한다.
 - 차트 조회는 `GET /api/visualizations/{visualization_id}`만 사용한다.
 - 내부 파일 경로, access scope 값과 원본 대량 행은 Tool payload에 넣지 않는다.
+- `RESULT_UI_MODE=present`: `execute_sql`·`run_simulation`은 bounded preview(`result_id`, `row_count`,
+  `source_truncated`, `columns`, `sample_rows`(≤5, 객체), `date_ranges`, `distinct_counts`, `statistics`,
+  `top_groups`(컬럼당 ≤10); simulation은 `simulation_type`·`scenario`·`summary`·`kpis`; SQL은 `purpose`만)만 반환하고,
+  `prepare_*` 대신 `present`를 등록한다. Claude에 노출되는 Tool 입력은 `tree` JSON 문자열 하나이며,
+  문자열 안의 root node는 assistant-ui 표준 `$type`(`$key` 선택, `children` 재귀)를 쓴다. 실행
+  경계에서 파싱·검증해 같은 트리를 AgentEvent에 싣는다. 64 KiB·깊이 8·
+  node 50 제한과 `resultId`·chart 설정을 실제 결과로 재검증하고, 성공 `{}`/실패
+  `{status:"error", code, message, details.path}`를 반환한다. 자동 표 보완은 하지 않는다.
+- `GET /api/query-results/{result_id}/preview|table|chart`(같은 `pp_session_scope`): table `page`·`page_size`(기본 10, ≤100)·
+  `columns`·`search`(≤200)·`sort_column`·`sort_direction(asc|desc)`를 저장된 최대 1,000건 전체에 적용하고
+  `row_count`·`filtered_row_count`와 현재 page를 반환한다. chart는 `chart_type(bar|line|area)`·`x_column`·`y_column`·
+  `group_by_column`·`aggregation(sum|avg|count|min|max)`·`title`.
+  없음·만료·타 scope는 404 `RESULT_NOT_FOUND`(동일 응답), 422 `INVALID_REQUEST`·`COLUMN_NOT_FOUND`·`INVALID_COLUMN_ROLE`·
+  `AGGREGATION_REQUIRED`·`EMPTY_RESULT`·`UNRENDERABLE_VALUES`. chart는 series ≤8(초과 시 상위만+`SERIES_LIMITED`),
+  point ≤500(시계열은 `TIME_BUCKETED`, 범주는 `CATEGORIES_LIMITED`; 시계열 재집계는 aggregation 필요).
 
 ### 지식과 SQL
 
@@ -71,14 +88,50 @@ Backend가 소유하는 범위는 다음과 같다.
 - `ENV=prod`는 `SERVICE_MODE=real`과 bundled SMT2020 지식이 아닌 명시적인
   운영 `KNOWLEDGE_DIR`을 요구한다. 조건이 맞지 않으면 시작 단계에서 실패한다.
 
+### 구조화 지식 변경 요청·승인
+
+구조화 YAML은 직접 수정 API가 없고 변경 요청이 승인될 때만 파일이 바뀐다. 상세 절차와
+운영 전제는 `docs/domain-knowledge-management.md`의 "구조화 지식 변경 요청과 승인"이 기준이다.
+
+- 권한: 요청마다 `X-User-Id`(생략 시 `KNOWLEDGE_DEFAULT_PRINCIPAL`)를 `KNOWLEDGE_PRINCIPALS`와
+  대조한다. 권한은 `knowledge:write`(작성·제출·철회), `knowledge:approve`(승인·반려)다.
+  알 수 없는 id·권한 부족·`KNOWLEDGE_MANAGEMENT_ENABLED=false`는 403 `{"detail"}`이다.
+  스텁은 보안 경계가 아니며 실제 인증이 오면 `core/principal.py::current_principal`만 바꾼다.
+- `GET /api/me` → `{id, name, permissions[], mode: "stub"|"authenticated",
+  knowledge_management, allow_self_approval, stub_users[{id,name}]}`. `stub_users`는 스텁에서만 채운다.
+- `GET /api/knowledge/guides/{kind}` → `{kind, key_field, fields[], template, immutable[]}`.
+  `fields[]`는 `{name, path, label, help, required, readonly, widget, example?, group?,
+  options?, item_widget?, fields?, value?}`이며 widget은 string·text·sql·boolean·number·date·enum·
+  string_list·record_list·object·map·json이다. 구조는 pydantic 모델, 문구는
+  `services/knowledge_guides.py`가 소유한다. `item_widget`(string|text)은 string_list 항목이 여러 줄 입력이 필요한지 알린다.
+  `template`은 필수 필드만 빈 값으로 채운 골격이다.
+- `GET /api/knowledge/source/{kind}/{key}` → `{kind, key, yaml, data}` 현재 항목의 정규화 내용(404).
+- `POST /api/knowledge/validate` `{kind, key?, yaml|data}` → 200 `{ok, parsed, yaml, data, key,
+  errors[{path, line, message}]}`. `yaml`(원문)과 `data`(폼) 중 정확히 하나만 보낸다.
+  `key`가 있으면 기존 항목 수정으로 보고 식별자 변경을 막는다. `parsed`는 입력이 mapping으로
+  읽혔는지이며 `data` 입력이 모델 검증에 실패해도 원문 탭용 `yaml`을 돌려준다. 저장하지 않는다.
+- `GET /api/knowledge/changes?state=&kind=&mine=` → 요약 목록
+  `{id, kind, key, is_new, state, revision, author{id,name}, created_at, updated_at}`.
+- `POST /api/knowledge/changes` `{kind, key?, yaml|data}` → 201 상세. `key` 없으면 신규 항목.
+  `GET /changes/{id}` 상세는 요약에 `yaml, data, current_yaml, history[]`를 더한다.
+  history: `{revision, action, actor_id, actor_name, note, self_approved, at}`,
+  action은 create·save·submit·withdraw·approve·reject.
+- `PUT /changes/{id}` `{expected_revision, yaml|data}`, `POST /changes/{id}/{submit|withdraw|
+  approve|reject}` `{expected_revision, note}`. approve·reject는 `knowledge:approve`와 note가 필요하다.
+- 오류: 403 권한·작성자 아님·자기 승인, 404, 409 revision 충돌·진행 중 요청 존재·기준 변경·
+  상태 불일치·이미 있는 키, 422 검증 실패, 503 저장소·반영 실패(경로 미노출).
+- `GET /api/knowledge/entries`는 scenario를 포함하고 각 행에 `pending_change{id,state}|null`을 더한다.
+
 ## 다음 작업
 
 우선순위가 같은 항목은 업무 데이터와 폐쇄망 반입 준비 상황에 따라 조정한다.
 
 ### P1
 
+- [ ] **`RESULT_UI_MODE=present` 운영 전환**: 실제 provider 환경에서 `present` 호출 순서·실패 후 수정·표 누락 여부를
+  e2e로 확인한 뒤 기본값을 정하고, legacy `prepare_*`·`/api/visualizations`·자동 표 보완의 삭제 계획을 별도로 만든다.
 - [ ] **후속질문 동적 생성**: 성공한 `done`에 2~4개 제안을 선택적으로 추가한다.
-  모델 출력 파싱 실패 시 빈 배열로 안전하게 종료한다.
+  모델 출력 파싱 실패 시 빈 배열로 안전하게 종료한다. 소비자 파서는 이미 준비돼 있다(2~4개·각 1~120자).
 
 ### P2
 
@@ -86,7 +139,7 @@ Backend가 소유하는 범위는 다음과 같다.
   검토하고 verified 상태를 갱신한다.
 - [ ] 서버 처리 시간 공개 필요성, 측정 의미와 비용을 검토한다. 클라이언트 관측
   시간과 혼동되는 값은 추가하지 않는다.
-- [ ] Result Store 후속 필터·재집계와 저장 backend 교체 필요성을 검토한다.
+- [ ] Result Store 후속 재집계와 저장 backend 교체 필요성을 검토한다.
 
 ### P3
 
@@ -96,6 +149,31 @@ Backend가 소유하는 범위는 다음과 같다.
   계획으로 설계한다.
 
 ## 완료 이력 요약
+
+### 2026-09-22 — 결과 API·`present` Tool·플래그
+
+- 저장 없는 preview·table·chart API(`services/query_result_service.py`, `chart_projection.py`)와 `present` Tool
+  (`services/present_service.py`, `tools/present_tool.py`), 플래그 `RESULT_UI_MODE`(기본 `legacy`)를 구현했다.
+- `present` vocabulary는 여러 결과를 묶는 `Card`와 도메인 `SqlPreview`·`QueryChart`·`QueryTable`·
+  `SimulationSummary`만 허용한다. 일반 설명·상태·경고는 공개 답변 text 또는 검증된 도메인 UI가 담당한다.
+  `present` 모드는 preview-only payload, Tool 집합 교체, 자동 표 보완 제거, `agent/agent_sdk_present/` 지침을 함께 전환한다.
+- Claude Code가 `$`로 시작하는 property 이름을 Tool schema에서 제외하는 문제와 실 provider 관통
+  검증에서 재귀 `$ref` schema가
+  `children`을 JSON 문자열로 변형하고 root `component`를 누락하는 것을 확인해, Tool 자체는
+  `tree` JSON 문자열 하나만 받도록 보강했다. 문자열 안에서는 assistant-ui 표준
+  `$type`/`$key`를 그대로 쓰고 Backend가 파싱·검증해 AgentEvent에 싣는다.
+- 검증: `pytest -q` 423 passed, 6 deselected. 실제 provider의 SQL→`present` 관통 호출은
+  한 번에 성공했고 공개 SSE에는 canonical `$type` 트리와 빈 성공 결과가 전달되며 본문에 raw JSON이 섞이지 않았다.
+  legacy 동작·기존 API는 회귀 테스트로 유지한다.
+- 미수행: simulation→`present` 실제 provider e2e, 운영 기본값 결정, 후속질문 필드
+  (`done.data.suggestions`), 대화·분기 영속 API.
+
+### 2026-09-22 — Result Store 표 검색·정렬·pagination
+
+- table API에 `search`·`sort_column`·`sort_direction`을 추가하고, 저장된 최대 1,000건을
+  먼저 검색·정렬한 뒤 요청된 page만 반환하도록 변경했다. 응답은 전체 `row_count`와
+  검색 후 `filtered_row_count`를 구분한다.
+- 검증: `python -m pytest -q` 430 passed, 6 deselected.
 
 ### 2026-09-08~14 — 기본 Agent와 도메인 지식
 
@@ -123,6 +201,17 @@ Backend가 소유하는 범위는 다음과 같다.
   지식 규칙을 구현했다.
 - Agent Workbench 감사용 오류·0행·빈 응답·미완료 fixture를 검증했다. 서버 timing,
   실제 모델과 대화 영속 저장은 의도적으로 보류했다.
+
+### 2026-09-21 — 구조화 지식 변경 요청·승인
+
+- 구조화 YAML 6종의 변경 요청 워크플로를 구현했다. 초안·이력은 SQLite, 승인 시 정규화 YAML을
+  원자적으로 쓰고 store를 즉시 reload하며 실패하면 파일을 복구한다. 기준 YAML 해시가 바뀌면
+  409로 막고, 정합성은 이번 변경이 새로 만든 문제만 게이트한다.
+- 정합성 규칙을 `tests`에서 `services/knowledge_integrity.py`로 옮겨 승인 게이트와 공유했다.
+  `KnowledgeStore`는 항목별 출처 경로를 기억해 파일명과 키가 다른 파일도 제자리에서 갱신한다.
+- 인증 전환용 `Principal`과 권한 단위 의존성을 추가했다(스텁, 보안 경계 아님).
+- 결정: 초안·이력은 SQLite/최종은 YAML(단일 기준 유지), 자기 승인 기본 차단, 삭제 없이
+  `active:false` 요청으로 비활성화, 승인 즉시 reload는 단일 워커 전제.
 
 ### 2026-09-21 — 실행·운영 기준 정리
 
@@ -165,11 +254,11 @@ Backend가 소유하는 범위는 다음과 같다.
 ## 검증 기준과 알려진 한계
 
 - 기본 검증: `source .venv/bin/activate && python -m pytest -q`.
-- 2026-09-21 기준 전체 개발 검증: **285 passed, 6 deselected**. SMT2020 자산을
-  제외한 clean 복사본은 **244 passed, 41 skipped, 6 deselected**다. 마커 제외
+- 2026-09-22 기준 전체 개발 검증: **426 passed, 6 deselected**. 마커 제외
   프로필(`not smt2020 and not smt2020_bundle and not mock_service and not e2e`)은
-  **223 passed, 68 deselected**다.
-- 세 검증 모두 Starlette TestClient의 upstream deprecation warning 1건만 남는다.
+  **266 passed, 68 deselected**다. SMT2020 자산을 제외한 clean 복사본 수치는 이 변경 후 다시
+  측정하지 않았다.
+- 재측정한 검증은 Starlette TestClient의 upstream deprecation warning 1건만 남는다.
 - E2E는 실제 CLI/provider 인증이 있는 환경에서만 `python -m pytest -m e2e`로
   실행한다.
 - 실제 provider 성공 응답, 실제 업무 데이터 정의와 폐쇄망 인프라 연결은 검증되지

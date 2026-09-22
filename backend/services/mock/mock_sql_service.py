@@ -10,8 +10,10 @@ import sqlite3
 
 import pandas as pd
 
+from core.config import result_ui_mode
 from services.knowledge_service import get_store
 from services.mock._sqlite import MISSING_DB_MESSAGE, Smt2020DbMissingError, connect
+from services.query_result_service import tool_preview
 from services.result_store import get_result_store, summarize_dataframe
 from services.service_logging import logged_service_operation
 from services.sql_guard import MAX_ROWS, SqlGuardError, check_sql
@@ -76,6 +78,14 @@ class MockSQLService:
             source_truncated=source_truncated,
             access_scope=access_scope,
         )
+
+        if result_ui_mode() == "present":
+            return tool_preview(
+                meta,
+                pd.DataFrame(rows, columns=columns),
+                kind="database",
+                purpose=purpose,
+            )
 
         result = {
             "status": "ok",

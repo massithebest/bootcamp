@@ -4,6 +4,7 @@
 실제 환경변수가 항상 우선한다.
 """
 
+import json
 import os
 import shutil
 from pathlib import Path
@@ -21,6 +22,11 @@ ENV = os.getenv("ENV", "").strip().lower() or "dev"
 
 SERVICE_MODE = os.getenv("SERVICE_MODE", "").strip().lower() or "mock"
 
+#: 조회 결과를 사용자에게 보여주는 방식. `legacy`는 인라인 표와 `prepare_table`·
+#: `prepare_visualization` Tool을, `present`는 bounded preview와 `present`
+#: Generative UI Tool을 쓴다. 운영 검증 전까지 기본값은 `legacy`다.
+RESULT_UI_MODE = os.getenv("RESULT_UI_MODE", "").strip().lower() or "legacy"
+
 #: backend/ 디렉터리. 아래 경로 상수의 기준점.
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -36,11 +42,19 @@ SMT2020_DB_PATH = Path(
 )
 
 
+def result_ui_mode() -> str:
+    """현재 결과 표시 모드. 호출 시점에 읽어 테스트에서 바꿀 수 있게 한다."""
+
+    return RESULT_UI_MODE
+
+
 def validate_runtime_configuration() -> None:
     """Fail fast when service or production knowledge isolation is unsafe."""
 
     if SERVICE_MODE not in {"mock", "real"}:
         raise RuntimeError("SERVICE_MODE must be either 'mock' or 'real'.")
+    if RESULT_UI_MODE not in {"legacy", "present"}:
+        raise RuntimeError("RESULT_UI_MODE must be either 'legacy' or 'present'.")
 
     if ENV != "prod":
         return
@@ -132,3 +146,70 @@ def agent_provider_env() -> dict[str, str]:
 KNOWLEDGE_DB_PATH = Path(os.getenv("KNOWLEDGE_DB_PATH") or BACKEND_DIR / "data" / "knowledge.sqlite3")
 # local은 SQL의 mock/real 모드와 독립. service는 향후 사내 RAG 어댑터용.
 KNOWLEDGE_SEARCH_BACKEND = os.getenv("KNOWLEDGE_SEARCH_BACKEND", "local")
+
+# ---- 구조화 지식 관리(변경 요청·승인) ----
+# 인증 체계가 생기기 전까지 쓰는 스텁 principal 설정이다. 보안 경계가 아니라
+# 작성자·승인자를 구분해 기록하기 위한 값이며, 실제 인증이 붙으면
+# `core/principal.py::current_principal`만 교체한다.
+KNOWLEDGE_PERMISSION_WRITE = "knowledge:write"
+KNOWLEDGE_PERMISSION_APPROVE = "knowledge:approve"
+
+#: false 이면 변경 요청 API의 쓰기 동작을 모두 막는다. 조회는 계속 가능하다.
+KNOWLEDGE_MANAGEMENT_ENABLED = (
+    os.getenv("KNOWLEDGE_MANAGEMENT_ENABLED", "true").strip().lower()
+    not in {"0", "false", "no", "off"}
+)
+
+#: 작성자와 승인자가 같은 principal이어도 승인을 허용할지 여부. 기본은 차단한다.
+KNOWLEDGE_ALLOW_SELF_APPROVAL = (
+    os.getenv("KNOWLEDGE_ALLOW_SELF_APPROVAL", "false").strip().lower()
+    in {"1", "true", "yes", "on"}
+)
+
+_DEFAULT_KNOWLEDGE_PRINCIPALS: dict[str, dict] = {
+    "user": {"name": "사용자", "permissions": [KNOWLEDGE_PERMISSION_WRITE]},
+    "admin": {
+        "name": "관리자",
+        "permissions": [KNOWLEDGE_PERMISSION_WRITE, KNOWLEDGE_PERMISSION_APPROVE],
+    },
+}
+
+
+def _load_knowledge_principals() -> dict[str, dict]:
+    """`KNOWLEDGE_PRINCIPALS` JSON({id: {name, permissions[]}})을 검증해 읽는다."""
+
+    raw = os.getenv("KNOWLEDGE_PRINCIPALS", "").strip()
+    if not raw:
+        return _DEFAULT_KNOWLEDGE_PRINCIPALS
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("KNOWLEDGE_PRINCIPALS must be valid JSON.") from exc
+    allowed = {KNOWLEDGE_PERMISSION_WRITE, KNOWLEDGE_PERMISSION_APPROVE}
+    if not isinstance(parsed, dict) or not parsed:
+        raise RuntimeError("KNOWLEDGE_PRINCIPALS must be a non-empty JSON object.")
+    principals: dict[str, dict] = {}
+    for principal_id, entry in parsed.items():
+        permissions = entry.get("permissions") if isinstance(entry, dict) else None
+        if (
+            not isinstance(principal_id, str)
+            or not principal_id.strip()
+            or not isinstance(permissions, list)
+            or not set(permissions) <= allowed
+        ):
+            raise RuntimeError(
+                "KNOWLEDGE_PRINCIPALS entries need an id and known permissions."
+            )
+        name = entry.get("name") or principal_id
+        principals[principal_id] = {"name": str(name), "permissions": list(permissions)}
+    return principals
+
+
+KNOWLEDGE_PRINCIPALS = _load_knowledge_principals()
+
+#: `X-User-Id` 헤더가 없을 때 쓰는 principal id. 비우면 권한이 가장 적은 항목.
+KNOWLEDGE_DEFAULT_PRINCIPAL = os.getenv("KNOWLEDGE_DEFAULT_PRINCIPAL", "").strip() or min(
+    KNOWLEDGE_PRINCIPALS, key=lambda key: len(KNOWLEDGE_PRINCIPALS[key]["permissions"])
+)
+if KNOWLEDGE_DEFAULT_PRINCIPAL not in KNOWLEDGE_PRINCIPALS:
+    raise RuntimeError("KNOWLEDGE_DEFAULT_PRINCIPAL must be one of KNOWLEDGE_PRINCIPALS.")

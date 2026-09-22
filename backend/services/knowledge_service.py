@@ -10,6 +10,7 @@ pydantic 으로 검증하고, tool/서비스/API 가 함께 쓰는 조회 인터
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any, Literal
@@ -205,6 +206,29 @@ class KnowledgeRecipe(KnowledgeMeta):
         return self
 
 
+@dataclass(frozen=True)
+class KindSpec:
+    """지식 종류별 모델, 키 필드와 `knowledge/` 안의 저장 위치."""
+
+    model: type[BaseModel]
+    key_field: str
+    #: 항목마다 파일 하나를 쓰는 종류의 디렉터리. glossary 는 파일 하나에 목록으로 담는다.
+    directory: str | None
+    attribute: str  # KnowledgeStore 의 dict 속성 이름
+
+
+GLOSSARY_FILE = "glossary.yaml"
+
+KIND_SPECS: dict[str, KindSpec] = {
+    "table": KindSpec(KnowledgeTable, "table", "catalog/tables", "tables"),
+    "kpi": KindSpec(KnowledgeKpi, "kpi_id", "kpi", "kpis"),
+    "recipe": KindSpec(KnowledgeRecipe, "recipe_id", "recipes", "recipes"),
+    "simulation": KindSpec(KnowledgeSimulation, "type", "simulations", "simulations"),
+    "scenario": KindSpec(KnowledgeScenario, "scenario_id", "scenarios", "scenarios"),
+    "glossary": KindSpec(GlossaryEntry, "term", None, "glossary"),
+}
+
+
 # ---- 로더 ----
 
 
@@ -244,7 +268,11 @@ class KnowledgeStore:
         glossary: list[GlossaryEntry],
         recipes: list[KnowledgeRecipe] | None = None,
         scenarios: list[KnowledgeScenario] | None = None,
+        source_paths: dict[tuple[str, str], str] | None = None,
     ) -> None:
+        #: (kind, key) -> `knowledge/` 기준 상대 경로. 파일명과 키가 다른 기존 파일을
+        #: 안전하게 덮어쓰기 위한 정보이며, 직접 생성한 저장소에서는 비어 있다.
+        self.source_paths = source_paths or {}
         self.tables = {table.table: table for table in tables}
         self.kpis = {kpi.kpi_id: kpi for kpi in kpis}
         self.simulations = {sim.type: sim for sim in simulations}
@@ -262,37 +290,38 @@ class KnowledgeStore:
         """`root` 아래 YAML 을 전부 읽어 검증한다. 없는 디렉터리는 빈 목록."""
 
         root = Path(root)
+        source_paths: dict[tuple[str, str], str] = {}
 
-        tables = [
-            _parse(KnowledgeTable, _read_yaml(path), path)
-            for path in sorted(root.glob("catalog/tables/*.yaml"))
-        ]
-        kpis = [
-            _parse(KnowledgeKpi, _read_yaml(path), path)
-            for path in sorted(root.glob("kpi/*.yaml"))
-        ]
-        simulations = [
-            _parse(KnowledgeSimulation, _read_yaml(path), path)
-            for path in sorted(root.glob("simulations/*.yaml"))
-        ]
-        recipes = [
-            _parse(KnowledgeRecipe, _read_yaml(path), path)
-            for path in sorted(root.glob("recipes/*.yaml"))
-        ]
-        scenarios = [
-            _parse(KnowledgeScenario, _read_yaml(path), path)
-            for path in sorted(root.glob("scenarios/*.yaml"))
-        ]
+        def read_kind(kind: str) -> list:
+            spec = KIND_SPECS[kind]
+            items = []
+            for path in sorted(root.glob(f"{spec.directory}/*.yaml")):
+                item = _parse(spec.model, _read_yaml(path), path)
+                source_paths[(kind, getattr(item, spec.key_field))] = str(
+                    path.relative_to(root)
+                )
+                items.append(item)
+            return items
 
-        glossary_path = root / "glossary.yaml"
+        tables = read_kind("table")
+        kpis = read_kind("kpi")
+        simulations = read_kind("simulation")
+        recipes = read_kind("recipe")
+        scenarios = read_kind("scenario")
+
+        glossary_path = root / GLOSSARY_FILE
         glossary: list[GlossaryEntry] = []
         if glossary_path.exists():
             raw = _read_yaml(glossary_path) or []
             if not isinstance(raw, list):
                 raise ValueError(f"{glossary_path.name}: 최상위가 리스트여야 합니다.")
             glossary = [_parse(GlossaryEntry, item, glossary_path) for item in raw]
+            for entry in glossary:
+                source_paths[("glossary", entry.term)] = GLOSSARY_FILE
 
-        return cls(tables, kpis, simulations, glossary, recipes, scenarios)
+        return cls(
+            tables, kpis, simulations, glossary, recipes, scenarios, source_paths
+        )
 
     # -- 조회 (tool / API 공용) --
 

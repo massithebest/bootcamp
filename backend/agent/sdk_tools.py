@@ -1,7 +1,7 @@
 """Claude Agent SDK 용 Tool 등록 계층.
 
-`tools/` 의 업무 함수를 그대로 재사용하고, Claude Agent SDK 가 인식할 수 있는
-in-process MCP Tool 로 감싸는 역할만 담당한다.
+`tools/` 의 업무 함수를 그대로 재사용하고, Claude Agent SDK 가 인식할 수 있도록
+in-process MCP 서버가 노출하는 Tool 로 감싸는 역할만 담당한다.
 
 - 업무 로직은 여기 두지 않는다. (tools/ + services/ 담당)
 - SDK 종속 코드(@tool, create_sdk_mcp_server)는 이 모듈과 event_adapter 에 모은다.
@@ -12,6 +12,7 @@ from typing import Any, NotRequired, TypedDict
 
 from claude_agent_sdk import create_sdk_mcp_server, tool
 
+from core.config import result_ui_mode
 from tools.knowledge_tool import (
     describe_table,
     get_kpi,
@@ -20,6 +21,8 @@ from tools.knowledge_tool import (
     list_recipes,
     list_tables,
 )
+from services.present_service import PresentError, decode_present_input, present_input_schema
+from tools.present_tool import present
 from tools.rag_tool import search_documents
 from tools.result_tool import get_result_page, get_result_summary
 from tools.simulation_tool import list_simulation, run_simulation
@@ -271,30 +274,65 @@ def _prepare_visualization_tool(access_scope: str | None):
     return _prepare_visualization
 
 
-def planning_tools(access_scope: str | None = None):
-    """Single source for SDK registration, allowed names and UI discovery."""
-    return [
+def _present_tool(access_scope: str | None):
+    @tool(
+        "present",
+        "SQL·시뮬레이션 결과를 사용자에게 보여 줄 UI 트리를 조합한다. "
+        "tree 필드에 root UI node 하나를 JSON 문자열로 직렬화해 넣는다. "
+        "문자열 안의 각 node는 $type으로 종류를 지정하고 children으로 중첩한다. "
+        "execute_sql·run_simulation이 반환한 result_id와 표시 설정만 넣고 행·차트 데이터는 넣지 않는다. "
+        "SQL은 SqlPreview, 추이·비교는 QueryChart, 상세 행은 QueryTable, 시뮬레이션은 SimulationSummary를 쓴다. "
+        "한 응답에서 조합 UI는 한 번 호출하고, 성공한 결과를 Markdown 표나 코드 펜스로 반복하지 않는다. "
+        "호출 뒤에는 '위/아래' 같은 위치 표현 대신 '표에는', '차트에서는'처럼 결과를 해석한다.",
+        present_input_schema(),
+    )
+    async def _present(args: dict[str, Any]) -> dict[str, Any]:
+        try:
+            node = decode_present_input(args)
+        except PresentError as exc:
+            return _ok(exc.as_tool_result())
+        return _ok(await present(node, access_scope=access_scope))
+
+    return _present
+
+
+def planning_tools(access_scope: str | None = None, mode: str | None = None):
+    """Single source for SDK registration, allowed names and UI discovery.
+
+    `RESULT_UI_MODE`가 결과 표시 도구를 정한다: legacy는 prepare_table·
+    prepare_visualization, present는 present를 등록한다.
+    """
+    mode = mode or result_ui_mode()
+    common = [
         _execute_sql_tool(access_scope), _search_documents, _list_simulation,
         _run_simulation_tool(access_scope), _list_tables, _describe_table,
         _list_kpis, _get_kpi, _list_recipes, _get_recipe,
         _get_result_summary_tool(access_scope), _get_result_page_tool(access_scope),
-        _prepare_table_tool(access_scope), _prepare_visualization_tool(access_scope),
+    ]
+    if mode == "present":
+        return [*common, _present_tool(access_scope)]
+    return [
+        *common, _prepare_table_tool(access_scope), _prepare_visualization_tool(access_scope),
     ]
 
 
-TOOL_NAMES = [f"mcp__{MCP_SERVER_NAME}__{item.name}" for item in planning_tools()]
+def tool_names(mode: str | None = None) -> list[str]:
+    return [f"mcp__{MCP_SERVER_NAME}__{item.name}" for item in planning_tools(mode=mode)]
 
 
-def build_planning_mcp_server(access_scope: str | None = None):
+TOOL_NAMES = tool_names()
+
+
+def build_planning_mcp_server(access_scope: str | None = None, mode: str | None = None):
     return create_sdk_mcp_server(
-        name=MCP_SERVER_NAME, version="0.1.0", tools=planning_tools(access_scope),
+        name=MCP_SERVER_NAME, version="0.1.0", tools=planning_tools(access_scope, mode),
     )
 
 
-async def tool_catalog() -> list[dict]:
+async def tool_catalog(mode: str | None = None) -> list[dict]:
     # Read the SDK's actual advertised schema, including TypedDict optional fields.
     from mcp_types import PaginatedRequestParams
-    server = build_planning_mcp_server()["instance"]
+    server = build_planning_mcp_server(mode=mode)["instance"]
     result = await server._request_handlers["tools/list"].handler(None, PaginatedRequestParams())
     output = {
         "execute_sql": "조회 행·컬럼 또는 대용량 결과 참조",
@@ -306,6 +344,7 @@ async def tool_catalog() -> list[dict]:
         "list_recipes": "집계 recipe 요약 목록", "get_recipe": "CTE·출력 grain·사용 예시",
         "get_result_summary": "저장 결과 메타데이터·수치 요약", "get_result_page": "저장 결과의 일부 행",
         "prepare_table": "최대 100행의 대화형 표", "prepare_visualization": "검증된 bar/line 차트 ID",
+        "present": "조합 UI 트리 검증 결과(빈 객체 또는 안전한 오류)",
     }
     return [{"name": t.name, "description": t.description or "", "input_schema": t.input_schema,
              "output": output[t.name], "status": "available"} for t in result.tools]

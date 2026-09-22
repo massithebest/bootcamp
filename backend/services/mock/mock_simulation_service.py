@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import pandas as pd
 
+from core.config import result_ui_mode
 from services.mock._sqlite import MISSING_DB_MESSAGE, Smt2020DbMissingError, connect
+from services.query_result_service import tool_preview
 from services.result_store import get_result_store, summarize_dataframe
 from services.service_logging import logged_service_operation
 from services.simulation_registry import list_simulation_types, validate_simulation_request
@@ -187,6 +189,17 @@ class MockSimulationService:
             conversation_id=None,
             access_scope=access_scope,
         )
+        if result_ui_mode() == "present":
+            return tool_preview(
+                meta,
+                pd.DataFrame(rows, columns=columns),
+                kind="simulation",
+                simulation_type=result["simulation_type"],
+                dataset=result["dataset"],
+                scenario=result["scenario"],
+                summary=result["summary"],
+                kpis=result["kpis"],
+            )
         result["result_id"] = meta.result_id
         result["columns"] = [
             {"name": column.name, "dtype": column.dtype, "role": column.role}

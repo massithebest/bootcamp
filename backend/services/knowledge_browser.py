@@ -1,6 +1,7 @@
 """Read-only projection of YAML and versioned text knowledge for the UI."""
 from services.knowledge_service import get_store
 from services.document_store import get_document_store, normalize
+from services.knowledge_change_store import get_change_store
 from services.service_logging import logged_service_operation
 
 
@@ -8,9 +9,10 @@ from services.service_logging import logged_service_operation
 def entries(query: str = "", kind: str | None = None) -> list[dict]:
     store = get_store()
     items = []
+    pending = get_change_store().open_index()
     groups = {
         "table": store.tables, "kpi": store.kpis, "recipe": store.recipes,
-        "simulation": store.simulations,
+        "simulation": store.simulations, "scenario": store.scenarios,
         "glossary": {item.term: item for item in store.glossary},
     }
     for category, mapping in groups.items():
@@ -21,7 +23,7 @@ def entries(query: str = "", kind: str | None = None) -> list[dict]:
                 "summary": data.get("description", data.get("definition", "")),
                 "status": data["status"], "source": data["source"], "owner": data["owner"],
                 "updated": str(data["updated"] or ""), "active": data["active"], "archived": False,
-                "detail": data})
+                "pending_change": pending.get((category, key)), "detail": data})
     for doc in get_document_store().list():
         latest = doc["versions"][0]
         items.append({"type": "document", "id": doc["id"], "title": latest["title"],

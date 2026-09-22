@@ -9,7 +9,6 @@ from claude_agent_sdk import (
     StreamEvent,
     SystemMessage,
     TextBlock,
-    ThinkingBlock,
     ToolResultBlock,
     ToolUseBlock,
     UserMessage,
@@ -17,6 +16,7 @@ from claude_agent_sdk import (
 
 from api.schemas import AgentEvent
 from agent.sdk_tools import MCP_SERVER_NAME
+from services.present_service import PresentError, decode_present_input
 
 
 _MCP_PREFIX = f"mcp__{MCP_SERVER_NAME}__"
@@ -75,7 +75,8 @@ class AgentEventAdapter:
     Adapter 가 tool_use_id -> tool_name 매핑을 유지한다.
 
     Notes:
-        - 내부 reasoning / chain-of-thought(ThinkingBlock)는 노출하지 않는다.
+        - 모델 thinking(ThinkingBlock)과 signature, 불완전 tool JSON은 항상 폐기하고
+          Frontend 로 전달하지 않는다.
         - Frontend 에는 업무적으로 의미 있는 text / status / tool_call /
           tool_result 만 전달한다.
     """
@@ -152,8 +153,8 @@ class AgentEventAdapter:
     def _convert_stream(self, message: StreamEvent) -> list[AgentEvent]:
         """공개 가능한 partial text delta만 기존 text 이벤트로 변환한다.
 
-        thinking/signature/tool input delta는 모델 내부 정보 또는 불완전한 JSON이므로
-        이 계층에서 계속 폐기한다. 알 수 없는 신규 event도 안전하게 무시한다.
+        thinking/signature/tool input delta는 항상 폐기한다. 알 수 없는 신규 event도
+        안전하게 무시한다.
         """
 
         event = message.event
@@ -208,12 +209,21 @@ class AgentEventAdapter:
                     # 내장 Tool(Skill/Read/Bash 등)은 Frontend 로 전달하지 않는다.
                     continue
                 short = _short_tool_name(block.name)
+                if short == "present":
+                    try:
+                        public_args = decode_present_input(block.input)
+                    except PresentError:
+                        # 실패 상세는 이어지는 안전한 tool_result로 알린다.
+                        # 잘못된 provider wire JSON은 공개 이벤트에 반복하지 않는다.
+                        public_args = {}
+                else:
+                    public_args = block.input
                 events.append(
                     AgentEvent(
                         type="tool_call",
                         tool_name=short,
                         tool_call_id=block.id,
-                        data={"args": block.input},
+                        data={"args": public_args},
                     )
                 )
                 events.append(
@@ -229,9 +239,8 @@ class AgentEventAdapter:
                     )
                 )
 
-            elif isinstance(block, ThinkingBlock):
-                # 내부 reasoning 은 Frontend 에 전달하지 않는다.
-                continue
+            # ThinkingBlock(모델 chain-of-thought)은 항상 무시한다 — 내부 추론을
+            # 노출하지 않는다는 원칙에 따라 어떤 분기도 두지 않는다.
 
         if text_already_streamed:
             if isinstance(message.message_id, str):

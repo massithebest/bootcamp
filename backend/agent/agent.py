@@ -8,7 +8,7 @@ from pathlib import Path
 from claude_agent_sdk import ClaudeAgentOptions, query
 
 from agent.event_adapter import AgentEventAdapter
-from agent.sdk_tools import TOOL_NAMES, build_planning_mcp_server
+from agent.sdk_tools import build_planning_mcp_server, tool_names
 from agent.session_store import (
     bind_session_id,
     get_session_id,
@@ -17,12 +17,25 @@ from agent.session_store import (
 )
 from agent.system_prompt import SYSTEM_PROMPT
 from api.schemas import AgentEvent
-from core.config import AGENT_MODEL, CLAUDE_CLI_PATH, agent_provider_env
+from core.config import (
+    AGENT_MODEL,
+    CLAUDE_CLI_PATH,
+    agent_provider_env,
+    result_ui_mode,
+)
 from tools.table_tool import prepare_table
 
 
 #: `agent/agent_sdk/` — CLAUDE.md 와 .claude/skills 가 위치한 Agent 작업 디렉터리.
 AGENT_SDK_CWD = str((Path(__file__).parent / "agent_sdk").resolve())
+
+#: `RESULT_UI_MODE=present` 전용 작업 디렉터리. 결과 표시 절차가 다른 CLAUDE.md와
+#: Skills를 담는다(공통 부분은 `agent_sdk/`와 같은 내용을 유지한다).
+AGENT_SDK_PRESENT_CWD = str((Path(__file__).parent / "agent_sdk_present").resolve())
+
+
+def agent_sdk_cwd(mode: str | None = None) -> str:
+    return AGENT_SDK_PRESENT_CWD if (mode or result_ui_mode()) == "present" else AGENT_SDK_CWD
 
 # '목표', '지표', '대표', 'stable'은 명시적인 표 요청이 아니다.
 _TABLE_REQUEST_PATTERN = re.compile(
@@ -113,14 +126,15 @@ def _build_options(
     Result Store 접근 범위 구분에만 쓰이고 모델 입력으로 노출되지 않는다.
     """
 
+    mode = result_ui_mode()
     return ClaudeAgentOptions(
         system_prompt=SYSTEM_PROMPT,
-        cwd=AGENT_SDK_CWD,
+        cwd=agent_sdk_cwd(mode),
         setting_sources=["project"],  # CLAUDE.md / .claude/skills 로드
-        mcp_servers={"planning": build_planning_mcp_server(access_scope)},
+        mcp_servers={"planning": build_planning_mcp_server(access_scope, mode)},
         # Skill: 프로젝트 Skills(.claude/skills/*)를 에이전트가 선택해 로드한다.
         # 문자열 system_prompt 로도 Claude Code preset 의 Skill 도구가 유지된다 (Task 0 확인).
-        allowed_tools=TOOL_NAMES + ["Skill"],
+        allowed_tools=tool_names(mode) + ["Skill"],
         permission_mode="bypassPermissions",
         resume=resume_session_id,
         fork_session=resume_session_at is not None,
@@ -245,7 +259,8 @@ async def run_agent(
         return
 
     if (
-        last_result_id is not None
+        result_ui_mode() == "legacy"
+        and last_result_id is not None
         and not table_prepared
         and _needs_table_fallback(message, "".join(response_text))
     ):
