@@ -6,14 +6,15 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createServer } from 'vite';
 import { z } from 'zod';
 
-const contract = JSON.parse(readFileSync(new URL('./fixtures/present-vocabulary.json', import.meta.url), 'utf8')).components;
+const contract = JSON.parse(readFileSync(new URL('./fixtures/present-vocabulary.json', import.meta.url), 'utf8')).tools;
 const ID = 'a'.repeat(32);
 const originalFetch = globalThis.fetch;
-let server, library, PresentToolUI, api, convertMessage, standalone, DatabaseResult, SimulationResult, ChartBlock, chartSummary;
+let server, PresentSqlPreviewToolUI, PresentChartToolUI, PresentTableToolUI, PresentSimulationToolUI, vocab, api, convertMessage, standalone, DatabaseResult, SimulationResult, ChartBlock, chartSummary;
 before(async () => {
   server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom' });
-  ({ generativeLibrary: library } = await server.ssrLoadModule('/src/components/chat/generative/library.tsx'));
-  ({ PresentToolUI } = await server.ssrLoadModule('/src/components/chat/generative/present-tool-ui.tsx'));
+  ({ PresentSqlPreviewToolUI, PresentChartToolUI, PresentTableToolUI, PresentSimulationToolUI } =
+    await server.ssrLoadModule('/src/components/chat/generative/present-tool-uis.tsx'));
+  vocab = await server.ssrLoadModule('/src/components/chat/generative/vocabulary.ts');
   api = await server.ssrLoadModule('/src/lib/query-result-api.ts');
   ({ convertMessage } = await server.ssrLoadModule('/src/lib/chat-runtime.ts'));
   standalone = await server.ssrLoadModule('/src/lib/standalone-tools.ts');
@@ -24,28 +25,34 @@ before(async () => {
 });
 after(async () => { globalThis.fetch = originalFetch; await server.close(); });
 
-/* ---------------- 계약: Backend vocabulary와 같은 이름·prop·enum ---------------- */
+/* ---------------- 계약: Backend present_* Tool과 같은 이름·prop·enum ---------------- */
 
-test('library exposes exactly the Backend vocabulary component names', () => {
-  assert.deepEqual(Object.keys(library).sort(), Object.keys(contract).sort());
+const zodByTool = () => ({
+  present_sql_preview: vocab.sqlPreviewArgs,
+  present_chart: vocab.chartArgs,
+  present_table: vocab.tableArgs,
+  present_simulation: vocab.simulationArgs,
 });
 
-test('custom component props match the Backend contract exactly; base components accept every Backend prop', () => {
-  const custom = new Set(['SqlPreview', 'QueryChart', 'QueryTable', 'SimulationSummary']);
+test('present tool set exposes exactly the Backend present_* Tool names', () => {
+  assert.deepEqual(Object.keys(zodByTool()).sort(), Object.keys(contract).sort());
+});
+
+test('present tool arg schemas match the Backend contract exactly', () => {
+  const zod = zodByTool();
   for (const [name, spec] of Object.entries(contract)) {
-    const schema = z.toJSONSchema(library[name].properties);
+    const schema = z.toJSONSchema(zod[name]);
     const frontend = schema.properties ?? {};
     const backend = Object.keys(spec.props);
-    if (custom.has(name)) assert.deepEqual(Object.keys(frontend).sort(), backend.sort(), name);
-    else for (const prop of backend) assert.ok(prop in frontend, `${name}.${prop}`);
+    assert.deepEqual(Object.keys(frontend).sort(), backend.sort(), name);
     for (const prop of backend) {
       if (spec.props[prop].enum) assert.deepEqual(frontend[prop].enum ?? frontend[prop].anyOf?.find(o => o.enum)?.enum, spec.props[prop].enum, `${name}.${prop} enum`);
     }
-    if (custom.has(name)) assert.deepEqual([...(schema.required ?? [])].sort(), [...spec.required].sort(), `${name} required`);
+    assert.deepEqual([...(schema.required ?? [])].sort(), [...spec.required].sort(), `${name} required`);
   }
 });
 
-test('shared prop names have one type across components (flat present schema)', () => {
+test('shared prop names have one type across present_* Tools (flat scalar args)', () => {
   const seen = new Map();
   for (const [name, spec] of Object.entries(contract)) {
     for (const [prop, def] of Object.entries(spec.props)) {
@@ -56,54 +63,39 @@ test('shared prop names have one type across components (flat present schema)', 
   }
 });
 
-test('vocabulary excludes data-carrying and interactive components', () => {
-  for (const banned of [
-    'Chart', 'Table', 'Image', 'Markdown', 'Box', 'Button', 'Input', 'Select', 'Carousel',
-    'Col', 'Row', 'Header', 'Text', 'Caption', 'Divider', 'Fact', 'Badge', 'Alert', 'ListView', 'ListViewItem',
-  ]) assert.equal(banned in library, false);
-});
+/* ---------------- present_* 렌더링 ---------------- */
 
-/* ---------------- present 렌더링 ---------------- */
+const surface = (Component, args, status = { type: 'complete' }, extra = {}) => renderToStaticMarkup(createElement(Component, { args, status, result: { id: 'r', toolCallId: 'c', toolName: 'present_table', data: {} }, isError: false, ...extra }));
 
-const surface = (args, status = { type: 'complete' }, extra = {}) => renderToStaticMarkup(createElement(PresentToolUI, { args, status, result: { id: 'r', toolCallId: 'c', toolName: 'present', data: {} }, isError: false, ...extra }));
-
-test('the retained Card base component renders through data-aui hooks', () => {
-  const html = surface({ $type: 'Card', title: '월별 생산량', children: '결과 묶음' });
-  assert.match(html, /data-aui="root"/);
-  assert.match(html, /data-aui="card"/);
-  assert.match(html, /월별 생산량/);
-  assert.match(html, /결과 묶음/);
-  assert.doesNotMatch(html, /<script|onclick/i);
-});
-
-test('unknown $type and malformed nodes render nothing and never throw', () => {
+test('malformed present tool args render an inline notice and never throw', () => {
   const originalWarn = console.warn; console.warn = () => {};
   try {
-    assert.doesNotMatch(surface({ $type: 'Chart', data: [1] }), /data-aui="(chart|card)"/);
-    assert.doesNotMatch(surface({}), /data-aui="card"/);
+    assert.match(surface(PresentChartToolUI, {}), /표시 설정이 올바르지 않아/);
+    assert.doesNotMatch(surface(PresentChartToolUI, {}), /<script|onclick/i);
+    assert.match(surface(PresentTableToolUI, { result_id: 'not-an-id' }), /표시 설정이 올바르지 않아/);
   } finally { console.warn = originalWarn; }
 });
 
-test('custom components show stable loading states before data arrives and reject bad props', () => {
-  assert.match(surface({ $type: 'QueryChart', resultId: ID, chartType: 'line', xColumn: 'm', yColumn: 'q' }), /차트를 불러오는 중/);
-  assert.match(surface({ $type: 'QueryTable', resultId: ID }), /표를 불러오는 중/);
-  assert.match(surface({ $type: 'QueryTable', resultId: 'not-an-id' }), /표시 설정이 올바르지 않아/);
-  assert.match(surface({ $type: 'QueryChart', resultId: ID, chartType: 'pie', xColumn: 'm', yColumn: 'q' }), /표시 설정이 올바르지 않아/);
-  assert.match(surface({ $type: 'SimulationSummary', scenario: 'SMT2020 HVLM', summary: '요약', kpis: [{ label: 'Part', value: 0, unit: '개' }] }), />0</);
+test('present_chart/present_table show stable loading states before data arrives and reject bad props', () => {
+  assert.match(surface(PresentChartToolUI, { result_id: ID, chart_type: 'line', x_column: 'm', y_column: 'q' }), /차트를 불러오는 중/);
+  assert.match(surface(PresentTableToolUI, { result_id: ID }), /표를 불러오는 중/);
+  assert.match(surface(PresentTableToolUI, { result_id: 'not-an-id' }), /표시 설정이 올바르지 않아/);
+  assert.match(surface(PresentChartToolUI, { result_id: ID, chart_type: 'pie', x_column: 'm', y_column: 'q' }), /표시 설정이 올바르지 않아/);
+  assert.match(surface(PresentSimulationToolUI, { scenario: 'SMT2020 HVLM', summary: '요약', kpis: [{ label: 'Part', value: 0, unit: '개' }] }), />0</);
 });
 
-test('SqlPreview is collapsed by default and never emits SQL as markup', () => {
-  const html = surface({ $type: 'SqlPreview', sql: 'SELECT "<b>x</b>" FROM t' });
+test('present_sql_preview is collapsed by default and never emits SQL as markup', () => {
+  const html = surface(PresentSqlPreviewToolUI, { sql: 'SELECT "<b>x</b>" FROM t' });
   assert.match(html, /실행 SQL/);
   assert.match(html, /aria-expanded="false"/);
   assert.doesNotMatch(html, /<b>x/);
 });
 
 test('present states: running, cancelled, failed and tool error are explicit', () => {
-  assert.match(surface({}, { type: 'running' }, { result: undefined }), /결과 화면을 구성하는 중/);
-  assert.match(surface({}, { type: 'incomplete', reason: 'cancelled' }, { result: undefined }), /중단/);
-  assert.match(surface({}, { type: 'incomplete', reason: 'error' }, { result: undefined }), /role="alert"[^>]*>결과 화면을 구성하지 못했습니다/);
-  const failed = surface({ $type: 'QueryTable', resultId: ID }, { type: 'complete' }, { result: { data: { status: 'error', message: '컬럼을 찾을 수 없습니다.' } }, isError: true });
+  assert.match(surface(PresentTableToolUI, {}, { type: 'running' }, { result: undefined }), /결과 화면을 구성하는 중/);
+  assert.match(surface(PresentTableToolUI, {}, { type: 'incomplete', reason: 'cancelled' }, { result: undefined }), /중단/);
+  assert.match(surface(PresentTableToolUI, {}, { type: 'incomplete', reason: 'error' }, { result: undefined }), /role="alert"[^>]*>결과 화면을 구성하지 못했습니다/);
+  const failed = surface(PresentTableToolUI, { result_id: ID }, { type: 'complete' }, { result: { data: { status: 'error', message: '컬럼을 찾을 수 없습니다.' } }, isError: true });
   assert.match(failed, /컬럼을 찾을 수 없습니다/);
 });
 
@@ -199,20 +191,20 @@ const assistant = (parts) => ({ id: 'a', role: 'assistant', content: '', parts, 
 const text = (id, value) => ({ kind: 'text', id, text: value });
 const contentTypes = (m) => convertMessage(m).content.map((p) => p.type === 'text' ? `text:${p.text}` : `${p.toolName}:${p.toolCallId}`);
 
-test('present is a standalone tool and keeps its text context order after regular tools', () => {
-  assert.equal(standalone.isStandaloneTool('present'), true);
+test('present_table is a standalone tool and keeps its text context order after regular tools', () => {
+  assert.equal(standalone.isStandaloneTool('present_table'), true);
   const m = assistant([
     text('t0', '조회합니다.'), tool('sql', 'execute_sql', { sql: 'S' }, { status: 'ok', result_id: ID }),
-    text('t1', '결과를 보여드립니다.'), tool('p', 'present', { $type: 'QueryTable', resultId: ID }, {}), text('t2', '표에는 두 건이 있습니다.'),
+    text('t1', '결과를 보여드립니다.'), tool('p', 'present_table', { result_id: ID }, {}), text('t2', '표에는 두 건이 있습니다.'),
   ]);
-  assert.deepEqual(contentTypes(m), ['execute_sql:sql', 'text:결과를 보여드립니다.', 'present:p', 'text:표에는 두 건이 있습니다.']);
+  assert.deepEqual(contentTypes(m), ['execute_sql:sql', 'text:결과를 보여드립니다.', 'present_table:p', 'text:표에는 두 건이 있습니다.']);
 });
 
-test('a failed present is hidden once a later present succeeds; all-failed keeps the error surface', () => {
-  const failed = tool('p1', 'present', { $type: 'QueryTable', resultId: ID }, { status: 'error', code: 'COLUMN_NOT_FOUND', message: '컬럼 없음' });
-  const ok = tool('p2', 'present', { $type: 'QueryTable', resultId: ID }, {});
-  assert.deepEqual(contentTypes(assistant([failed, ok])).filter((x) => x.startsWith('present')), ['present:p2']);
-  assert.deepEqual(contentTypes(assistant([failed])).filter((x) => x.startsWith('present')), ['present:p1']);
+test('a failed present_table is hidden once a later present_table succeeds; all-failed keeps the error surface', () => {
+  const failed = tool('p1', 'present_table', { result_id: ID }, { status: 'error', code: 'COLUMN_NOT_FOUND', message: '컬럼 없음' });
+  const ok = tool('p2', 'present_table', { result_id: ID }, {});
+  assert.deepEqual(contentTypes(assistant([failed, ok])).filter((x) => x.startsWith('present_table')), ['present_table:p2']);
+  assert.deepEqual(contentTypes(assistant([failed])).filter((x) => x.startsWith('present_table')), ['present_table:p1']);
   assert.equal(convertMessage(assistant([failed])).content[0].isError, true);
 });
 
@@ -220,7 +212,7 @@ test('legacy Markdown table de-duplication is unchanged and not applied to prese
   const md = '| a | b |\n| --- | --- |\n| 1 | x |';
   const legacy = assistant([tool('t', 'prepare_table', { result_id: ID }, { status: 'ok', result_id: ID, title: null, columns: ['a', 'b'], rows: [[1, 'x']], row_count: 1, displayed_count: 1, source_truncated: false }), text('m', md)]);
   assert.equal(convertMessage(legacy).content.filter((p) => p.type === 'text').length, 0);
-  const present = assistant([tool('p', 'present', { $type: 'QueryTable', resultId: ID }, {}), text('m', md)]);
+  const present = assistant([tool('p', 'present_table', { result_id: ID }, {}), text('m', md)]);
   assert.equal(convertMessage(present).content.filter((p) => p.type === 'text').length, 1);
 });
 

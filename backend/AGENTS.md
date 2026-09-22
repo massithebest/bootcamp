@@ -1,128 +1,47 @@
 # Backend 작업 지침
 
-Python 3.11 FastAPI 서비스다. `main.py`가 앱을 만들고 `/api/chat`은 Claude Agent
-SDK 이벤트를 SSE로 전달한다. 코드 변경 전 `plan/Todo.md`와 대상
-폴더의 더 가까운 `AGENTS.md`를 확인한다. 이 workspace는 Frontend나
-루트 계획 문서를 읽을 수 있다고 가정하지 않는다.
+Python 3.11 FastAPI 서비스다. `/api/chat`은 Claude Agent SDK 이벤트를
+`AgentEvent` SSE로 변환한다. 작업 전 `plan/Todo.md`와 대상 폴더의 더 가까운
+`AGENTS.md`를 확인한다.
 
-## 작업과 계획
+## 경계
 
-- 기존 staged·unstaged·untracked 변경은 사용자 작업으로 간주하고 요청 범위
-  밖 파일을 되돌리거나 덮어쓰지 않는다.
-- 작은 계획은 `plan/Todo.md`에 직접 작성하고, 큰 작업만 `plan/`에
-  날짜형 파일로 만든다. 외부 소비자 계약은 문서 안에 자체적으로 적는다.
-- 폐쇄망 환경을 기준으로 하며 외부 CDN·런타임 API, 비밀값·사내 URL을
-  코드·로그·문서에 추가하지 않는다.
+- 흐름은 route → agent → SDK tool → tool → service → DB/provider 순서다.
+  route에 SQL, provider 설정, 결과 검증과 업무 로직을 넣지 않는다.
+- API 계약은 `api/schemas.py`, 이벤트 변환은 `agent/event_adapter.py`, 등록 Tool은
+  `agent/sdk_tools.py`, 구조화 지식은 `knowledge/` YAML을 기준으로 한다.
+- SQL은 `services/sql_guard.py`를 통과한 읽기 전용 쿼리만 허용한다.
+  `services/mock`과 `services/real`의 공개 시그니처·반환 형태를 맞춘다.
+- 환경변수는 `core/config.py`에서 읽고 새 키는 비밀값 없이 `.env.example`에 추가한다.
+- 폐쇄망·real service 작업은 `docs/CLOSED_NETWORK_SETUP.md`, 지식 작업은
+  `docs/domain-knowledge-management.md`를 먼저 확인한다.
 
-## 계층과 계약
+## Agent와 결과 계약
 
-- 흐름은 route → agent → SDK tool → tool → service → DB/외부 provider 순서다.
-  route에는 SQL, provider 설정, 시각화 검증과 업무 로직을 넣지 않는다.
-- `api/schemas.py`가 API 계약, `agent/event_adapter.py`가 SDK 이벤트 변환,
-  `agent/sdk_tools.py::TOOL_NAMES`가 등록 tool 목록의 기준이다.
-- `agent/system_prompt.py`에는 짧은 역할·안전 원칙, 런타임
-  `agent/agent_sdk/CLAUDE.md`에는 Tool/Skill 인덱스와 공통 절차,
-  `.claude/skills/*/SKILL.md`에는 업무별 실행 절차만 둔다. 스키마와 업무 정의를
-  이 세 계층에 복제하지 않는다.
-- `knowledge/` YAML이 catalog, join, KPI, recipe/CTE, simulation, glossary와
-  scenario의 source of truth다. 로드·검증은 `services/knowledge_service.py`,
-  Agent 접근은 등록된 지식 tool을 통한다.
-- table과 recipe의 `query_rules`는 기본 날짜·필터·정렬·조인 전제,
-  `aggregation_rules`는 grain·집계 함수·중복·재집계 규칙,
-  `visualization_hints`는 표현 권고를 담는다. table/recipe의 `sample_queries`는
-  `question`, `sql`만 허용하며 현재 데이터 값인 `answer`를 저장하지 않는다.
-- SQL은 `services/sql_guard.py`의 읽기 전용 검사를 통과해야 한다. Mock의 DB
-  authorizer와 read-only 연결을 유지하고, real 구현도 DB 권한과 실행 계층에서
-  쓰기를 차단한다. 카탈로그 스키마 변경 시 YAML, 시드 스크립트와 테스트를
-  함께 갱신한다.
-- `services/mock`과 `services/real`의 함수 시그니처와 결과 형태를 같게 유지하고
-  mock 구현을 삭제하지 않는다.
+- 공개 이벤트는 `text`, `status`, `tool_call`, `tool_result`, `error`, `done`이다.
+  같은 호출은 동일한 `tool_call_id`를 쓰고 모델 thinking·내부 경로·scope·provider
+  설정을 노출하지 않는다.
+- 성공한 `done.data.turn_id`만 포크 anchor로 사용한다. 오류 스트림도 `error` 다음
+  `done`으로 종료한다.
+- `RESULT_UI_MODE=legacy`는 `prepare_table`·`prepare_visualization`, `present`는
+  bounded preview와 flat `present_*` Tool 및 `/api/query-results/*`를 사용한다.
+  모드를 바꾸면 Tool 등록, payload, 런타임 지침, Frontend fixture를 함께 갱신한다.
+- 구조화 YAML은 변경 요청 승인 경로로만 수정한다. 권한 검사는
+  `core/principal.py`에 두며 현재 principal 구현은 보안 경계가 아니다.
 
-## Agent와 결과 처리
+## 런타임 지침 계층
 
-- 안정적인 `AgentEvent` 종류는 `text`, `status`, `tool_call`, `tool_result`,
-  `error`, `done`이다. 성공한 `done.data.turn_id`와
-  `ChatRequest.fork_from_turn_id`의 포크 계약을 유지한다.
-- 같은 업무 Tool 호출의 `tool_call`, 연결된 `status`, `tool_result`는 동일한
-  `tool_call_id`를 사용한다. `tool_call.data.args`에는 공개 가능한 모델 입력만
-  넣고 access scope, provider 설정과 내부 SDK 이벤트는 노출하지 않는다.
-- partial `text_delta`만 `text`로 전달하고 같은 provider message의 최종 누적
-  `TextBlock`을 중복 전송하지 않는다. signature/불완전 tool JSON과 모델 thinking
-  (`ThinkingBlock`)은 어떤 경우에도 공개 이벤트로 변환하지 않는다. 지침의
-  "내부 추론 과정은 노출하지 않는다"는 답변 text 규칙이다.
-- 포크 anchor에는 transcript에 존재하는 `AssistantMessage` 또는 `UserMessage`
-  UUID만 사용한다. `ResultMessage.uuid`를 `resume_session_at`에 전달하지 않는다.
-  fork ID 생략은 계속 진행, 빈 문자열은 새 대화, 알 수 없는 ID는 오류 후 안전한
-  새 대화 fallback이라는 구분을 유지한다.
-- streaming 오류는 내부 예외를 숨기고 `error` 다음 `done` 이벤트를 보낸다.
-- 조회 결과는 `services/result_store.py`로 저장하며 내부 parquet 경로를 tool
-  payload에 노출하지 않는다.
-- 결과 표시 방식은 `RESULT_UI_MODE`(`core/config.py`)가 정한다. 값은 payload 형태·
-  등록 Tool(`sdk_tools.planning_tools(mode=)`)·Agent 지침 디렉터리(`agent_sdk/` ↔
-  `agent_sdk_present/`)·자동 표 보완을 함께 바꾼다. 기본은 `legacy`다.
-- `legacy`: 차트는 `prepare_visualization`이 실제 `result_id`와 grain을 검증해 등록하고
-  `/api/visualizations/{id}`로 조회한다. 독립 표는 `prepare_table`이 `result_id`, access
-  scope와 선택 컬럼을 검증해 최대 100행만 반환한다. 표 요청 또는 Markdown 표 응답에서
-  모델이 호출을 빠뜨리면 `run_agent`가 마지막 접근 가능한 Result Store 결과로
-  `prepare_table` 이벤트를 보완한다. SQL·시뮬레이션 결과에 자동 차트를 붙이지 않는다.
-- `present`: `execute_sql`·`run_simulation`은 전체 행 없이 bounded preview
-  (`services/query_result_service.tool_preview`)만 반환하고, 모델은 `present`
-  (`services/present_service.py` vocabulary·검증)로 `resultId`와 표시 설정만 담은 UI
-  트리를 조합한다. 표·차트·preview는 `/api/query-results/{result_id}/…`가 저장 없이
-  조회하며(`services/query_result_service.py`, `chart_projection.py`) 없음·만료·타 scope는
-  모두 404 `RESULT_NOT_FOUND`다. 자동 표 보완은 하지 않는다. vocabulary를 바꾸면 소비자의
-  schema fixture와 `agent_sdk_present/` 지침을 같은 작업에서 갱신한다.
-- `agent_sdk_present/`는 `agent_sdk/`와 결과 표시 절차만 다르다. `kpi-shortfall-analysis`
-  Skill은 같은 내용을 유지하며 테스트가 일치를 검사한다.
-- 환경변수는 `core/config.py`에서만 읽는다. 새 키는 실제 값 없이
-  `.env.example`에도 추가한다.
-- 작성형 텍스트 지식은 `services/document_store.py`의 로컬 SQLite에서 버전·검토·
-  활성화 상태를 관리한다. 구조화 YAML은 직접 수정하는 API가 없고, 변경 요청
-  (`services/knowledge_change_store.py`)의 승인으로만 `knowledge_writer`가 파일을
-  바꾼다. 텍스트 지식과 구조화 YAML 저장소를 섞어 수정하지 않는다.
-- 변경 요청·승인의 권한은 `core/principal.py`의 `require(permission)`만 검사한다.
-  인증 체계가 생기면 `current_principal`만 교체하며 라우트에 사용자·역할 분기를
-  넣지 않는다. 현재 스텁은 보안 경계가 아니다.
+- `agent/system_prompt.py`: 짧은 역할·안전 원칙.
+- `agent/agent_sdk*/CLAUDE.md`: Tool·Skill 인덱스와 공통 규칙.
+- `agent/agent_sdk*/.claude/skills/*/SKILL.md`: 업무별 절차.
 
-## 폐쇄망과 지식 관리
+스키마와 업무 정의를 여러 계층에 복제하지 않는다. Tool을 바꾸면 wrapper,
+지침, prompt 정합성 테스트와 소비자 renderer 필요 여부를 함께 확인한다.
 
-- 의존성·provider·환경·배포 또는 real 서비스 작업 전
-  [폐쇄망 배포 및 이식 가이드](docs/CLOSED_NETWORK_SETUP.md)를 읽는다.
-- table, KPI, recipe/CTE, RAG 지식을 추가하거나 검토할 때는
-  [도메인 지식 관리 지침](docs/domain-knowledge-management.md)을 따른다.
-- 로컬 `datasets/`, `data/`, `.env`, 변환용 `scripts/`는 배포 저장소에 자동으로
-  포함되지 않는다. 테스트 fixture와 달리 운영·benchmark 자산이 필요한 명령은
-  해당 파일의 별도 반입 여부를 먼저 확인한다.
-- API 키, 비밀번호, 사내 URL을 코드·로그·문서·예시 설정에 넣지 않는다.
+## 작업과 검증
 
-## 명령과 검증
-
-`backend/`에서 실행한다.
-
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements-dev.txt
-cp .env.example .env
-# 선택: 로컬 SMT2020 개발 자산이 있을 때만 실행
-python -m scripts.build_smt2020_db
-python -m uvicorn main:app --reload --port 8100
-python -m pytest -q
-python -m pytest -m e2e
-```
-
-Windows PowerShell에서는 `py -3.11 -m venv .venv`로 만들고
-`.\.venv\Scripts\Activate.ps1`로 활성화한다. 에이전트의 테스트 도구까지 필요한
-개발 환경이므로 여기서는 `requirements-dev.txt`를 설치하며, 폐쇄망 실행 환경은
-`docs/CLOSED_NETWORK_SETUP.md`에 따라 `requirements.txt`만 설치한다.
-
-- SMT2020은 개발용 mock 회귀 자산이며 폐쇄망에 반입하지 않는다. 자산이 없으면
-  관련 테스트만 skip하고, 폐쇄망에서는 `ENV=prod`, `SERVICE_MODE=real`, 별도
-  `KNOWLEDGE_DIR`을 사용한다.
-- 기본 테스트는 mock 서비스와 SDK `query` 대체를 우선한다. E2E는 실제
-  CLI/provider 인증이 필요한 동작에만 사용한다.
-- 새 tool은 wrapper, 런타임 지침, prompt 정합성 테스트와
-  프론트 renderer/toolkit 필요 여부를 함께 갱신한다. 입력 기본값과 선택 필드는
-  업무 함수 시그니처와 MCP 광고 JSON Schema에서 같은 의미여야 한다.
-- 현재 별도 linter, formatter와 coverage 기준은 없다. 설정 없이 필수라고
-  문서화하지 않는다.
+- 기존 변경을 보존하고 작은 작업은 `plan/Todo.md`, 큰 작업만
+  `plan/<yymmdd>-<topic>-plan.md`에 기록한다.
+- 로컬 `datasets/`, `data/`, `.env`, 변환 스크립트와 비밀값은 커밋하지 않는다.
+- 기본 검증: `source .venv/bin/activate && python -m pytest -q`
+- 실제 CLI/provider가 필요한 경우에만 `python -m pytest -m e2e`를 실행한다.

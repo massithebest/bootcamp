@@ -108,8 +108,8 @@ def test_build_options_select_tools_and_instructions_by_mode(monkeypatch) -> Non
 
     assert legacy.cwd == AGENT_SDK_CWD and present.cwd == AGENT_SDK_PRESENT_CWD
     assert "mcp__planning__prepare_table" in legacy.allowed_tools
-    assert "mcp__planning__present" not in legacy.allowed_tools
-    assert "mcp__planning__present" in present.allowed_tools
+    assert "mcp__planning__present_chart" not in legacy.allowed_tools
+    assert "mcp__planning__present_chart" in present.allowed_tools
     assert "mcp__planning__prepare_table" not in present.allowed_tools
     assert "Skill" in present.allowed_tools
 
@@ -154,21 +154,20 @@ def test_present_call_flows_through_event_adapter() -> None:
     from agent.event_adapter import AgentEventAdapter
 
     adapter = AgentEventAdapter()
-    wire_tree = {"$type": "QueryTable", "$key": "table-1", "resultId": "a" * 32}
-    assistant_ui_tree = {"$type": "QueryTable", "$key": "table-1", "resultId": "a" * 32}
+    args = {"result_id": "a" * 32, "columns": ["part"], "title": "표"}
     call = adapter.convert(AssistantMessage(
         content=[ToolUseBlock(
             id="present-1",
-            name="mcp__planning__present",
-            input={"tree": json.dumps(wire_tree)},
+            name="mcp__planning__present_table",
+            input=args,
         )], model="x",
     ))
     result = adapter.convert(UserMessage(content=[ToolResultBlock(
         tool_use_id="present-1", content=[{"type": "text", "text": "{}"}],
     )]))
 
-    assert call[0].type == "tool_call" and call[0].tool_name == "present"
-    assert call[0].data == {"args": assistant_ui_tree}
+    assert call[0].type == "tool_call" and call[0].tool_name == "present_table"
+    assert call[0].data == {"args": args}
     assert [e.type for e in result] == ["tool_result", "status"]
     assert result[0].data == {} and result[0].tool_call_id == "present-1"
     assert result[1].data["status"] == "completed"

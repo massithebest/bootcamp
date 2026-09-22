@@ -10,8 +10,8 @@ Agent 애플리케이션이다. 개발용 mock 회귀에는 선택적으로 SMT2
 - table·KPI·recipe·scenario YAML과 버전형 텍스트 지식 조회·관리
 - 카탈로그의 조회·집계 규칙을 적용한 읽기 전용 SQL
 - 최대 1,000행 Result Store, 결과 요약·구간 조회
-- 검색·정렬·페이지 이동이 가능한 최대 100행 독립 표
-- 실제 결과 컬럼과 grain을 검증한 bar·line 차트
+- legacy 모드의 최대 100행 독립 표와 검증된 bar·line 차트
+- `present` 모드의 서버 페이지 표, bar·line·area 차트와 시뮬레이션 요약
 - 질문 편집·재생성·중단과 3-pane Agent Workbench
 
 ```text
@@ -97,6 +97,7 @@ SMT2020 자산이 없으면 관련 테스트만 자동으로 skip된다. 폐쇄�
 - [Frontend 계획과 이력](frontend/plan/Todo.md)
 - [Backend 실행·운영](backend/README.md)
 - [Frontend 실행·검증](frontend/README.md)
+- [Frontend UI 디자인 기준](frontend/docs/assistant-ui-design.md)
 - [도메인 지식 관리](backend/docs/domain-knowledge-management.md)
 - [개발 Agent 작업 지침](AGENTS.md)
 

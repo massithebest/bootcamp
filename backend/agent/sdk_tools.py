@@ -21,8 +21,18 @@ from tools.knowledge_tool import (
     list_recipes,
     list_tables,
 )
-from services.present_service import PresentError, decode_present_input, present_input_schema
-from tools.present_tool import present
+from services.present_service import (
+    present_chart_input_schema,
+    present_simulation_input_schema,
+    present_sql_preview_input_schema,
+    present_table_input_schema,
+)
+from tools.present_tool import (
+    present_chart,
+    present_simulation,
+    present_sql_preview,
+    present_table,
+)
 from tools.rag_tool import search_documents
 from tools.result_tool import get_result_page, get_result_summary
 from tools.simulation_tool import list_simulation, run_simulation
@@ -274,33 +284,72 @@ def _prepare_visualization_tool(access_scope: str | None):
     return _prepare_visualization
 
 
-def _present_tool(access_scope: str | None):
+def _present_sql_preview_tool(access_scope: str | None):
     @tool(
-        "present",
-        "SQL·시뮬레이션 결과를 사용자에게 보여 줄 UI 트리를 조합한다. "
-        "tree 필드에 root UI node 하나를 JSON 문자열로 직렬화해 넣는다. "
-        "문자열 안의 각 node는 $type으로 종류를 지정하고 children으로 중첩한다. "
-        "execute_sql·run_simulation이 반환한 result_id와 표시 설정만 넣고 행·차트 데이터는 넣지 않는다. "
-        "SQL은 SqlPreview, 추이·비교는 QueryChart, 상세 행은 QueryTable, 시뮬레이션은 SimulationSummary를 쓴다. "
-        "한 응답에서 조합 UI는 한 번 호출하고, 성공한 결과를 Markdown 표나 코드 펜스로 반복하지 않는다. "
-        "호출 뒤에는 '위/아래' 같은 위치 표현 대신 '표에는', '차트에서는'처럼 결과를 해석한다.",
-        present_input_schema(),
+        "present_sql_preview",
+        "실행한 SQL 원문을 사용자에게 보여 준다(기본 접힘). "
+        "sql에는 실제로 실행한 SQL을 그대로 넣는다.",
+        present_sql_preview_input_schema(),
     )
-    async def _present(args: dict[str, Any]) -> dict[str, Any]:
-        try:
-            node = decode_present_input(args)
-        except PresentError as exc:
-            return _ok(exc.as_tool_result())
-        return _ok(await present(node, access_scope=access_scope))
+    async def _present_sql_preview(args: dict[str, Any]) -> dict[str, Any]:
+        return _ok(await present_sql_preview(args, access_scope=access_scope))
 
-    return _present
+    return _present_sql_preview
+
+
+def _present_chart_tool(access_scope: str | None):
+    @tool(
+        "present_chart",
+        "execute_sql·run_simulation이 반환한 result_id를 서버가 집계한 bar/line/area 차트로 "
+        "보여준다. 행·차트 데이터는 넣지 않고 result_id와 표시 설정만 넣는다. "
+        "추이·비교를 보여줄 때 쓴다. 필요하면 한 응답에서 여러 번 호출할 수 있다(예: 지표별로 "
+        "따로 보여줄 때). 성공한 호출을 Markdown 표나 코드 펜스로 반복하지 않는다. "
+        "호출 뒤에는 '위/아래' 같은 위치 표현 대신 '차트에서는'처럼 결과를 해석한다.",
+        present_chart_input_schema(),
+    )
+    async def _present_chart(args: dict[str, Any]) -> dict[str, Any]:
+        return _ok(await present_chart(args, access_scope=access_scope))
+
+    return _present_chart
+
+
+def _present_table_tool(access_scope: str | None):
+    @tool(
+        "present_table",
+        "execute_sql·run_simulation이 반환한 result_id를 페이지 단위 표로 보여준다. "
+        "행 데이터는 넣지 않고 result_id와 표시 설정만 넣는다. "
+        "상세 행을 보여줄 때 쓴다. 필요하면 한 응답에서 여러 번 호출할 수 있다. "
+        "성공한 호출을 Markdown 표나 코드 펜스로 반복하지 않는다. "
+        "호출 뒤에는 '위/아래' 같은 위치 표현 대신 '표에는'처럼 결과를 해석한다.",
+        present_table_input_schema(),
+    )
+    async def _present_table(args: dict[str, Any]) -> dict[str, Any]:
+        return _ok(await present_table(args, access_scope=access_scope))
+
+    return _present_table
+
+
+def _present_simulation_tool(access_scope: str | None):
+    @tool(
+        "present_simulation",
+        "시뮬레이션 시나리오·요약·KPI를 보여준다. "
+        "같은 결과의 차트·표를 함께 보여줘야 하면 같은 응답에서 present_chart·present_table을 "
+        "result_id를 공유해 별도로 호출하고 텍스트로 그 연결을 설명한다. "
+        "성공한 호출을 Markdown 표나 코드 펜스로 반복하지 않는다.",
+        present_simulation_input_schema(),
+    )
+    async def _present_simulation(args: dict[str, Any]) -> dict[str, Any]:
+        return _ok(await present_simulation(args, access_scope=access_scope))
+
+    return _present_simulation
 
 
 def planning_tools(access_scope: str | None = None, mode: str | None = None):
     """Single source for SDK registration, allowed names and UI discovery.
 
     `RESULT_UI_MODE`가 결과 표시 도구를 정한다: legacy는 prepare_table·
-    prepare_visualization, present는 present를 등록한다.
+    prepare_visualization, present는 present_sql_preview·present_chart·
+    present_table·present_simulation을 등록한다.
     """
     mode = mode or result_ui_mode()
     common = [
@@ -310,7 +359,13 @@ def planning_tools(access_scope: str | None = None, mode: str | None = None):
         _get_result_summary_tool(access_scope), _get_result_page_tool(access_scope),
     ]
     if mode == "present":
-        return [*common, _present_tool(access_scope)]
+        return [
+            *common,
+            _present_sql_preview_tool(access_scope),
+            _present_chart_tool(access_scope),
+            _present_table_tool(access_scope),
+            _present_simulation_tool(access_scope),
+        ]
     return [
         *common, _prepare_table_tool(access_scope), _prepare_visualization_tool(access_scope),
     ]
@@ -344,7 +399,10 @@ async def tool_catalog(mode: str | None = None) -> list[dict]:
         "list_recipes": "집계 recipe 요약 목록", "get_recipe": "CTE·출력 grain·사용 예시",
         "get_result_summary": "저장 결과 메타데이터·수치 요약", "get_result_page": "저장 결과의 일부 행",
         "prepare_table": "최대 100행의 대화형 표", "prepare_visualization": "검증된 bar/line 차트 ID",
-        "present": "조합 UI 트리 검증 결과(빈 객체 또는 안전한 오류)",
+        "present_sql_preview": "SQL 표시 설정 검증 결과(빈 객체 또는 안전한 오류)",
+        "present_chart": "차트 표시 설정 검증 결과(빈 객체 또는 안전한 오류)",
+        "present_table": "표 표시 설정 검증 결과(빈 객체 또는 안전한 오류)",
+        "present_simulation": "시뮬레이션 요약 표시 설정 검증 결과(빈 객체 또는 안전한 오류)",
     }
     return [{"name": t.name, "description": t.description or "", "input_schema": t.input_schema,
              "output": output[t.name], "status": "available"} for t in result.tools]

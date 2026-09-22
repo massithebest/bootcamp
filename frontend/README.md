@@ -12,7 +12,7 @@ Frontend는 `http://localhost:3100`을 사용한다.
 - Knowledge Manager: 구조화 YAML 조회와 버전형 텍스트 지식 관리
 - Standalone Table: 최대 100행 검색·정렬·페이지 이동
 - Visualization: Backend가 검증한 bar·line 차트와 데이터 표 대안
-- 조합형 결과(`RESULT_UI_MODE=present`): 모델이 조합한 SQL·차트(bar·line·area)·서버 page 표·시뮬레이션 요약
+- `present` 결과: flat Tool로 전달된 SQL·차트(bar·line·area)·서버 page 표·시뮬레이션 요약
 
 채팅 UI는 `@assistant-ui/react`의 `useLocalRuntime`(`ChatModelAdapter`)과 thread 목록 runtime을
 사용한다. 대화 목록과 분기는 이번 브라우저 세션 동안만 유지된다(새로고침하면 사라진다). 브라우저는
@@ -70,7 +70,7 @@ bundle에는 포함되지 않는다.
 
 ## 현재 제약
 
-- 세션 목록은 현재 실행 동안의 예시 상태이며 영속 저장소가 아니다.
+- 세션 목록과 대화 분기는 브라우저 메모리에만 있으며 영속 저장소가 아니다.
 - Composer의 첨부·모델 선택·추론 강도 제어는 표시만 제공하는 비활성 UI다.
 - 새 응답은 standalone Tool UI를 사용하며 과거 chart marker는 호환용으로만 읽는다.
 - 모바일 환경은 지원하지 않으며 검증하지 않는다. 데스크톱 브라우저에서만 구동한다.
@@ -78,7 +78,7 @@ bundle에는 포함되지 않는다.
 ## 참고
 
 - [Frontend 작업 지침](AGENTS.md)
-- [Frontend 디자인 가이드](CLAUDE.md)
+- [assistant-ui 디자인 기준](docs/assistant-ui-design.md)
 - [기술 결정 기록](docs/decisions.md)
 - [폐쇄망 운영 원칙](docs/closed-network.md)
 - [Frontend 계획과 완료 이력](plan/Todo.md)

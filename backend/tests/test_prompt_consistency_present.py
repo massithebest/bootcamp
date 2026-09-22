@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from agent.agent import AGENT_SDK_CWD, AGENT_SDK_PRESENT_CWD
-from agent.sdk_tools import _present_tool, tool_names
+from agent.sdk_tools import planning_tools, tool_names
 from agent.system_prompt import SYSTEM_PROMPT
 from services.knowledge_service import get_store
 
@@ -67,20 +67,26 @@ def test_no_legacy_only_instructions_remain(path: Path) -> None:
 def test_present_procedure_is_documented_in_every_presenting_file() -> None:
     for path in (CLAUDE_MD, *(p for p in SKILLS if p.parent.name != "kpi-shortfall-analysis")):
         text = path.read_text(encoding="utf-8")
-        assert "present" in text and "resultId" in text, path
+        assert "present_" in text and "result_id" in text, path
         assert "행·차트 data 배열" in text, path
-        assert "QueryTable" in text and "최대 2회" in text, path
+        assert "present_table" in text and "최대 2회" in text, path
         assert "위·아래·다음 표/차트" in text and "표에는…" in text and "차트에서는…" in text, path
-        assert "도입 설명 → present 호출 → 결과 해석" in text, path
+        assert "도입 설명 → present_* 호출 → 결과 해석" in text, path
 
 
-def test_present_tool_description_forbids_position_words_and_data() -> None:
-    description = _present_tool("scope-a").description
+def test_present_tool_descriptions_forbid_position_words_and_raw_tree() -> None:
+    tools = {t.name: t for t in planning_tools(access_scope="scope-a", mode="present")}
 
-    assert "tree 필드" in description and "JSON 문자열" in description
-    assert "$type" in description and "children" in description
-    assert "행·차트 데이터는 넣지 않는다" in description
-    assert "위/아래" in description and "표에는" in description and "차트에서는" in description
+    chart = tools["present_chart"].description
+    table = tools["present_table"].description
+    sql_preview = tools["present_sql_preview"].description
+    simulation = tools["present_simulation"].description
+
+    for description in (chart, table, sql_preview, simulation):
+        assert "tree" not in description and "$type" not in description and "children" not in description
+
+    assert "위/아래" in chart and "차트에서는" in chart and "result_id" in chart
+    assert "위/아래" in table and "표에는" in table and "result_id" in table
 
 
 def test_system_prompt_still_lists_no_present_mode_tools() -> None:

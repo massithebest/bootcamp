@@ -24,8 +24,9 @@ Windows PowerShell에서는 `py -3.11 -m venv .venv`와
 
 - `ENV=dev|prod`: `prod`에서는 real service와 별도 운영 지식 경로를 강제
 - `SERVICE_MODE=mock|real`: SQL·RAG·simulation service 선택. `prod`는 `real`만 허용
-- `RESULT_UI_MODE=legacy|present`: 결과 표시 방식(기본 `legacy`). `present`는 bounded preview와 `present`
-  Generative UI Tool, `/api/query-results/*` 조회를 사용하고 `prepare_table`·`prepare_visualization`은 등록하지 않는다
+- `RESULT_UI_MODE=legacy|present`: 결과 표시 방식(기본 `legacy`). `present`는 bounded preview와
+  flat `present_sql_preview`·`present_chart`·`present_table`·`present_simulation`,
+  `/api/query-results/*`를 사용하고 `prepare_table`·`prepare_visualization`은 등록하지 않는다
 - `LLM_PROVIDER`, `AGENT_MODEL`, provider key: 실제 Agent SDK 설정
 - `KNOWLEDGE_DIR`, `KNOWLEDGE_DB_PATH`: 구조화 YAML과 텍스트 지식 SQLite 위치
 - `KNOWLEDGE_SEARCH_BACKEND=local|service`: `search_documents`가 로컬 SQLite 또는 사내 RAG 어댑터를 쓸지 선택

@@ -1,27 +1,24 @@
-"""`present` Tool: vocabulary schema, 재귀 검증, 접근 제어, SDK 등록."""
+"""`present_*` Tool들: 인자 schema, result 교차 검증, 접근 제어, SDK 등록."""
 
 import asyncio
-import copy
-import json
-import re
 
 import pytest
 
 from agent.sdk_tools import planning_tools, tool_catalog, tool_names
 from services import result_store
 from services.present_service import (
-    PRESENT_MAX_BYTES,
-    PRESENT_MAX_DEPTH,
-    PRESENT_MAX_NODES,
-    VOCABULARY,
     PresentError,
-    decode_present_input,
-    present_input_schema,
-    to_assistant_ui_tree,
-    validate_present,
+    present_chart_input_schema,
+    present_simulation_input_schema,
+    present_sql_preview_input_schema,
+    present_table_input_schema,
+    validate_present_chart,
+    validate_present_simulation,
+    validate_present_sql_preview,
+    validate_present_table,
 )
 from services.result_store import LocalParquetResultStore
-from tools.present_tool import present
+from tools.present_tool import present_chart, present_simulation, present_sql_preview, present_table
 
 SCOPE = "scope-a"
 
@@ -39,319 +36,225 @@ def result(tmp_path, monkeypatch):
     )
 
 
-def _tree(result_id):
-    return {
-        "$type": "Card",
-        "title": "월별 생산량",
-        "children": [
-            {"$type": "SqlPreview", "sql": "SELECT 1"},
-            {
-                "$type": "QueryChart",
-                "resultId": result_id,
-                "chartType": "line",
-                "xColumn": "work_month",
-                "yColumn": "qty",
-                "groupByColumn": "line",
-                "title": "추이",
-            },
-            {"$type": "QueryTable", "resultId": result_id, "columns": ["work_month", "qty"]},
-        ],
-    }
-
-
-def _error(node, *, scope=SCOPE) -> PresentError:
+def _error(fn, args, *, scope=SCOPE) -> PresentError:
     with pytest.raises(PresentError) as caught:
-        validate_present(node, access_scope=scope)
+        fn(args, access_scope=scope)
     return caught.value
 
 
-def test_valid_tree_returns_empty_object(result) -> None:
-    assert validate_present(_tree(result.result_id), access_scope=SCOPE) == {}
-    assert asyncio.run(present(_tree(result.result_id), access_scope=SCOPE)) == {}
+# ---- 성공 ----
 
 
-def test_simulation_summary_accepts_result_children_and_optional_fields(result) -> None:
-    node = {
-        "$type": "SimulationSummary",
-        "scenario": "HVLM",
+def test_valid_chart_returns_empty_object(result) -> None:
+    args = {
+        "result_id": result.result_id,
+        "chart_type": "line",
+        "x_column": "work_month",
+        "y_column": "qty",
+        "group_by_column": "line",
+        "title": "추이",
+    }
+
+    assert validate_present_chart(args, access_scope=SCOPE) == {}
+    assert asyncio.run(present_chart(args, access_scope=SCOPE)) == {}
+
+
+def test_valid_table_returns_empty_object(result) -> None:
+    args = {"result_id": result.result_id, "columns": ["work_month", "qty"]}
+
+    assert validate_present_table(args, access_scope=SCOPE) == {}
+    assert asyncio.run(present_table(args, access_scope=SCOPE)) == {}
+
+
+def test_valid_sql_preview_returns_empty_object() -> None:
+    args = {"sql": "SELECT 1", "title": "쿼리"}
+
+    assert validate_present_sql_preview(args, access_scope=SCOPE) == {}
+    assert asyncio.run(present_sql_preview(args, access_scope=SCOPE)) == {}
+
+
+def test_valid_simulation_returns_empty_object(result) -> None:
+    args = {
+        "scenario": "HVLM 입력검증",
         "summary": "요약",
-        "kpis": [{"label": "Part", "value": 3, "unit": "개"}, {"label": "상태", "value": "정상"}],
-        "resultId": result.result_id,
-        "children": [
-            {"$type": "QueryTable", "resultId": result.result_id},
-            {
-                "$type": "QueryChart",
-                "resultId": result.result_id,
-                "chartType": "bar",
-                "xColumn": "work_month",
-                "yColumn": "qty",
-                "aggregation": "sum",
-            },
-        ],
+        "kpis": [{"label": "불량률", "value": 1.2, "unit": "%"}],
+        "result_id": result.result_id,
     }
 
-    assert validate_present(node, access_scope=SCOPE) == {}
+    assert validate_present_simulation(args, access_scope=SCOPE) == {}
+    assert asyncio.run(present_simulation(args, access_scope=SCOPE)) == {}
 
 
-@pytest.mark.parametrize(
-    "mutate,code",
-    [
-        (lambda n: n.update({"$type": "Chart"}), "UNKNOWN_COMPONENT"),
-        (lambda n: n.update({"$type": None}), "UNKNOWN_COMPONENT"),
-        (lambda n: n.update({"onClick": "x"}), "UNKNOWN_PROP"),
-        (lambda n: n.update({"$action": {}}), "UNKNOWN_PROP"),
-        (lambda n: n.update({"rows": [[1]]}), "DATA_NOT_ALLOWED"),
-        (lambda n: n.update({"data": []}), "DATA_NOT_ALLOWED"),
-        (lambda n: n.update({"title": 3}), "INVALID_PROP"),
-        (lambda n: n.update({"title": "x" * 121}), "UI_LIMIT_EXCEEDED"),
-        (lambda n: n.update({"padding": 99}), "INVALID_PROP"),
-        (lambda n: n.update({"children": [123]}), "INVALID_UI_TREE"),
-    ],
-)
-def test_structure_violations_report_safe_code_and_path(result, mutate, code) -> None:
-    node = _tree(result.result_id)
-    mutate(node)
+def test_simulation_without_result_id_is_valid() -> None:
+    args = {"scenario": "s", "summary": "su", "kpis": []}
 
-    error = _error(node)
-
-    assert error.code == code
-    assert error.details["path"].startswith("$")
+    assert validate_present_simulation(args, access_scope=SCOPE) == {}
 
 
-def test_root_must_be_object_and_leaf_components_reject_children() -> None:
-    assert _error([]).code == "INVALID_UI_TREE"
-    assert _error({"$type": "SqlPreview", "sql": "SELECT 1", "children": ["b"]}).code == "INVALID_UI_TREE"
-    assert _error({"$type": "SqlPreview"}).code == "INVALID_PROP"
+# ---- result_id 접근 제어 ----
 
 
-def test_simulation_summary_rejects_non_result_children(result) -> None:
-    node = {
-        "$type": "SimulationSummary",
-        "scenario": "s",
-        "summary": "s",
-        "kpis": [],
-        "children": [{"$type": "SqlPreview", "sql": "SELECT 1"}],
+def test_chart_unknown_result_id_is_not_found() -> None:
+    args = {
+        "result_id": "0" * 32,
+        "chart_type": "bar",
+        "x_column": "work_month",
+        "y_column": "qty",
     }
 
-    assert _error(node).code == "INVALID_UI_TREE"
-    node["children"] = ["문자열"]
-    assert _error(node).code == "INVALID_UI_TREE"
+    error = _error(validate_present_chart, args)
+
+    assert error.code == "RESULT_NOT_FOUND" and error.details["path"] == "$.result_id"
 
 
-def test_limits_on_size_depth_and_node_count() -> None:
-    deep: dict = {"$type": "SqlPreview", "sql": "SELECT 1"}
-    for _ in range(PRESENT_MAX_DEPTH):
-        deep = {"$type": "Card", "children": deep}
-    wide = {
-        "$type": "Card",
-        "children": [{"$type": "SqlPreview", "sql": "SELECT 1"} for _ in range(PRESENT_MAX_NODES)],
+def test_table_wrong_scope_is_not_found(result) -> None:
+    args = {"result_id": result.result_id}
+
+    error = _error(validate_present_table, args, scope="other-scope")
+
+    assert error.code == "RESULT_NOT_FOUND"
+
+
+def test_simulation_unknown_result_id_is_not_found() -> None:
+    args = {"scenario": "s", "summary": "su", "kpis": [], "result_id": "0" * 32}
+
+    error = _error(validate_present_simulation, args)
+
+    assert error.code == "RESULT_NOT_FOUND" and error.details["path"] == "$.result_id"
+
+
+# ---- 실제 저장 결과에 대한 교차 검증 ----
+
+
+def test_chart_unknown_column_reports_invalid_column_role_or_not_found(result) -> None:
+    args = {
+        "result_id": result.result_id,
+        "chart_type": "bar",
+        "x_column": "not_a_column",
+        "y_column": "qty",
     }
-    huge = {"$type": "SqlPreview", "sql": "x" * 20_000, "$key": "k"}
-    big = {"$type": "Card", "children": [copy.deepcopy(huge) for _ in range(4)]}
 
-    assert _error(deep).code == "UI_LIMIT_EXCEEDED"
-    assert _error(wide).code == "UI_LIMIT_EXCEEDED"
-    assert len(json.dumps(big)) > PRESENT_MAX_BYTES
-    assert _error(big).code == "UI_LIMIT_EXCEEDED"
+    error = _error(validate_present_chart, args)
+
+    assert error.code == "COLUMN_NOT_FOUND"
 
 
-def test_result_id_format_and_access_are_checked(result) -> None:
-    node = _tree(result.result_id)
-    other = copy.deepcopy(node)
-    other["children"][1]["resultId"] = "f" * 32
-    malformed = copy.deepcopy(node)
-    malformed["children"][2]["resultId"] = "ABC"
+def test_chart_aggregation_required_when_grain_duplicates(result) -> None:
+    args = {
+        "result_id": result.result_id,
+        "chart_type": "bar",
+        "x_column": "work_month",
+        "y_column": "qty",
+    }
 
-    foreign = _error(node, scope="scope-b")
-    missing = _error(other)
+    error = _error(validate_present_chart, args)
 
-    assert foreign.code == missing.code == "RESULT_NOT_FOUND"
-    assert foreign.message == missing.message
-    assert _error(malformed).code == "INVALID_PROP"
-    assert _error(node, scope=None).code == "RESULT_NOT_FOUND"
+    assert error.code == "AGGREGATION_REQUIRED"
 
 
-def test_chart_and_table_settings_are_validated_against_stored_result(result) -> None:
-    bad_column = _tree(result.result_id)
-    bad_column["children"][1]["xColumn"] = "nope"
-    bad_role = _tree(result.result_id)
-    bad_role["children"][1]["yColumn"] = "line"
-    del bad_role["children"][1]["groupByColumn"]
-    grain = _tree(result.result_id)
-    del grain["children"][1]["groupByColumn"]
-    table = _tree(result.result_id)
-    table["children"][2]["columns"] = ["missing"]
+def test_chart_non_numeric_y_column_reports_invalid_column_role(result) -> None:
+    args = {
+        "result_id": result.result_id,
+        "chart_type": "bar",
+        "x_column": "work_month",
+        "y_column": "line",
+        "group_by_column": None,
+    }
 
-    assert _error(bad_column).code == "COLUMN_NOT_FOUND"
-    assert _error(bad_role).code == "INVALID_COLUMN_ROLE"
-    assert _error(grain).code == "AGGREGATION_REQUIRED"
-    assert _error(bad_column).details["path"] == "$.children[1]"
-    error = _error(table)
-    assert error.code == "COLUMN_NOT_FOUND" and error.details["path"] == "$.children[2].columns"
+    error = _error(validate_present_chart, args)
+
+    assert error.code == "INVALID_COLUMN_ROLE"
+
+
+def test_table_duplicate_columns_are_rejected(result) -> None:
+    args = {"result_id": result.result_id, "columns": ["qty", "qty"]}
+
+    error = _error(validate_present_table, args)
+
+    assert error.code == "INVALID_PROP" and error.details["path"] == "$.columns"
+
+
+def test_table_missing_column_is_reported(result) -> None:
+    args = {"result_id": result.result_id, "columns": ["not_a_column"]}
+
+    error = _error(validate_present_table, args)
+
+    assert error.code == "COLUMN_NOT_FOUND"
+    assert error.details["columns"] == ["not_a_column"]
 
 
 def test_tool_returns_safe_error_payload(result) -> None:
-    bad = _tree(result.result_id)
-    bad["children"][1]["yColumn"] = "line"
-    del bad["children"][1]["groupByColumn"]
-
-    payload = asyncio.run(present(bad, access_scope=SCOPE))
-
-    assert payload["status"] == "error" and payload["code"] == "INVALID_COLUMN_ROLE"
-    assert str(result.path.parent) not in json.dumps(payload)
-
-
-def test_advertised_schema_uses_one_non_recursive_json_string() -> None:
-    schema = present_input_schema()
-
-    assert schema["required"] == ["tree"]
-    assert set(schema["properties"]) == {"tree"}
-    assert schema["properties"]["tree"]["type"] == "string"
-    assert schema["properties"]["tree"]["maxLength"] == PRESENT_MAX_BYTES
-    assert schema["additionalProperties"] is False
-    assert "$defs" not in schema and "$ref" not in json.dumps(schema)
-    description = schema["properties"]["tree"]["description"]
-    assert set(VOCABULARY) == {
-        "Card",
-        "SqlPreview",
-        "QueryChart",
-        "QueryTable",
-        "SimulationSummary",
-    }
-    assert all(name in description for name in VOCABULARY)
-    assert "Card(title?:string" in description
-    assert "SqlPreview(sql:string" in description
-    assert "QueryTable(resultId:string" in description
-    assert all(
-        f"{name}(" not in description
-        for name in ("Col", "Row", "Header", "Text", "Fact", "Badge", "Alert", "ListView")
-    )
-
-
-def test_advertised_schema_property_names_are_claude_code_compatible() -> None:
-    pattern = re.compile(r"^[a-zA-Z0-9_.-]{1,64}$")
-
-    def check(value) -> None:
-        if isinstance(value, dict):
-            properties = value.get("properties")
-            if isinstance(properties, dict):
-                assert all(pattern.fullmatch(name) for name in properties)
-            for child in value.values():
-                check(child)
-        elif isinstance(value, list):
-            for child in value:
-                check(child)
-
-    check(present_input_schema())
-
-
-def test_tool_wire_tree_converts_to_assistant_ui_without_touching_regular_objects() -> None:
-    wire = {
-        "component": "SimulationSummary",
-        "nodeKey": "summary-1",
-        "scenario": "HVLM",
-        "summary": "요약",
-        "kpis": [{"label": "component", "value": "QueryTable"}],
-        "children": [
-            {"component": "QueryChart", "nodeKey": 1, "resultId": "a" * 32},
-            "설명",
-        ],
+    args = {
+        "result_id": result.result_id,
+        "chart_type": "bar",
+        "x_column": "work_month",
+        "y_column": "qty",
     }
 
-    converted = to_assistant_ui_tree(wire)
+    payload = asyncio.run(present_chart(args, access_scope=SCOPE))
 
-    assert converted["$type"] == "SimulationSummary"
-    assert converted["$key"] == "summary-1"
-    assert converted["children"][0]["$type"] == "QueryChart"
-    assert converted["children"][0]["$key"] == 1
-    assert converted["kpis"] == wire["kpis"]
-    assert wire["component"] == "SimulationSummary" and "$type" not in wire
+    assert payload["status"] == "error" and payload["code"] == "AGGREGATION_REQUIRED"
 
 
-def test_tool_input_decodes_json_string_to_assistant_ui_tree() -> None:
-    tree = {
-        "$type": "Card",
-        "$key": "root",
-        "children": [{"$type": "SqlPreview", "sql": "SELECT 1"}],
-    }
-
-    converted = decode_present_input({"tree": json.dumps(tree, ensure_ascii=False)})
-
-    assert converted == {
-        "$type": "Card",
-        "$key": "root",
-        "children": [{"$type": "SqlPreview", "sql": "SELECT 1"}],
-    }
+# ---- Tool schema 형태 ----
 
 
-def test_tool_input_keeps_legacy_wire_alias_as_compatibility_only() -> None:
-    wire = {"component": "SqlPreview", "nodeKey": "old", "sql": "SELECT 1"}
+def test_input_schemas_are_flat_scalar_objects() -> None:
+    for schema in (
+        present_sql_preview_input_schema(),
+        present_chart_input_schema(),
+        present_table_input_schema(),
+        present_simulation_input_schema(),
+    ):
+        assert schema["type"] == "object"
+        assert schema["additionalProperties"] is False
+        for prop_schema in schema["properties"].values():
+            # 재귀($ref)나 문자열-속-JSON 없이 scalar/array-of-scalar/object(kpi)만 쓴다.
+            kind = prop_schema.get("type") or {
+                option.get("type") for option in prop_schema.get("anyOf", [])
+            }
+            assert kind, prop_schema
 
-    assert decode_present_input({"tree": json.dumps(wire, ensure_ascii=False)}) == {
-        "$type": "SqlPreview",
-        "$key": "old",
-        "sql": "SELECT 1",
-    }
+
+def test_present_chart_schema_requires_core_fields() -> None:
+    schema = present_chart_input_schema()
+
+    assert set(schema["required"]) == {"result_id", "chart_type", "x_column", "y_column"}
+    assert schema["properties"]["chart_type"]["enum"] == ["bar", "line", "area"]
 
 
-@pytest.mark.parametrize(
-    "args,path",
-    [
-        ({}, "$.tree"),
-        ({"tree": []}, "$.tree"),
-        ({"tree": "not json"}, "$.tree"),
-        ({"tree": "[]"}, "$.tree"),
-        ({"tree": "{}", "component": "Card"}, "$.component"),
-    ],
-)
-def test_tool_input_rejects_malformed_or_ambiguous_wire_values(args, path) -> None:
-    with pytest.raises(PresentError) as caught:
-        decode_present_input(args)
+def test_present_simulation_schema_requires_scenario_summary_kpis() -> None:
+    schema = present_simulation_input_schema()
 
-    assert caught.value.code == "INVALID_UI_TREE"
-    assert caught.value.details["path"] == path
+    assert set(schema["required"]) == {"scenario", "summary", "kpis"}
+    assert "result_id" not in schema["required"]
+
+
+# ---- 등록·모드 ----
 
 
 def test_present_registration_depends_on_mode() -> None:
-    legacy = tool_names("legacy")
-    present_mode = tool_names("present")
+    present_names = {t.name for t in planning_tools(mode="present")}
+    legacy_names = {t.name for t in planning_tools(mode="legacy")}
 
-    assert "mcp__planning__present" not in legacy
-    assert {"mcp__planning__prepare_table", "mcp__planning__prepare_visualization"} <= set(legacy)
-    assert "mcp__planning__present" in present_mode
-    assert not {"mcp__planning__prepare_table", "mcp__planning__prepare_visualization"} & set(present_mode)
-    assert len(planning_tools(mode="present")) == 13
+    assert {"present_sql_preview", "present_chart", "present_table", "present_simulation"} <= present_names
+    assert not {"present_sql_preview", "present_chart", "present_table", "present_simulation"} & legacy_names
+    assert {"prepare_table", "prepare_visualization"} <= legacy_names
+    assert not {"prepare_table", "prepare_visualization"} & present_names
+
+
+def test_tool_names_prefixes_present_tools() -> None:
+    names = tool_names("present")
+
+    for short in ("present_sql_preview", "present_chart", "present_table", "present_simulation"):
+        assert f"mcp__planning__{short}" in names
 
 
 def test_tool_catalog_advertises_present_schema_in_present_mode() -> None:
-    rows = asyncio.run(tool_catalog("present"))
-    by_name = {row["name"]: row for row in rows}
+    catalog = asyncio.run(tool_catalog(mode="present"))
+    by_name = {item["name"]: item for item in catalog}
 
-    assert "present" in by_name and "prepare_table" not in by_name
-    assert set(by_name["present"]["input_schema"]["properties"]) == {"tree"}
-    assert "$defs" not in by_name["present"]["input_schema"]
-    assert by_name["present"]["output"]
-
-
-def test_registered_present_tool_accepts_json_wire_tree_and_validates_canonical_tree(result) -> None:
-    present_tool = next(item for item in planning_tools(SCOPE, "present") if item.name == "present")
-
-    response = asyncio.run(present_tool.handler({
-        "tree": json.dumps({
-            "$type": "QueryTable",
-            "$key": "result-table",
-            "resultId": result.result_id,
-        }),
-    }))
-
-    assert json.loads(response["content"][0]["text"]) == {}
-
-
-def test_registered_present_tool_returns_safe_parse_error() -> None:
-    present_tool = next(item for item in planning_tools(SCOPE, "present") if item.name == "present")
-
-    response = asyncio.run(present_tool.handler({"tree": "["}))
-    payload = json.loads(response["content"][0]["text"])
-
-    assert payload["status"] == "error" and payload["code"] == "INVALID_UI_TREE"
-    assert payload["details"]["path"] == "$.tree"
+    for short in ("present_sql_preview", "present_chart", "present_table", "present_simulation"):
+        assert short in by_name
+        assert by_name[short]["input_schema"]["type"] == "object"
+        assert by_name[short]["status"] == "available"

@@ -66,9 +66,9 @@ function Field({ field, value, onChange, path }: { field: FieldGuide; value: unk
   }
   const wide = WIDE.has(field.widget) ? "sm:col-span-2" : "";
   if (composite) {
-    return <fieldset className={`${wide} min-w-0 space-y-1.5 border-0 p-0`} aria-describedby={describedBy}><legend className="p-0 text-ui text-ink-2">{label}</legend>{help}{control}<ErrorText id={`${id}-error`} messages={messages} /></fieldset>;
+    return <fieldset className={`${wide} min-w-0 space-y-1.5 border-0 p-0`} aria-describedby={describedBy}><legend className="p-0 text-ui text-ink-2">{label}</legend>{control}{help}<ErrorText id={`${id}-error`} messages={messages} /></fieldset>;
   }
-  return <div className={`${wide} min-w-0 space-y-1`}><label htmlFor={id} className="block text-ui text-ink-2">{label}</label>{help}{control}<ErrorText id={`${id}-error`} messages={messages} /></div>;
+  return <div className={`${wide} min-w-0 space-y-1`}><label htmlFor={id} className="block text-ui text-ink-2">{label}</label>{control}{help}<ErrorText id={`${id}-error`} messages={messages} /></div>;
 }
 
 /** 같은 부모 아래 필드들. 짧은 입력은 두 열, 긴 입력은 한 열을 다 쓴다. */

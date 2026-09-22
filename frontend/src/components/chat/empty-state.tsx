@@ -27,7 +27,7 @@ export function ExampleSuggestions() {
           <li>
             <SuggestionPrimitive.Trigger
               send
-              className="rounded-lg border border-line-strong bg-canvas px-3 py-1.5 text-ui text-ink-2 transition-colors hover:bg-surface hover:text-ink"
+              className="rounded-md border border-line-strong bg-canvas px-3 py-1.5 text-ui text-ink-2 transition-colors hover:bg-surface hover:text-ink"
             >
               <SuggestionPrimitive.Title />
             </SuggestionPrimitive.Trigger>

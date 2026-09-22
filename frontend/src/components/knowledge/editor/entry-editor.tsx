@@ -24,7 +24,8 @@ type Content = { mode: "form"; data: FieldData } | { mode: "yaml"; yaml: string 
 type Tab = "form" | "yaml" | "review";
 const TABS: { id: Tab; label: string }[] = [{ id: "form", label: "입력 폼" }, { id: "yaml", label: "원문 YAML" }, { id: "review", label: "변경 검토" }];
 const payload = (content: Content): ChangeContent => content.mode === "form" ? { data: content.data } : { yaml: content.yaml };
-const primaryButton = `${buttonClass} border-accent bg-accent-weak text-accent`;
+// 승인·검토 요청 등 1차 액션. live 상태가 아니므로 accent가 아닌 ink 채움을 쓴다.
+const primaryButton = "rounded border border-ink bg-ink px-3 py-1.5 text-ui text-canvas hover:bg-ink-strong focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
 
 /** 구조화 지식 하나의 편집·검토·승인 화면. 초안은 서버 변경 요청으로 저장되고 승인 전에는 런타임에 반영되지 않는다. */
 export const EntryEditor = forwardRef<EntryEditorHandle, Props>(function EntryEditor({ target, me, onDirtyChange, onTarget, onClose }, ref) {
@@ -183,7 +184,7 @@ export const EntryEditor = forwardRef<EntryEditorHandle, Props>(function EntryEd
   const open = !!change && ["draft", "submitted", "rejected"].includes(change.state);
 
   return <div className="space-y-5">
-    <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="sticky top-0 z-10 -mt-4 flex flex-wrap items-start justify-between gap-3 border-b border-line bg-canvas pb-3 pt-4 sm:-mt-6 sm:pt-6">
       <div className="min-w-0 space-y-1">
         <h2 ref={titleRef} tabIndex={-1} className="break-words text-ui-lg font-semibold outline-none">{title}</h2>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-ink-2">

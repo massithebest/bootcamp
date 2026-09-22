@@ -16,7 +16,6 @@ from claude_agent_sdk import (
 
 from api.schemas import AgentEvent
 from agent.sdk_tools import MCP_SERVER_NAME
-from services.present_service import PresentError, decode_present_input
 
 
 _MCP_PREFIX = f"mcp__{MCP_SERVER_NAME}__"
@@ -209,15 +208,7 @@ class AgentEventAdapter:
                     # 내장 Tool(Skill/Read/Bash 등)은 Frontend 로 전달하지 않는다.
                     continue
                 short = _short_tool_name(block.name)
-                if short == "present":
-                    try:
-                        public_args = decode_present_input(block.input)
-                    except PresentError:
-                        # 실패 상세는 이어지는 안전한 tool_result로 알린다.
-                        # 잘못된 provider wire JSON은 공개 이벤트에 반복하지 않는다.
-                        public_args = {}
-                else:
-                    public_args = block.input
+                public_args = block.input
                 events.append(
                     AgentEvent(
                         type="tool_call",

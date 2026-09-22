@@ -20,11 +20,13 @@ const config: Config = {
         ink: "var(--ink)",
         "ink-2": "var(--ink-2)",
         "ink-3": "var(--ink-3)",
-        // 액센트 (활성 세션 / 포커스 / 주요 액션 한정)
+        // 액센트 (live 상태 전용: streaming/running/connected/selected/focus)
         accent: "var(--accent)",
         "accent-hover": "var(--accent-hover)",
         "accent-weak": "var(--accent-weak)",
         "accent-ink": "var(--accent-ink)",
+        // 1차 액션(CTA) 채움 — accent 아닌 무채색
+        "ink-strong": "var(--ink-strong)",
         // 상태 3색 (저채도)
         "ok-ink": "var(--ok-ink)",
         "ok-weak": "var(--ok-weak)",
@@ -44,7 +46,8 @@ const config: Config = {
         "ui-lg": ["0.875rem", { lineHeight: "1.5rem" }], // 14px 살짝 큰 본문
       },
       borderRadius: {
-        DEFAULT: "0.3125rem",
+        // document 계층(6px): 패널·경고·툴 카드 등 bare `rounded` 기본값.
+        DEFAULT: "0.375rem",
       },
       transitionTimingFunction: {
         panel: "cubic-bezier(0.22, 0.61, 0.36, 1)",

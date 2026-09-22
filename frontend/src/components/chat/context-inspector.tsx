@@ -49,12 +49,12 @@ function ToolsPanel() {
   const resource = useKnowledgeResource(fetchKnowledgeTools);
   return <div className="space-y-3"><p className="text-2xs text-ink-2">Agent에 등록된 도구입니다. 서비스 연결 상태를 의미하지 않습니다.</p><ResourceState {...resource} retry={resource.reload} />
     {resource.data?.length === 0 && <p>등록된 도구가 없습니다.</p>}
-    {resource.data?.map(tool => <details key={tool.name} className="border-b border-line pb-3"><summary className="cursor-pointer break-words font-mono text-data">{tool.name}<span className="ml-2 font-sans text-2xs text-ink-3">사용 가능</span></summary><div className="mt-3 space-y-2 border-l-2 border-line-strong pl-3"><p className="text-ui leading-relaxed text-ink-2">{tool.description}</p><p className="text-2xs leading-relaxed text-ink-2"><span className="font-medium text-ink">결과</span> · {tool.output}</p></div></details>)}
+    {resource.data?.map(tool => <details key={tool.name} className="border-b border-line pb-3"><summary className="cursor-pointer break-words font-mono text-data">{tool.name}<span className="ml-2 font-sans text-2xs text-ink-3">사용 가능</span></summary><div className="mt-3 space-y-1 border-l-2 border-line-strong pl-3"><p className="text-ui leading-relaxed text-ink-2">{tool.description}</p><p className="text-2xs leading-relaxed text-ink-2"><span className="font-medium text-ink">결과</span> · {tool.output}</p></div></details>)}
   </div>;
 }
 function SkillsPanel() {
   const resource = useKnowledgeResource(fetchKnowledgeSkills);
-  return <div className="space-y-4"><p className="text-2xs leading-relaxed text-ink-2">질문에 맞춰 Agent가 선택하는 업무 절차입니다.</p><ResourceState {...resource} retry={resource.reload} />{resource.data?.length === 0 && <p>등록된 Skill이 없습니다.</p>}<ul className="space-y-5">{resource.data?.map(s => <SkillItem key={s.name} name={s.name} description={s.description} />)}</ul></div>;
+  return <div className="space-y-3"><p className="text-2xs leading-relaxed text-ink-2">질문에 맞춰 Agent가 선택하는 업무 절차입니다.</p><ResourceState {...resource} retry={resource.reload} />{resource.data?.length === 0 && <p>등록된 Skill이 없습니다.</p>}<ul className="space-y-3">{resource.data?.map(s => <SkillItem key={s.name} name={s.name} description={s.description} />)}</ul></div>;
 }
 function SkillItem({ name, description }: { name: string; description: string }) {
   const [expanded, setExpanded] = useState(false);

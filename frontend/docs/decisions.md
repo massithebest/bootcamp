@@ -630,6 +630,21 @@ Inspector는 `absolute` overlay만 적용해 중앙 Chat의 grid 폭을 소비�
 근거: 백엔드가 초안·검토 이력은 SQLite에, 최종 내용은 `knowledge/` YAML에 두어 단일 기준을 유지한다.
 
 
+## assistant-ui 디자인 적용 범위 (2026-09-22, 활성)
+
+공식 디자인 원문은 `assistant-ui-design.md`에 폐쇄망 사본으로 보관하고, 프로젝트별
+결정만 이 문서에 남긴다. 상세 token 값은 `globals.css`와 `tailwind.config.ts`가 기준이다.
+
+- 라이트 테마와 시스템 Sans/Mono font만 사용한다. 외부 font·CDN은 도입하지 않는다.
+- Chat이 primary인 3-pane 데스크톱 UI를 유지한다. 모바일 전용 UX는 지원하지 않는다.
+- 모델 thinking은 표시하지 않으며 공개 `status`는 업무 진행 단계로만 표현한다.
+- 원격 image·attachment·voice·Assistant Cloud는 Backend 계약이 생기기 전까지 도입하지 않는다.
+- radius는 document(6px), control(8px), surface(10px), floating card(12px),
+  thread(16px), capsule 체계를 사용한다. thread radius는 Composer 등 제품 surface에만 쓴다.
+- blue accent는 streaming·running·connected·selected와 focus에 사용하고, CTA는 ink 계열을 쓴다.
+  기존 텍스트 링크와 pane resize affordance의 accent는 범위를 넓히지 않는 조건으로 유지한다.
+- 장식적 gradient·glass·과도한 shadow와 전면 카드화를 피하고 상태는 색만으로 전달하지 않는다.
+
 ## assistant-ui 통합 전환 (2026-09-22, 활성)
 
 `present` Generative UI 결과 전환과 LocalRuntime 전환을 한 계획으로 수행했다. Backend `/api/chat` SSE 계약은
@@ -650,23 +665,19 @@ Inspector는 `absolute` overlay만 적용해 중앙 Chat의 grid 폭을 소비�
   유지된다. 다른 thread가 응답 중이어도 전환할 수 있고 실행은 계속된다(런타임이 thread를 유지). 계획의
   `RemoteThreadList({backgroundThreads})`는 runtime hook 경로에서 옵션이 없어 쓰지 않았다. Backend 앵커는 프로세스
   메모리이므로 재시작 후 fork는 Backend `error`로 돌아올 수 있다.
-- **Generative UI**: Python Backend가 검증·실행한 `present` Tool의 `$type` 트리를
-  `@assistant-ui/react-generative-ui@0.0.19`의 `renderGenerativeUI`로 렌더한다. package의
-  `present()`는 frontend Tool(`execute` 포함)이라 LocalRuntime이 결과를 클라이언트에서 추가해 재실행을
-  유발할 수 있으므로 생성하지 않고 toolkit에는 `type: "backend"`로 등록했다.
-  `defineGenerativeComponents`는 compiler 없이 실행 시 예외를 던지므로 같은 형태의 일반 객체 library를 쓴다
-  (`@assistant-ui/vite`·`"use generative"` 미도입).
-- **Tool wire 경계**: provider에 노출되는 `present` Tool은 재귀 `$ref` 호환성을 위해
-  `tree` JSON 문자열 하나를 받는다. 문자열 안의 node와 Backend가 공개하는
-  `tool_call` AgentEvent args는 둘 다 assistant-ui 표준 `$type`/`$key`를 쓴다.
+- **결과 Tool UI**: Backend가 실행한 flat `present_sql_preview`·`present_chart`·
+  `present_table`·`present_simulation`을 Tool 이름별 renderer로 표시한다. 각 renderer는
+  snake_case args를 Zod로 검증해 기존 결과 컴포넌트 prop으로 변환한다.
+- **Tool wire 경계**: 재귀 `$type` tree와 JSON 문자열 이중 인코딩은 사용하지 않는다.
+  Tool args에는 scalar 설정과 `result_id`만 두며 원본 행·차트 data 배열을 싣지 않는다.
 - **결과 데이터**: 트리에는 `resultId`와 표시 설정만 있다. `QueryTable`은
   `@tanstack/react-table` 9.2.4 수동 모드로 `/api/query-results/{id}/table`에 page·전체 셀 검색·
   단일 열 정렬을 보낸다. Result Store의 최대 1,000건에 서버가 먼저 검색·정렬을 적용하고
   기본 10행의 현재 page만 반환한다. 차트는 `/chart` 서버 집계 응답을 조회한다
   (요청 공유·abort·성공만 cache). 전체 행은 브라우저에 한 번에 오지 않는다.
-- **Vocabulary 계약**: FE Zod와 Backend `present` vocabulary는 `tests/fixtures/present-vocabulary.json`(Backend 사본)으로
-  비교한다. 허용 목록은 여러 결과를 묶는 `Card`와 `SqlPreview`·`QueryChart`·`QueryTable`·`SimulationSummary`로 제한한다.
-  일반 설명은 Assistant Markdown이 담당하고 로딩·경고·오류는 도메인 component 내부에서 표시한다. 공유 prop(`title`·`resultId`)은 모두 같은 타입을 유지한다.
+- **Schema 계약**: FE Zod와 Backend Tool schema는 `tests/fixtures/present-vocabulary.json`
+  (Backend 사본)으로 비교한다. 여러 결과는 메시지 안에 순차적으로 표시하고 관계는
+  Assistant Markdown으로 설명한다. 별도 Card grouping 계약은 없다.
 - **실패한 `present`**: 같은 메시지에서 이후 `present`가 성공하면 실패 호출은 숨기고, 전부 실패하면 오류 알림 표면을
   그대로 보여 준다(계획의 "ToolGroup 안 표시"에서 단순화).
 - **두 결과 모드**: `RESULT_UI_MODE=legacy|present` 플래그는 Backend가 소유한다. `DatabaseResult`·`SimulationResult`는

@@ -33,7 +33,7 @@ Backend에 없는 기능을 동작하는 것처럼 표시하는 것은 범위 �
 | 실행 과정 | 완료 | 공개 status, ToolGroup, 호출 ID별 args/result와 2단계 disclosure |
 | 표 | 완료 | legacy 최대 100행 local 표 + `QueryTable` 최대 1,000건 서버 검색·정렬·10/25/50/100 pagination |
 | 차트 | 완료 | legacy 검증 API bar/line + 조합형 `QueryChart`(bar/line/area, 서버 집계), loading/error와 데이터 표 대안 |
-| 조합형 결과 | 구현(플래그 대기) | `present` Generative UI(`SqlPreview`·`QueryChart`·`QueryTable`·`SimulationSummary`); Backend `RESULT_UI_MODE=present` 전환 후 사용 |
+| 조합형 결과 | 구현(플래그 대기) | flat `present_sql_preview`·`present_chart`·`present_table`·`present_simulation` Tool renderer(`SqlPreview`·`QueryChart`·`QueryTable`·`SimulationSummary`); Backend `RESULT_UI_MODE=present` 전환 후 사용 |
 | 후속질문 | 파서·UI 완료 | `done.data.suggestions`를 Backend가 보내면 표시(현재 미전송) |
 | 지식 관리 | 완료 | 구조화 지식 조회·수정 요청·검토·승인(가이드 폼·원문 YAML·diff), 텍스트 등록·검토·활성화, 정확한 버전 인용 |
 | Layout | 완료 | Sidebar·Chat·Inspector, Inspector resize, 좁은 화면 overlay |
@@ -56,10 +56,24 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 
 ### 조합형 결과 (`RESULT_UI_MODE=present`)
 
-- Frontend가 받는 `present` Tool args root는 wrapper 없는 assistant-ui 표준 `$type` node(`$key` 선택)이며 허용 vocabulary는 여러 결과를 묶는 `Card`와 도메인 `SqlPreview`·`QueryChart`·`QueryTable`·`SimulationSummary`다. 범용 레이아웃·텍스트·상태 node는 허용하지 않고 일반 설명은 Assistant Markdown이 담당한다. prop 계약은 `tests/fixtures/present-vocabulary.json`과 `components/chat/generative/vocabulary.ts`.
-  provider에 노출되는 Tool은 `tree` JSON 문자열을 받고, 그 안의 node도 assistant-ui 표준 `$type`/`$key`를 쓴다. Backend가 파싱·검증한 뒤 같은 트리를 공개 AgentEvent에 싣는다.
-  Frontend는 backend Tool UI에서 package의 `renderGenerativeUI`로 그린다. `present` 결과는 성공 시 빈 객체, 실패는
-  `{status:"error", code, message, details.path}`다.
+- Backend는 `present` Tool 하나 대신 flat(스칼라 인자) Tool 4개를 보낸다:
+  `present_sql_preview(sql, title?)`,
+  `present_chart(result_id, chart_type, x_column, y_column, group_by_column?, aggregation?, title?)`,
+  `present_table(result_id, columns?, title?)`,
+  `present_simulation(scenario, summary, kpis, result_id?)`. 각 Tool 이름이 곧 렌더링할 컴포넌트를
+  정하므로 `$type` 트리 파싱이 없다. 인자는 snake_case로 wire와 그대로 일치한다.
+  prop 계약은 `tests/fixtures/present-vocabulary.json`(Tool 이름별 schema)과
+  `components/chat/generative/vocabulary.ts`(같은 이름의 Zod schema, snake_case)다.
+  Frontend는 `components/chat/generative/present-tool-uis.tsx`의 Tool별 renderer가 인자를
+  Zod로 파싱해 `QueryChart`/`QueryTable`/`SqlPreview`/`SimulationSummary`(모두 flat camelCase
+  prop, resultId 기반 API 조회는 그대로)에 매핑한다. `renderGenerativeUI`/
+  `@assistant-ui/react-generative-ui`는 더 쓰지 않는다(패키지 의존성 제거).
+  Tool 결과는 성공 시 빈 객체, 실패는 `{status:"error", code, message, details.path}`다.
+  여러 결과를 한 화면에 시각적으로 묶는 기능(과거 `Card`)은 없다 — 같은 `result_id`로
+  `present_*`를 여러 번 호출해도 메시지 안에서 순차적으로 나열된다(`execute_sql` 여러 번
+  호출과 같은 방식). (과거에는 Tool 하나가 UI 트리 전체를 `tree` JSON-문자열로 받았으나,
+  실제 provider가 그 문자열 타입을 지키지 못해 반복 실패하는 문제가 있어 2026-09-22
+  이중 인코딩을 없애는 재설계로 바꿨다. 상세 근거는 아래 완료 이력 참고.)
 - 이 모드의 `execute_sql`·`run_simulation` 결과는 전체 행 없이 preview(`result_id`, `row_count`, `columns`, `sample_rows`(객체,
   최대 5), `date_ranges`, `distinct_counts`, `statistics`, `top_groups`; simulation은 `simulation_type`·`scenario`·`summary`·`kpis`)다.
 - `GET /api/query-results/{resultId}/table?page&page_size(≤100)&columns=…&search=&sort_column=&sort_direction=asc|desc`
@@ -117,7 +131,8 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 ### P1
 
 - [ ] **조합형 결과 운영 전환**: Backend가 `RESULT_UI_MODE=present`로 전환된 환경에서 관통 검증(SQL·simulation →
-  `present` → 표·차트·SQL)하고 legacy `prepare_*` renderer·`chart` marker·`/api/visualizations` client 삭제 계획을 별도로 만든다.
+  `present_chart`/`present_table`/`present_sql_preview`/`present_simulation` → 표·차트·SQL)하고 legacy
+  `prepare_*` renderer·`chart` marker·`/api/visualizations` client 삭제 계획을 별도로 만든다.
 - [ ] **후속질문 표시 검증**: Backend가 `done.data.suggestions`를 보내면 실제 응답에서 표시·전송·오류/취소 미표시를 확인한다.
 
 ### P2
@@ -139,6 +154,90 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
   재연결을 관통 검증한다.
 
 ## 완료 이력 요약
+
+### 2026-09-22 — 개발 문서와 디자인 기준 분리
+
+- `AGENTS.md`는 Frontend 구조·공유 계약·검증만 남기고, `CLAUDE.md`는 상세 내용을
+  복제하지 않는 문서 진입점으로 축약했다.
+- assistant-ui 공통 디자인 원문은 `docs/assistant-ui-design.md`, 프로젝트별 결정과
+  예외는 `docs/decisions.md`, 구현 계약과 검증 이력은 이 문서가 맡도록 분리했다.
+- README와 Elements 반입 안내를 현재 LocalRuntime과 flat `present_*` Tool 구현에 맞췄다.
+
+### 2026-09-22 — 지식 관리 등록·전환 UX 개선
+
+- `knowledge-manager.tsx`: "텍스트 지식 등록" 버튼과 값이 가려진 "구조화 지식
+  추가" `<select>`를 하나의 `DropdownMenu`("+ 새 지식 추가")로 합쳤다. 열면
+  텍스트 항목과(쓰기 권한이 있으면) 구조화 종류 전체가 한 번에 보인다.
+  `ui/dropdown-menu.tsx`(기존 미사용 shadcn 소스)를 재사용했고,
+  `DropdownMenuLabel`은 `DropdownMenuGroup`으로 감싸야 한다(감싸지 않으면
+  base-ui `MenuGroupContext is missing` 런타임 오류).
+- "전체 / 내 요청 / 검토 대기"를 `role="group"` 버튼 묶음에서 `ui/tabs.tsx`
+  (`variant="line"`)의 실제 `Tabs`/`TabsList`/`TabsTrigger`/`TabsContent`로
+  바꿨다. 편집기 내부의 `입력 폼 | 원문 YAML | 변경 검토` 커스텀
+  `role="tablist"`로 구현된 접근성 계약은 건드리지 않았다.
+- `ui/tabs.tsx`가 이번에 처음 실사용되며 `globals.css`에 빠져 있던
+  `data-horizontal`/`data-vertical` custom variant(기존 `data-open`/
+  `data-closed`와 같은 패턴)를 추가로 정의했다. 없으면 base-ui `Tabs` root의
+  `data-horizontal:flex-col`이 적용되지 않아 `TabsList`와 `TabsContent`가
+  세로로 쌓이지 않고 가로로 늘어나며(둘 다 7000px대 높이로 stretch) 탭이
+  전혀 보이지 않는다 — 브라우저로 직접 확인해서 찾은 문제였다.
+- `editor/field-editor.tsx`의 `Field`: 렌더 순서를 `label → help → control`
+  에서 `label → control → help`로 바꿨다. `record_list`(예: table의
+  `columns`) 같은 2열 grid에서 `help`가 있는 필드(예: 타입의 "SQL 타입")만
+  라벨이 두 줄이 되어 입력 박스가 같은 행의 다른 필드보다 아래로 밀리던
+  정렬 문제를 고쳤다.
+- `editor/entry-editor.tsx`: 편집기 헤더(제목·상태 문구·"편집 닫기" 버튼)를
+  `sticky top-0 z-10 bg-canvas`로 바꿔 긴 폼을 스크롤해도 항상 보이게 했다.
+  처음에는 헤더에 직접 음수 margin(`-mx-4 sm:-mx-6`)을 줘서 부모 section의
+  padding을 상쇄하려 했으나, section 자체가 `overflow-y-auto`인 스크롤
+  컨테이너라 그 padding은 스크롤과 무관하게 항상 고정된 여백으로 남고,
+  깊이 중첩된 자손의 음수 margin은 그 여백까지 정확히 도달하지 못해 스크롤
+  중 헤더 위치가 흔들리고 뒤 내용이 비치는 문제가 있었다. `knowledge-
+  manager.tsx`의 "지식 상세" section에서 padding(`p-4 sm:p-6`)을 section
+  자체가 아니라 스크롤되는 내부 wrapper(`div.flex.min-h-full.flex-1.flex-col`)로
+  옮겨 section의 스크롤 뷰포트 자체는 padding이 없게 만들고, entry-editor의
+  sticky 헤더는 그 wrapper의 세로 padding만 `-mt-4 sm:-mt-6`로 상쇄해 진짜
+  section 상단(사이드바의 "+ 새 지식 추가" 버튼과 같은 높이)에 흔들림 없이
+  고정되게 했다(표 헤더의 `interactive-data-table.tsx`/`query-table.tsx`
+  `sticky top-0 z-10` 패턴, Composer의 `sticky bottom-0 bg-canvas` 패턴과
+  같은 관례). 빈 상태(`!hasPane`)의 중앙 안내 문구(`my-auto`)가 계속
+  세로 중앙에 오도록 wrapper에도 `flex flex-col`을 유지했다.
+- 검증: `npm test`(111 passed) · `npm run build`(type check 포함) ·
+  `npm run lint`(0 errors, 기존 무관 warning 4개만) 통과. 개발 서버
+  (localhost:3100)에서 Playwright로 새 드롭다운 전체 옵션 노출, 탭 전환(전체/
+  내 요청/검토 대기), `table` 신규 등록 화면의 컬럼 1·2 필드 정렬과 폼 끝까지
+  스크롤해도 편집기 헤더·닫기 버튼이 고정되는 것을 직접 확인했다.
+
+### 2026-09-22 — `present` Generative UI를 flat `present_*` Tool renderer로 재설계
+
+- Backend가 `present` Tool 하나(재귀 `$type`/`children` 트리를 `tree` JSON-문자열 하나로
+  받음)를 `present_sql_preview`·`present_chart`·`present_table`·`present_simulation` 4개
+  flat Tool로 교체했다(실제 provider가 `tree` 문자열 타입을 지키지 못해 SDK 강제 검증에
+  막혀 반복 실패하는 문제 때문 — Backend `plan/Todo.md` 참고). Frontend도 같은 작업에서
+  맞춰 재설계했다.
+- `components/chat/generative/vocabulary.ts`의 Zod schema 필드명을 snake_case로 바꿔
+  wire와 그대로 맞췄다(`resultId`→`result_id` 등). `library.tsx`(`GenerativeUILibrary`)와
+  `present-tool-ui.tsx`(`renderGenerativeUI` 호출)를 삭제하고, Tool 이름별 renderer 4개
+  (`components/chat/generative/present-tool-uis.tsx`)로 교체했다 — 각 renderer가 Zod로
+  인자를 파싱해 기존 `QueryChart`/`QueryTable`/`SqlPreview`/`SimulationSummary`(변경 없음)에
+  camelCase prop으로 매핑한다. `@assistant-ui/react-generative-ui` 의존성을 제거했다
+  (`package.json`, `npm prune`).
+  `toolkit/index.tsx`·`lib/standalone-tools.ts`에 새 Tool 이름 4개를 등록했다.
+- `lib/chat-runtime.ts`의 standalone dedup 로직(`isSuccessfulStandalonePart`,
+  `shouldShowStandalonePart`)이 `toolName === "present"` 리터럴에 의존하던 특수 분기를
+  없애고 `toolName.startsWith("present_")`로 일반화했다. 이제 한 턴에 서로 다른
+  `result_id`로 `present_chart`를 여러 번 호출할 수 있으므로(예: 지표 2개), dedup을
+  Tool 이름만으로 하지 않고 `result_id`까지 함께 봐서 서로 다른 호출을 잘못 묶어
+  숨기지 않게 했다.
+- `tests/fixtures/present-vocabulary.json`을 `$type` 키 맵에서 Tool 이름별 schema 맵으로
+  다시 만들고, `tests/generative.test.mjs`·`tests/suggestions.test.mjs`의 `$type` 트리
+  기반 테스트를 flat 인자 기반으로 재작성했다.
+- 검증: `npm test` 111 passed, `npm run build`(type check 포함) 성공, `npm run lint`
+  0 errors(기존 무관 warning 4개만). Backend와 함께 실제 provider(GLM-5.3-flash)로
+  이전에 반복 실패하던 "지표 2개, 차트 2개" 시나리오를 재현해 `present_chart` 2회 호출이
+  모두 성공하는 것을 확인했다.
+- 미수행: `present_*` 운영 기본값 결정, Card 상당의 시각적 grouping 필요 여부는 실사용
+  피드백을 보고 재검토(위 P1 항목).
 
 ### 2026-09-08~14 — 기본 Workbench와 지식 조회
 
@@ -203,6 +302,42 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 - 브라우저는 최대 1,000건을 한 번에 받지 않고 검색·정렬된 현재 page만 받는다.
 - 검증: `npm test` 113 passed, `npm run build` 성공, `npm run lint` 오류 0(기존 warning 4).
 
+### 2026-09-22 — assistant-ui Design System 정합화
+
+- assistant-ui 공식 design.md 기준으로 radius를 5단계 의미 체계
+  (`rounded`=document 6px, `rounded-md`=control 8px, `rounded-lg`=surface
+  10px, `rounded-xl`=floating card 12px, `rounded-2xl`=thread 16px,
+  Composer 전용 명시적 예외 유지)로 갱신했다(`globals.css`, `tailwind.config.ts`,
+  `components/ui/{button,input,textarea,select,tooltip}.tsx`,
+  `assistant-ui/elements/surfaces.ts`).
+- `--accent`(blue)를 streaming·running·connected·selected와 그 연장인
+  focus 전용으로 좁혔다. 전송/중단 버튼, 사이드바 로고 배지, 지식 편집기의
+  승인·검토·초안 저장 CTA를 `--ink`/`--ink-strong` 채움으로 교체하고
+  `--shadcn-primary`도 `--ink`로 재매핑했다. 스트리밍 커서·실행 중 스피너·
+  선택된 대화/탭 항목의 accent는 유지했다.
+- 아이콘 크기를 `size-3.5`(버튼 내부 보조)/`size-4`(독립 배치)/`size-7`
+  (아이콘 버튼 컨테이너)/`size-8`(1차 액션 버튼) 4단계로 정리했다. 실제
+  스윕 결과 이탈값은 없었다(기존 `size-3~3.5` 문서 규칙과 실제 사용이 이미
+  대부분 일치).
+- `tool-group.aui.tsx`의 `text-sm` 2곳을 `text-ui`로, `context-inspector.tsx`의
+  `space-y-1~5` 5종 혼용을 2단계(`space-y-1` 항목 내부/`space-y-3` 목록)로
+  정리했다.
+- assistant-ui 공식 `design.md` 원문을
+  [assistant-ui 디자인 기준](../docs/assistant-ui-design.md)에 폐쇄망용으로
+  미러링하고 `AGENTS.md`에서 1차 참고 문서로 연결했다. 프로젝트별 차이(라이트 전용,
+  시스템 폰트만 사용, Reasoning UI 미사용, Composer의 `rounded-2xl`, 하이퍼링크
+  accent 색 유지)는 `docs/decisions.md`에 기록했다.
+- 검증: `npm test` 113 passed, `npm run build` 성공(type check 포함),
+  `npm run lint` 오류 0(기존 warning 4, 신규 없음). 데스크톱 브라우저
+  (1440×900)에서 홈 화면·Composer·Sidebar·지식 관리 화면을 눈으로 확인해
+  전송 버튼·로고 배지의 ink 색, 선택 상태의 accent 유지, radius 변화를
+  검증했다.
+- 남은 판단 필요 항목(변경하지 않음, 의도적 유지로 기록): 마크다운·Skill
+  링크의 `text-accent`, `chat-window.tsx`의 pane resize handle
+  hover 색은 공식 규칙("blue는 live 상태 전용")과 엄밀히는 어긋나지만
+  기존 링크 관행·리사이즈 어포던스로 판단해 그대로 뒀다. `docs/decisions.md`에
+  근거를 남겼다.
+
 ### 2026-09-21 — 실행·계획 기준 정리
 
 - Vite dev/preview 포트를 3100, 기본 Backend 주소를 8100으로 통일했다.
@@ -218,6 +353,13 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 - pane은 마운트를 유지하고 좁은 화면 재개방은 Chat을 밀지 않는 overlay다.
 - 일반 UI는 semantic CSS token과 light theme만 사용한다. 외부 font·CDN과 새
   remote runtime을 추가하지 않는다.
+- Radius는 document(6px, `rounded`)/control(8px, `rounded-md`)/surface(10px,
+  `rounded-lg`)/floating card(12px, `rounded-xl`)/thread(16px, `rounded-2xl`,
+  Composer 전용)/capsule(9999px, `rounded-full`) 5단계 의미 체계를 따른다.
+  `--accent`(blue)는 streaming·running·connected·selected와 focus 전용이며
+  1차 액션(CTA)은 `--ink`/`--ink-strong`을 쓴다. 상세는
+  [assistant-ui 디자인 기준](../docs/assistant-ui-design.md)과
+  `docs/decisions.md`의 "assistant-ui 디자인 적용 범위"를 참고한다.
 - Tool 실행은 최종 답변보다 낮은 위계로 두고 완료 후 자동으로 접는다.
 - 표·코드에는 가로·세로 scroll cap을 적용하고 숫자·식별자는 mono와
   tabular-nums를 사용한다.

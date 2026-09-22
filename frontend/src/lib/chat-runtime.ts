@@ -275,13 +275,9 @@ function shouldShowStandalonePart(
   parts: Extract<MessagePart, { kind: "tool" }>[],
 ): boolean {
   if (isSuccessfulStandalonePart(part)) return true;
-  if (part.toolName === "present") {
-    // 모델이 오류를 고쳐 다시 호출해 성공했다면 앞선 실패 호출은 숨긴다.
-    // 전부 실패했다면 오류 알림 표면을 그대로 보여 준다.
-    return !parts.slice(index + 1).some(
-      (later) => later.toolName === "present" && isSuccessfulStandalonePart(later),
-    );
-  }
+  // present_sql_preview는 args에 result_id가 없어 아래 공통 분기가 항상 그대로 보여준다.
+  // present_chart·present_table·present_simulation은 result_id별로 dedup한다 — 한 턴에
+  // 서로 다른 result_id로 여러 번 호출될 수 있으므로 Tool 이름만으로 묶지 않는다.
   const resultId = typeof part.args?.result_id === "string" ? part.args.result_id : null;
   if (!resultId) return true;
   return !parts.slice(index + 1).some(
@@ -295,7 +291,7 @@ function shouldShowStandalonePart(
 function isSuccessfulStandalonePart(
   part: Extract<MessagePart, { kind: "tool" }>,
 ): boolean {
-  if (part.toolName === "present") {
+  if (part.toolName.startsWith("present_")) {
     return part.result !== undefined && toolResultError(part.result) === null;
   }
   if (part.toolName === "prepare_visualization") {

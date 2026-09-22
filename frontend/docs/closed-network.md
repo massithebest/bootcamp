@@ -85,13 +85,11 @@ npm run preview
 - browser Network 탭이나 사내 proxy 로그에서 허용된 Backend 외 outbound 요청이
   없어야 한다.
 
-## 2026-09-22 반입 항목: Generative UI
+## 2026-09-22 반입 항목: 결과 Tool UI
 
-- `@assistant-ui/react-generative-ui@0.0.19`(MIT, pre-1.0): install script가 없고 dist의 외부 URL은
-  Adaptive Card 스키마 문자열뿐이다(fetch하지 않음). 전이 의존성 `assistant-stream`은
-  `0.3.42`에서 `0.3.44`로 올라간다(`@assistant-ui/react@0.15.19`의 `^0.3.42` 범위 안, react 버전은 유지).
-- `zod@4.6.5`를 직접 의존성으로 고정한다(기존 전이 `4.6.2`).
-- 사내 registry에 위 정확한 버전과 lockfile의 전이 의존성이 있는지 반입 전에 확인한다.
+- `zod@4.6.5`를 결과 Tool 인자 검증용 직접 의존성으로 고정한다.
+- `@assistant-ui/react-generative-ui`는 flat `present_*` Tool 전환 후 제거했다.
+- 사내 registry에는 현재 `package-lock.json`의 정확한 버전과 전이 의존성만 반입한다.
   `npm view <package>@<version> dependencies peerDependencies`와 `dist` URL grep 절차를 따른다.
 
 ## 현재 확인된 주의점

@@ -4,6 +4,8 @@ import { formatTime } from "@/lib/format-time";
 import { useKnowledgeResource } from "@/hooks/use-knowledge-resource";
 import { KNOWLEDGE_LABELS, PERMISSION_WRITE, STATUS_LABELS, STRUCTURED_KINDS, type ChangeSummary, type DocumentFields, type KnowledgeDocument, type KnowledgeEntry, type KnowledgeTarget, type StructuredKind } from "@/types/knowledge";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buttonClass, controlClass, EntryStatus, ResourceState } from "./shared";
 import { StructuredDetail } from "./structured-detail";
 import { ChangeStateBadge } from "./editor/change-badge";
@@ -122,11 +124,12 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
     <div className="shrink-0 border-b border-line px-5 py-3"><div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2"><div className="min-w-0"><p className="text-ui text-ink-2">공용 지식 · 활성화와 승인은 모든 대화의 이후 검색에 적용됩니다.</p><p className="mt-1 text-2xs text-ink-3">구조화 지식은 수정 요청을 만들고 승인 권한자가 승인하면 반영됩니다. 텍스트 지식의 작성자와 검토자 이름은 기록용입니다.</p></div>{me.data && <UserSwitcher me={me.data} />}</div></div>
     <div className="flex min-h-0 flex-1 overflow-hidden">
       <section aria-label="지식 목록" className={`${hasPane ? "hidden lg:flex" : "flex"} thin-scroll w-full shrink-0 flex-col gap-3 overflow-y-auto border-r border-line p-4 lg:w-72`}>
-        <button className={buttonClass} disabled={busy} onClick={() => navigate("new")}>텍스트 지식 등록</button>
-        {canWrite && <select className={controlClass} aria-label="구조화 지식 추가" value="" disabled={busy} onChange={e => startNew(e.target.value)}><option value="">구조화 지식 추가…</option>{STRUCTURED_KINDS.map(k => <option key={k} value={k}>{KNOWLEDGE_LABELS[k]} 추가</option>)}</select>}
-        <div role="group" aria-label="목록 보기" className="flex gap-1">{SEGMENTS.map(item => { const count = item.id === "mine" ? mine.data?.filter(c => c.state === "draft" || c.state === "submitted" || c.state === "rejected").length : item.id === "queue" ? queue.data?.length : undefined; return <button key={item.id} type="button" aria-pressed={segment === item.id} className={`flex-1 rounded border px-2 py-1.5 text-ui focus-visible:outline-2 focus-visible:outline-accent ${segment === item.id ? "border-accent bg-accent-weak font-semibold text-accent" : "border-line-strong text-ink-2 hover:bg-surface-2"}`} onClick={() => setSegment(item.id)}>{item.label}{count ? <span className="ml-1 tabular-nums">{count}</span> : null}</button>; })}</div>
-        {segment !== "all" && <><ResourceState {...changeRows} retry={changeRows.reload} />{changeRows.data && changeRows.data.filter(c => segment === "queue" || ["draft", "submitted", "rejected"].includes(c.state)).length === 0 && <p className="text-ui text-ink-3">{segment === "queue" ? "검토를 기다리는 요청이 없습니다." : "진행 중인 내 요청이 없습니다. 지식을 열어 수정 요청을 만들 수 있습니다."}</p>}<ul className="divide-y divide-line">{changeRows.data?.filter(c => segment === "queue" || ["draft", "submitted", "rejected"].includes(c.state)).map(changeRow)}</ul></>}
-        {segment === "all" && <>
+        <DropdownMenu><DropdownMenuTrigger disabled={busy} render={<button type="button" className={buttonClass} />}>+ 새 지식 추가</DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={() => navigate("new")}>텍스트 지식 등록</DropdownMenuItem>{canWrite && <><DropdownMenuSeparator /><DropdownMenuGroup><DropdownMenuLabel>구조화 지식</DropdownMenuLabel>{STRUCTURED_KINDS.map(k => <DropdownMenuItem key={k} onClick={() => startNew(k)}>{KNOWLEDGE_LABELS[k]} 추가</DropdownMenuItem>)}</DropdownMenuGroup></>}</DropdownMenuContent></DropdownMenu>
+        <Tabs value={segment} onValueChange={v => setSegment(v as Segment)}>
+          <TabsList variant="line" aria-label="목록 보기" className="w-full">{SEGMENTS.map(item => { const count = item.id === "mine" ? mine.data?.filter(c => c.state === "draft" || c.state === "submitted" || c.state === "rejected").length : item.id === "queue" ? queue.data?.length : undefined; return <TabsTrigger key={item.id} value={item.id} className="flex-1">{item.label}{count ? <span className="ml-1 tabular-nums">{count}</span> : null}</TabsTrigger>; })}</TabsList>
+          <TabsContent value="mine" className="space-y-3"><ResourceState {...changeRows} retry={changeRows.reload} />{changeRows.data && changeRows.data.filter(c => ["draft", "submitted", "rejected"].includes(c.state)).length === 0 && <p className="text-ui text-ink-3">진행 중인 내 요청이 없습니다. 지식을 열어 수정 요청을 만들 수 있습니다.</p>}<ul className="divide-y divide-line">{changeRows.data?.filter(c => ["draft", "submitted", "rejected"].includes(c.state)).map(changeRow)}</ul></TabsContent>
+          <TabsContent value="queue" className="space-y-3"><ResourceState {...changeRows} retry={changeRows.reload} />{changeRows.data && changeRows.data.length === 0 && <p className="text-ui text-ink-3">검토를 기다리는 요청이 없습니다.</p>}<ul className="divide-y divide-line">{changeRows.data?.map(changeRow)}</ul></TabsContent>
+          <TabsContent value="all" className="space-y-3">
         <input className={controlClass} aria-label="관리 지식 검색" placeholder="제목·본문·출처 검색" value={query} onChange={e => setQuery(e.target.value)} />
         <select className={controlClass} aria-label="관리 지식 유형" value={kind} onChange={e => setKind(e.target.value)}><option value="">전체 유형</option>{Object.entries(KNOWLEDGE_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>
         <div className="flex gap-2"><select aria-label="검토 상태" className={controlClass} value={status} onChange={e => setStatus(e.target.value)}><option value="">전체 검토 상태</option><option value="draft">미검토</option><option value="verified">검토 완료</option></select><select aria-label="활성 여부" className={controlClass} value={active} onChange={e => setActive(e.target.value)}><option value="">전체 사용 상태</option><option value="active">검색 반영</option><option value="inactive">검색 제외</option><option value="archived">보관됨</option></select></div>
@@ -136,9 +139,11 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
           const selected = selection && selection !== "new" && selection.id === e.id && selection.kind === e.type;
           return <li key={`${e.type}:${e.id}`}><button type="button" aria-current={selected ? "true" : undefined} className={`w-full space-y-1.5 border-l-2 px-3 py-3 text-left transition-colors hover:bg-surface-2 ${selected ? "border-accent bg-accent-weak" : "border-transparent"}`} onClick={() => navigate({ kind: e.type, id: e.id })}><span className="flex items-start justify-between gap-2"><span className="text-2xs font-medium text-ink-2">{KNOWLEDGE_LABELS[e.type]}</span><EntryStatus entry={e} /></span><span className="block break-words text-ui font-semibold text-ink">{e.title}</span><span className="block line-clamp-2 text-2xs leading-relaxed text-ink-2">{e.summary || "요약 없음"}</span>{e.pending_change && <span className="flex items-center gap-1.5 text-2xs text-ink-2">변경 요청 <ChangeStateBadge state={e.pending_change.state} /></span>}</button></li>;
         })}</ul>
-        </>}
+          </TabsContent>
+        </Tabs>
       </section>
-      <section aria-label="지식 상세" className={`${hasPane ? "flex" : "hidden lg:flex"} thin-scroll min-w-0 flex-1 flex-col overflow-y-auto p-4 sm:p-6`}>
+      <section aria-label="지식 상세" className={`${hasPane ? "flex" : "hidden lg:flex"} thin-scroll min-w-0 flex-1 flex-col overflow-y-auto`}>
+        <div className="flex min-h-full flex-1 flex-col p-4 sm:p-6">
         {hasPane && <button className={`${buttonClass} mb-4 self-start lg:hidden`} onClick={() => navigate(null)}>← 목록으로</button>}
         {!hasPane && <p className="my-auto text-center text-ui text-ink-3">지식을 선택해 내용을 확인하거나 텍스트 지식을 등록하세요.</p>}
         <div className="mx-auto w-full max-w-4xl space-y-4">
@@ -156,7 +161,7 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
                 <div className="grid gap-4 sm:grid-cols-2">{field("category", "분류", 100)}{field("tagsText", "태그 (쉼표 구분)", 2400)}</div>
                 {field("content", "본문", 100000, true)}
                 <div className="grid gap-4 sm:grid-cols-2">{field("owner", "담당자 / 작성자", 100)}{field("source", "출처", 500)}</div>
-                {editable && <div className="flex items-center gap-3"><button type="submit" className={`${buttonClass} border-accent bg-accent-weak text-accent`} disabled={busy || !dirty}>초안 저장</button><span className="text-2xs text-ink-3">{dirty ? "저장하지 않은 변경 있음" : "저장된 내용"}</span></div>}
+                {editable && <div className="flex items-center gap-3"><button type="submit" className={buttonClass} disabled={busy || !dirty}>초안 저장</button><span className="text-2xs text-ink-3">{dirty ? "저장하지 않은 변경 있음" : "저장된 내용"}</span></div>}
               </fieldset>
             </form>
             {doc && selectedVersion && <>
@@ -167,6 +172,7 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
             </>}
           </>}
           </>}
+        </div>
         </div>
       </section>
     </div>

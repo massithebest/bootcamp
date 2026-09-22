@@ -1,6 +1,6 @@
 # Production Planning Agent Backend 계획 및 이력
 
-**상태: 진행 중. 마지막 갱신: 2026-09-21.**
+**상태: 진행 중. 마지막 갱신: 2026-09-22.**
 
 이 문서는 Backend 작업의 목표, 현재 계약, 다음 작업과 완료 이력을 관리하는 단일
 기준 문서다. 폐쇄망 반입 후 Backend workspace만 열어도 이해할 수 있도록 다른
@@ -37,7 +37,7 @@ Backend가 소유하는 범위는 다음과 같다.
 | Result Store | 1차 완료 | parquet+metadata, TTL·용량 정리, browser access scope |
 | 표 | 완료 | 검증된 결과에서 선택 컬럼과 최대 100행 payload |
 | 시각화 | 완료 | 검증된 bar/line 명세, 최대 500 points·8 series (legacy) |
-| 결과 API·`present` | 구현(기본 `legacy`) | `/api/query-results/{id}/preview|table|chart`, `present` Tool·검증, `RESULT_UI_MODE` 플래그, `agent_sdk_present/` 지침 |
+| 결과 API·`present` | 구현(기본 `legacy`) | `/api/query-results/{id}/preview|table|chart`, `present_sql_preview`·`present_chart`·`present_table`·`present_simulation` flat Tool·검증, `RESULT_UI_MODE` 플래그, `agent_sdk_present/` 지침 |
 | RAG | Local 완료 / Vector 미구현 | 활성 검토 문서 local 검색; Milvus·문서 색인 후속 |
 | 실행 환경 | 완료 | Python 3.11 `.venv`, Backend 기본 포트 8100 |
 | Service logging | 완료 | 공개 작업 시작·완료·실패, 소요 시간, 중첩 DEBUG와 민감정보 비노출 |
@@ -66,11 +66,17 @@ Backend가 소유하는 범위는 다음과 같다.
 - `RESULT_UI_MODE=present`: `execute_sql`·`run_simulation`은 bounded preview(`result_id`, `row_count`,
   `source_truncated`, `columns`, `sample_rows`(≤5, 객체), `date_ranges`, `distinct_counts`, `statistics`,
   `top_groups`(컬럼당 ≤10); simulation은 `simulation_type`·`scenario`·`summary`·`kpis`; SQL은 `purpose`만)만 반환하고,
-  `prepare_*` 대신 `present`를 등록한다. Claude에 노출되는 Tool 입력은 `tree` JSON 문자열 하나이며,
-  문자열 안의 root node는 assistant-ui 표준 `$type`(`$key` 선택, `children` 재귀)를 쓴다. 실행
-  경계에서 파싱·검증해 같은 트리를 AgentEvent에 싣는다. 64 KiB·깊이 8·
-  node 50 제한과 `resultId`·chart 설정을 실제 결과로 재검증하고, 성공 `{}`/실패
-  `{status:"error", code, message, details.path}`를 반환한다. 자동 표 보완은 하지 않는다.
+  `prepare_*` 대신 flat(스칼라 인자) Tool 4개를 등록한다: `present_sql_preview(sql, title?)`,
+  `present_chart(result_id, chart_type, x_column, y_column, group_by_column?, aggregation?, title?)`,
+  `present_table(result_id, columns?, title?)`, `present_simulation(scenario, summary, kpis, result_id?)`.
+  (과거에는 `present` tool 하나가 UI 트리 전체를 `tree` JSON-문자열 하나로 받았으나, 실제
+  tool-calling 모델이 문자열 타입을 지키지 못해 Claude Agent SDK의 강제 `jsonschema.validate`에
+  막혀 `is_error=True`로 반복 실패하는 문제(2026-09-22 확인·재현)가 있어 이중 인코딩 자체를
+  없앴다. `resultId`·chart 설정을 실제 결과로 재검증하고, 성공 `{}`/실패
+  `{status:"error", code, message, details.path}`를 반환하는 계약은 그대로다. 여러 결과를
+  한 화면에 시각적으로 묶는 기능(과거 `Card`)은 없다 — 같은 `result_id`로 여러 `present_*`를
+  호출해도 화면에는 순차적으로 나열되며 연결은 모델이 텍스트로 설명한다. 자동 표 보완은
+  하지 않는다.
 - `GET /api/query-results/{result_id}/preview|table|chart`(같은 `pp_session_scope`): table `page`·`page_size`(기본 10, ≤100)·
   `columns`·`search`(≤200)·`sort_column`·`sort_direction(asc|desc)`를 저장된 최대 1,000건 전체에 적용하고
   `row_count`·`filtered_row_count`와 현재 page를 반환한다. chart는 `chart_type(bar|line|area)`·`x_column`·`y_column`·
@@ -128,8 +134,9 @@ Backend가 소유하는 범위는 다음과 같다.
 
 ### P1
 
-- [ ] **`RESULT_UI_MODE=present` 운영 전환**: 실제 provider 환경에서 `present` 호출 순서·실패 후 수정·표 누락 여부를
-  e2e로 확인한 뒤 기본값을 정하고, legacy `prepare_*`·`/api/visualizations`·자동 표 보완의 삭제 계획을 별도로 만든다.
+- [ ] **`RESULT_UI_MODE=present` 운영 전환**: flat `present_*` Tool로 재설계한 뒤(2026-09-22, 아래
+  완료 이력 참고) 실제 provider 환경에서 호출 성공률을 계속 관찰하고 기본값을 정한 뒤, legacy
+  `prepare_*`·`/api/visualizations`·자동 표 보완의 삭제 계획을 별도로 만든다.
 - [ ] **후속질문 동적 생성**: 성공한 `done`에 2~4개 제안을 선택적으로 추가한다.
   모델 출력 파싱 실패 시 빈 배열로 안전하게 종료한다. 소비자 파서는 이미 준비돼 있다(2~4개·각 1~120자).
 
@@ -150,6 +157,14 @@ Backend가 소유하는 범위는 다음과 같다.
 
 ## 완료 이력 요약
 
+### 2026-09-22 — 개발 문서 역할 정리
+
+- `AGENTS.md`는 Backend 경계·공유 계약·검증만 남기고 세부 구현 설명을 계획과
+  운영 문서로 돌렸다. 개발용 `CLAUDE.md`는 `AGENTS.md` 호환 진입점으로 유지했다.
+- 런타임 `agent_sdk*/CLAUDE.md`는 Tool·Skill 인덱스와 공통 안전 규칙만 남기고
+  업무 절차는 Skills, schema는 Tool 설명을 기준으로 하도록 축약했다.
+- Backend README의 `present` 모드를 현재 flat `present_*` Tool 계약에 맞췄다.
+
 ### 2026-09-22 — 결과 API·`present` Tool·플래그
 
 - 저장 없는 preview·table·chart API(`services/query_result_service.py`, `chart_projection.py`)와 `present` Tool
@@ -167,6 +182,34 @@ Backend가 소유하는 범위는 다음과 같다.
   legacy 동작·기존 API는 회귀 테스트로 유지한다.
 - 미수행: simulation→`present` 실제 provider e2e, 운영 기본값 결정, 후속질문 필드
   (`done.data.suggestions`), 대화·분기 영속 API.
+
+### 2026-09-22 — `present` Tool을 flat `present_*` 4개로 재설계
+
+- 실제 운영 provider가 Claude가 아니라 OpenRouter의 `z-ai/glm-5.3-flash`임을 확인했다. 위
+  항목에서 만든 `tree` JSON-문자열 이중 인코딩을 이 모델이 자주 어기고 `tree`를 객체 그대로
+  보내, Claude Agent SDK의 강제 `jsonschema.validate`(`claude_agent_sdk/types.py`의 `run_tool`)가
+  Python 코드 실행 전에 `Input validation error: ... is not of type 'string'`로 호출을 거부하는
+  것을 직접 재현해 확인했다. MCP는 이 SDK(0.2.152)에서 custom tool 등록의 유일한 경로이고
+  이 강제 검증도 끌 수 없어(비-MCP 우회 불가), 이중 인코딩 자체를 없애는 재설계로 해결했다.
+- `present` 하나를 `present_sql_preview`·`present_chart`·`present_table`·`present_simulation`
+  4개 flat Tool로 교체했다(`services/present_service.py`, `tools/present_tool.py`,
+  `agent/sdk_tools.py`). `VOCABULARY`·`present_input_schema`·`decode_present_input`·
+  `to_assistant_ui_tree`·`_walk`(재귀 검증)를 삭제하고 tool별 `*_input_schema()`와
+  `validate_present_<x>()`로 교체했다. `event_adapter.py`의 present 전용 디코딩 분기도 삭제해
+  다른 Tool과 같은 일반 경로를 탄다.
+  `PresentError`/`_fail`, `check_accessible`/`read_chart`(Result Store 교차 검증)는 그대로
+  재사용했다.
+  여러 결과를 한 화면에 묶는 `Card`/`SimulationSummary` 자식 기능은 뺐다 — 프론트에 여러 tool
+  호출을 하나로 묶는 기존 메커니즘이 없어 범위가 커지므로, 여러 `present_*` 호출은
+  `execute_sql` 여러 번 호출처럼 순차적으로 나열되고 연결은 모델이 텍스트로 설명한다.
+  `agent_sdk_present/CLAUDE.md`와 `.claude/skills/{simulation,sql-analysis}/SKILL.md`를 이
+  계약에 맞춰 다시 썼다.
+- 검증: `pytest -q` 418 passed, 6 deselected(`test_present.py`, `test_prompt_consistency_present.py`,
+  `test_result_ui_mode.py` 전면 재작성 포함). 실제 provider(GLM-5.3-flash)로 이전에 반복
+  실패하던 시나리오("지표 2개, 차트 2개 보여줘")를 재현해 `present_chart` 2회 호출이 모두
+  `is_error` 없이 `{}` 성공으로 끝나는 것을 SSE로 직접 확인했다.
+- 미수행: `present_*` 운영 기본값 결정(위 항목과 동일), Card 상당의 시각적 grouping이
+  필요한지 여부는 실사용 피드백을 보고 재검토.
 
 ### 2026-09-22 — Result Store 표 검색·정렬·pagination
 

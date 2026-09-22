@@ -1,23 +1,22 @@
 {
-  "$comment": "Backend services/present_service.py VOCABULARY의 사본. Backend 계약을 바꾸면 함께 갱신한다.",
-  "components": {
-    "Card": {
-      "children": "any",
+  "$comment": "Backend services/present_service.py의 present_*_input_schema() 사본. Backend 계약을 바꾸면 함께 갱신한다.",
+  "tools": {
+    "present_sql_preview": {
       "props": {
-        "padding": {
-          "maximum": 8,
-          "minimum": 0,
-          "type": "number"
+        "sql": {
+          "maxLength": 20000,
+          "type": "string"
         },
         "title": {
           "maxLength": 120,
           "type": "string"
         }
       },
-      "required": []
+      "required": [
+        "sql"
+      ]
     },
-    "QueryChart": {
-      "children": "none",
+    "present_chart": {
       "props": {
         "aggregation": {
           "enum": [
@@ -29,7 +28,7 @@
           ],
           "type": "string"
         },
-        "chartType": {
+        "chart_type": {
           "enum": [
             "bar",
             "line",
@@ -37,7 +36,7 @@
           ],
           "type": "string"
         },
-        "groupByColumn": {
+        "group_by_column": {
           "anyOf": [
             {
               "maxLength": 200,
@@ -48,7 +47,7 @@
             }
           ]
         },
-        "resultId": {
+        "result_id": {
           "pattern": "^[0-9a-f]{32}$",
           "type": "string"
         },
@@ -56,30 +55,29 @@
           "maxLength": 120,
           "type": "string"
         },
-        "xColumn": {
+        "x_column": {
           "maxLength": 200,
           "type": "string"
         },
-        "yColumn": {
+        "y_column": {
           "maxLength": 200,
           "type": "string"
         }
       },
       "required": [
-        "resultId",
-        "chartType",
-        "xColumn",
-        "yColumn"
+        "result_id",
+        "chart_type",
+        "x_column",
+        "y_column"
       ]
     },
-    "QueryTable": {
-      "children": "none",
+    "present_table": {
       "props": {
         "columns": {
           "maxItems": 50,
           "type": "array"
         },
-        "resultId": {
+        "result_id": {
           "pattern": "^[0-9a-f]{32}$",
           "type": "string"
         },
@@ -89,17 +87,16 @@
         }
       },
       "required": [
-        "resultId"
+        "result_id"
       ]
     },
-    "SimulationSummary": {
-      "children": "result",
+    "present_simulation": {
       "props": {
         "kpis": {
           "maxItems": 12,
           "type": "array"
         },
-        "resultId": {
+        "result_id": {
           "pattern": "^[0-9a-f]{32}$",
           "type": "string"
         },
@@ -116,22 +113,6 @@
         "scenario",
         "summary",
         "kpis"
-      ]
-    },
-    "SqlPreview": {
-      "children": "none",
-      "props": {
-        "sql": {
-          "maxLength": 20000,
-          "type": "string"
-        },
-        "title": {
-          "maxLength": 120,
-          "type": "string"
-        }
-      },
-      "required": [
-        "sql"
       ]
     }
   }
