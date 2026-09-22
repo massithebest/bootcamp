@@ -12,7 +12,7 @@ from typing import Any
 
 import pandas as pd
 
-from services.chart_projection import project_chart
+from services.chart_projection import _json_value, project_chart
 from services.query_result_errors import QueryResultError, query_error
 from services.result_store import (
     ResultMeta,
@@ -21,7 +21,6 @@ from services.result_store import (
     get_result_store,
 )
 from services.service_logging import logged_service_operation
-from services.visualization_service import _json_value
 
 
 logger = logging.getLogger(__name__)

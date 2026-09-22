@@ -22,11 +22,6 @@ ENV = os.getenv("ENV", "").strip().lower() or "dev"
 
 SERVICE_MODE = os.getenv("SERVICE_MODE", "").strip().lower() or "mock"
 
-#: 조회 결과를 사용자에게 보여주는 방식. `legacy`는 인라인 표와 `prepare_table`·
-#: `prepare_visualization` Tool을, `present`는 bounded preview와 `present`
-#: Generative UI Tool을 쓴다. 운영 검증 전까지 기본값은 `legacy`다.
-RESULT_UI_MODE = os.getenv("RESULT_UI_MODE", "").strip().lower() or "legacy"
-
 #: backend/ 디렉터리. 아래 경로 상수의 기준점.
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -42,19 +37,11 @@ SMT2020_DB_PATH = Path(
 )
 
 
-def result_ui_mode() -> str:
-    """현재 결과 표시 모드. 호출 시점에 읽어 테스트에서 바꿀 수 있게 한다."""
-
-    return RESULT_UI_MODE
-
-
 def validate_runtime_configuration() -> None:
     """Fail fast when service or production knowledge isolation is unsafe."""
 
     if SERVICE_MODE not in {"mock", "real"}:
         raise RuntimeError("SERVICE_MODE must be either 'mock' or 'real'.")
-    if RESULT_UI_MODE not in {"legacy", "present"}:
-        raise RuntimeError("RESULT_UI_MODE must be either 'legacy' or 'present'.")
 
     if ENV != "prod":
         return
@@ -76,12 +63,6 @@ validate_runtime_configuration()
 #: 조회 결과(parquet) 저장 디렉터리. git 추적 대상이 아니다.
 RESULT_STORE_DIR = Path(
     os.getenv("RESULT_STORE_DIR") or BACKEND_DIR / "data" / "results"
-)
-
-#: 검증된 시각화 명세(JSON sidecar) 저장 디렉터리. 수치 데이터는 저장하지 않는다.
-VISUALIZATION_STORE_DIR = Path(
-    os.getenv("VISUALIZATION_STORE_DIR")
-    or BACKEND_DIR / "data" / "visualizations"
 )
 
 #: 조회 결과 보존 시간과 결과 저장소의 최대 디스크 사용량.

@@ -99,30 +99,3 @@ def test_production_selects_real_services(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert result.stdout.strip() == "services.real.sql_service"
-
-
-def test_result_ui_mode_defaults_to_legacy() -> None:
-    result = run_import(
-        {"ENV": "dev", "RESULT_UI_MODE": "", "KNOWLEDGE_DIR": ""},
-        "import core.config as config; print(config.RESULT_UI_MODE)",
-    )
-
-    assert result.returncode == 0
-    assert result.stdout.strip() == "legacy"
-
-
-def test_result_ui_mode_accepts_present() -> None:
-    result = run_import(
-        {"ENV": "dev", "RESULT_UI_MODE": "PRESENT", "KNOWLEDGE_DIR": ""},
-        "import core.config as config; print(config.RESULT_UI_MODE)",
-    )
-
-    assert result.returncode == 0
-    assert result.stdout.strip() == "present"
-
-
-def test_invalid_result_ui_mode_is_rejected() -> None:
-    result = run_import({"ENV": "dev", "RESULT_UI_MODE": "typo", "KNOWLEDGE_DIR": ""})
-
-    assert result.returncode != 0
-    assert "RESULT_UI_MODE" in result.stderr

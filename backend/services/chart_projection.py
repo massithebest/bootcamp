@@ -7,13 +7,14 @@ Result Store의 DataFrame과 표시 설정만 받아 Recharts 소비 형태의 c
 from __future__ import annotations
 
 import math
+import re
+from datetime import date, datetime
 from typing import Any
 
 import pandas as pd
 
 from services.query_result_errors import QueryResultError, query_error
 from services.result_store import ResultColumn
-from services.visualization_service import _identity, _json_value, _label_column, _time_key
 
 
 CHART_TYPES = ("bar", "line", "area")
@@ -23,6 +24,61 @@ MAX_SERIES = 8
 TITLE_MAX_LENGTH = 120
 _BUCKET_LEVELS = ("week", "month", "quarter", "year")
 _BUCKET_LABEL = {"week": "주", "month": "월", "quarter": "분기", "year": "연"}
+
+
+def _json_value(value: Any) -> Any:
+    if isinstance(value, (pd.Timestamp, datetime, date)):
+        return value.isoformat()
+    item = getattr(value, "item", None)
+    value = item() if callable(item) else value
+    if value is None or (pd.api.types.is_scalar(value) and pd.isna(value)):
+        return None
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    return str(value)
+
+
+def _identity(value: Any) -> tuple[str, str]:
+    normalized = _json_value(value)
+    return type(normalized).__name__, repr(normalized)
+
+
+_YEAR_MONTH_COMPACT = re.compile(r"^(\d{4})(\d{2})$")
+_YEAR_MONTH_DASH = re.compile(r"^(\d{4})-(\d{1,2})$")
+
+
+def _time_key(value: Any) -> pd.Timestamp:
+    if value is None or (pd.api.types.is_scalar(value) and pd.isna(value)):
+        raise ValueError("시간축에 NULL이 있습니다")
+    if isinstance(value, bool) or isinstance(value, (int, float)):
+        raise ValueError("숫자 시간축은 지원하지 않습니다")
+    if isinstance(value, str):
+        compact = _YEAR_MONTH_COMPACT.fullmatch(value.strip())
+        if compact:
+            return pd.Timestamp(year=int(compact.group(1)), month=int(compact.group(2)), day=1)
+        dashed = _YEAR_MONTH_DASH.fullmatch(value.strip())
+        if dashed:
+            return pd.Timestamp(year=int(dashed.group(1)), month=int(dashed.group(2)), day=1)
+    parsed = pd.to_datetime(value, errors="raise")
+    if pd.isna(parsed):
+        raise ValueError("시간축 값을 해석할 수 없습니다")
+    return pd.Timestamp(parsed)
+
+
+def _label_column(frame: pd.DataFrame, group_by: str) -> str | None:
+    candidates: list[str] = []
+    if group_by.endswith("_cd"):
+        candidates.append(f"{group_by[:-3]}_nm")
+    if group_by.endswith("_code"):
+        candidates.append(f"{group_by[:-5]}_name")
+    for candidate in candidates:
+        if candidate not in frame.columns:
+            continue
+        pairs = frame[[group_by, candidate]].drop_duplicates()
+        non_null = pairs.dropna(subset=[group_by, candidate])
+        if non_null.groupby(group_by, dropna=False)[candidate].nunique().max() <= 1:
+            return candidate
+    return None
 
 
 def _name(value: Any, field: str) -> str:

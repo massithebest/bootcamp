@@ -230,28 +230,25 @@ def test_present_simulation_schema_requires_scenario_summary_kpis() -> None:
     assert "result_id" not in schema["required"]
 
 
-# ---- 등록·모드 ----
+# ---- 등록 ----
 
 
-def test_present_registration_depends_on_mode() -> None:
-    present_names = {t.name for t in planning_tools(mode="present")}
-    legacy_names = {t.name for t in planning_tools(mode="legacy")}
+def test_present_tools_are_always_registered() -> None:
+    names = {t.name for t in planning_tools()}
 
-    assert {"present_sql_preview", "present_chart", "present_table", "present_simulation"} <= present_names
-    assert not {"present_sql_preview", "present_chart", "present_table", "present_simulation"} & legacy_names
-    assert {"prepare_table", "prepare_visualization"} <= legacy_names
-    assert not {"prepare_table", "prepare_visualization"} & present_names
+    assert {"present_sql_preview", "present_chart", "present_table", "present_simulation"} <= names
+    assert not {"prepare_table", "prepare_visualization"} & names
 
 
 def test_tool_names_prefixes_present_tools() -> None:
-    names = tool_names("present")
+    names = tool_names()
 
     for short in ("present_sql_preview", "present_chart", "present_table", "present_simulation"):
         assert f"mcp__planning__{short}" in names
 
 
-def test_tool_catalog_advertises_present_schema_in_present_mode() -> None:
-    catalog = asyncio.run(tool_catalog(mode="present"))
+def test_tool_catalog_advertises_present_schema() -> None:
+    catalog = asyncio.run(tool_catalog())
     by_name = {item["name"]: item for item in catalog}
 
     for short in ("present_sql_preview", "present_chart", "present_table", "present_simulation"):

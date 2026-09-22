@@ -12,7 +12,6 @@ from typing import Any, NotRequired, TypedDict
 
 from claude_agent_sdk import create_sdk_mcp_server, tool
 
-from core.config import result_ui_mode
 from tools.knowledge_tool import (
     describe_table,
     get_kpi,
@@ -37,8 +36,6 @@ from tools.rag_tool import search_documents
 from tools.result_tool import get_result_page, get_result_summary
 from tools.simulation_tool import list_simulation, run_simulation
 from tools.sql_tool import execute_sql
-from tools.table_tool import prepare_table
-from tools.visualization_tool import prepare_visualization
 
 
 MCP_SERVER_NAME = "planning"
@@ -225,65 +222,6 @@ def _get_result_page_tool(access_scope: str | None):
     return _get_result_page
 
 
-class _PrepareTableInput(TypedDict):
-    result_id: str
-    columns: NotRequired[list[str]]
-    title: NotRequired[str]
-
-
-def _prepare_table_tool(access_scope: str | None):
-    @tool(
-        "prepare_table",
-        "사용자가 표를 요청했거나 조회 결과의 행을 표로 제시할 때 반드시 호출한다. "
-        "저장된 조회 결과를 현재 응답의 standalone 대화형 표로 준비하며 원본 행 배열은 받지 않는다. "
-        "화면에는 최대 100행을 제공하고 같은 데이터를 Markdown 표로 반복하지 않는다. "
-        "호출 뒤에는 '위/아래/다음 표' 같은 위치 표현 대신 '표에는'처럼 결과를 해석한다.",
-        _PrepareTableInput,
-    )
-    async def _prepare_table(args: _PrepareTableInput) -> dict[str, Any]:
-        return _ok(
-            await prepare_table(
-                result_id=args["result_id"],
-                columns=args.get("columns"),
-                title=args.get("title"),
-                access_scope=access_scope,
-            )
-        )
-
-    return _prepare_table
-
-
-class _PrepareVisualizationInput(TypedDict):
-    result_id: str
-    kind: str
-    x: str
-    y: list[str]
-    group_by: NotRequired[str]
-
-
-def _prepare_visualization_tool(access_scope: str | None):
-    @tool(
-        "prepare_visualization",
-        "저장된 집계 결과의 실제 컬럼과 grain을 검증하고 bar/line 시각화를 등록한다. "
-        "집계 SQL이나 data 배열은 받지 않는다. 호출 뒤에는 '위/아래/다음 차트' 같은 "
-        "위치 표현 대신 '차트에서는'처럼 결과를 해석한다.",
-        _PrepareVisualizationInput,
-    )
-    async def _prepare_visualization(args: _PrepareVisualizationInput) -> dict[str, Any]:
-        return _ok(
-            await prepare_visualization(
-                result_id=args["result_id"],
-                kind=args["kind"],
-                x=args["x"],
-                y=args["y"],
-                group_by=args.get("group_by"),
-                access_scope=access_scope,
-            )
-        )
-
-    return _prepare_visualization
-
-
 def _present_sql_preview_tool(access_scope: str | None):
     @tool(
         "present_sql_preview",
@@ -344,50 +282,41 @@ def _present_simulation_tool(access_scope: str | None):
     return _present_simulation
 
 
-def planning_tools(access_scope: str | None = None, mode: str | None = None):
+def planning_tools(access_scope: str | None = None):
     """Single source for SDK registration, allowed names and UI discovery.
 
-    `RESULT_UI_MODE`가 결과 표시 도구를 정한다: legacy는 prepare_table·
-    prepare_visualization, present는 present_sql_preview·present_chart·
-    present_table·present_simulation을 등록한다.
+    결과 표시 도구는 항상 present_sql_preview·present_chart·present_table·
+    present_simulation을 등록한다.
     """
-    mode = mode or result_ui_mode()
-    common = [
+    return [
         _execute_sql_tool(access_scope), _search_documents, _list_simulation,
         _run_simulation_tool(access_scope), _list_tables, _describe_table,
         _list_kpis, _get_kpi, _list_recipes, _get_recipe,
         _get_result_summary_tool(access_scope), _get_result_page_tool(access_scope),
-    ]
-    if mode == "present":
-        return [
-            *common,
-            _present_sql_preview_tool(access_scope),
-            _present_chart_tool(access_scope),
-            _present_table_tool(access_scope),
-            _present_simulation_tool(access_scope),
-        ]
-    return [
-        *common, _prepare_table_tool(access_scope), _prepare_visualization_tool(access_scope),
+        _present_sql_preview_tool(access_scope),
+        _present_chart_tool(access_scope),
+        _present_table_tool(access_scope),
+        _present_simulation_tool(access_scope),
     ]
 
 
-def tool_names(mode: str | None = None) -> list[str]:
-    return [f"mcp__{MCP_SERVER_NAME}__{item.name}" for item in planning_tools(mode=mode)]
+def tool_names() -> list[str]:
+    return [f"mcp__{MCP_SERVER_NAME}__{item.name}" for item in planning_tools()]
 
 
 TOOL_NAMES = tool_names()
 
 
-def build_planning_mcp_server(access_scope: str | None = None, mode: str | None = None):
+def build_planning_mcp_server(access_scope: str | None = None):
     return create_sdk_mcp_server(
-        name=MCP_SERVER_NAME, version="0.1.0", tools=planning_tools(access_scope, mode),
+        name=MCP_SERVER_NAME, version="0.1.0", tools=planning_tools(access_scope),
     )
 
 
-async def tool_catalog(mode: str | None = None) -> list[dict]:
+async def tool_catalog() -> list[dict]:
     # Read the SDK's actual advertised schema, including TypedDict optional fields.
     from mcp_types import PaginatedRequestParams
-    server = build_planning_mcp_server(mode=mode)["instance"]
+    server = build_planning_mcp_server()["instance"]
     result = await server._request_handlers["tools/list"].handler(None, PaginatedRequestParams())
     output = {
         "execute_sql": "조회 행·컬럼 또는 대용량 결과 참조",
@@ -398,7 +327,6 @@ async def tool_catalog(mode: str | None = None) -> list[dict]:
         "list_kpis": "KPI 요약 목록", "get_kpi": "KPI 공식·진단·SQL 정의",
         "list_recipes": "집계 recipe 요약 목록", "get_recipe": "CTE·출력 grain·사용 예시",
         "get_result_summary": "저장 결과 메타데이터·수치 요약", "get_result_page": "저장 결과의 일부 행",
-        "prepare_table": "최대 100행의 대화형 표", "prepare_visualization": "검증된 bar/line 차트 ID",
         "present_sql_preview": "SQL 표시 설정 검증 결과(빈 객체 또는 안전한 오류)",
         "present_chart": "차트 표시 설정 검증 결과(빈 객체 또는 안전한 오류)",
         "present_table": "표 표시 설정 검증 결과(빈 객체 또는 안전한 오류)",

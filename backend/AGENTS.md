@@ -23,17 +23,18 @@ Python 3.11 FastAPI 서비스다. `/api/chat`은 Claude Agent SDK 이벤트를
   설정을 노출하지 않는다.
 - 성공한 `done.data.turn_id`만 포크 anchor로 사용한다. 오류 스트림도 `error` 다음
   `done`으로 종료한다.
-- `RESULT_UI_MODE=legacy`는 `prepare_table`·`prepare_visualization`, `present`는
-  bounded preview와 flat `present_*` Tool 및 `/api/query-results/*`를 사용한다.
-  모드를 바꾸면 Tool 등록, payload, 런타임 지침, Frontend fixture를 함께 갱신한다.
+- 결과 표시는 bounded preview와 flat `present_*` Tool(`present_sql_preview`·
+  `present_chart`·`present_table`·`present_simulation`) 및
+  `/api/query-results/*`만 사용한다. 이 계약을 바꾸면 Tool 등록, payload,
+  런타임 지침, Frontend fixture를 함께 갱신한다.
 - 구조화 YAML은 변경 요청 승인 경로로만 수정한다. 권한 검사는
   `core/principal.py`에 두며 현재 principal 구현은 보안 경계가 아니다.
 
 ## 런타임 지침 계층
 
 - `agent/system_prompt.py`: 짧은 역할·안전 원칙.
-- `agent/agent_sdk*/CLAUDE.md`: Tool·Skill 인덱스와 공통 규칙.
-- `agent/agent_sdk*/.claude/skills/*/SKILL.md`: 업무별 절차.
+- `agent/agent_sdk/CLAUDE.md`: Tool·Skill 인덱스와 공통 규칙.
+- `agent/agent_sdk/.claude/skills/*/SKILL.md`: 업무별 절차.
 
 스키마와 업무 정의를 여러 계층에 복제하지 않는다. Tool을 바꾸면 wrapper,
 지침, prompt 정합성 테스트와 소비자 renderer 필요 여부를 함께 확인한다.

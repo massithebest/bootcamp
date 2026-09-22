@@ -14,10 +14,8 @@ from api.routes_chat import router as chat_router
 from api.routes_knowledge import router as knowledge_router
 from api.routes_me import router as me_router
 from api.routes_query_results import router as query_results_router
-from api.routes_visualizations import router as visualizations_router
 from core.config import CORS_ALLOW_ORIGINS
 from services.result_store import cleanup_expired
-from services.visualization_store import cleanup_expired as cleanup_visualizations
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -28,13 +26,8 @@ async def _result_cleanup_loop() -> None:
     while True:
         try:
             deleted = cleanup_expired()
-            visualization_deleted = cleanup_visualizations()
             if deleted:
                 logger.info("조회 결과 정리 완료: deleted=%d", deleted)
-            if visualization_deleted:
-                logger.info(
-                    "시각화 명세 정리 완료: deleted=%d", visualization_deleted
-                )
         except Exception:
             logger.exception("조회 결과 정리 중 오류가 발생했습니다")
         await asyncio.sleep(RESULT_CLEANUP_INTERVAL_SECONDS)
@@ -89,11 +82,6 @@ app.include_router(
 
 app.include_router(
     query_results_router,
-    prefix="/api",
-)
-
-app.include_router(
-    visualizations_router,
     prefix="/api",
 )
 

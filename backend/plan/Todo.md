@@ -35,9 +35,7 @@ Backend가 소유하는 범위는 다음과 같다.
 | SQL | Mock 완료 / Real 미구현 | 등록 table만 허용하는 SELECT/WITH, 1,000행 저장 상한 |
 | Simulation | Mock 완료 / Real 미구현 | SMT2020 HVLM/LVHM 입력 관계·정합성 검증 |
 | Result Store | 1차 완료 | parquet+metadata, TTL·용량 정리, browser access scope |
-| 표 | 완료 | 검증된 결과에서 선택 컬럼과 최대 100행 payload |
-| 시각화 | 완료 | 검증된 bar/line 명세, 최대 500 points·8 series (legacy) |
-| 결과 API·`present` | 구현(기본 `legacy`) | `/api/query-results/{id}/preview|table|chart`, `present_sql_preview`·`present_chart`·`present_table`·`present_simulation` flat Tool·검증, `RESULT_UI_MODE` 플래그, `agent_sdk_present/` 지침 |
+| 결과 API·표·시각화 | 완료 | `/api/query-results/{id}/preview|table|chart`, `present_sql_preview`·`present_chart`·`present_table`·`present_simulation` flat Tool·검증(유일한 결과 표시 경로, 최대 500 points·8 series) |
 | RAG | Local 완료 / Vector 미구현 | 활성 검토 문서 local 검색; Milvus·문서 색인 후속 |
 | 실행 환경 | 완료 | Python 3.11 `.venv`, Backend 기본 포트 8100 |
 | Service logging | 완료 | 공개 작업 시작·완료·실패, 소요 시간, 중첩 DEBUG와 민감정보 비노출 |
@@ -58,15 +56,11 @@ Backend가 소유하는 범위는 다음과 같다.
 ### 결과와 시각화
 
 - `execute_sql`과 simulation 결과는 `result_id`로 Result Store에 저장한다.
-- `prepare_table`은 scope·TTL·컬럼을 검증하고 최대 100행만 반환한다.
-- `prepare_visualization`은 실제 결과 컬럼과 grain을 검증해
-  `visualization_id`를 반환한다.
-- 차트 조회는 `GET /api/visualizations/{visualization_id}`만 사용한다.
 - 내부 파일 경로, access scope 값과 원본 대량 행은 Tool payload에 넣지 않는다.
-- `RESULT_UI_MODE=present`: `execute_sql`·`run_simulation`은 bounded preview(`result_id`, `row_count`,
+- `execute_sql`·`run_simulation`은 bounded preview(`result_id`, `row_count`,
   `source_truncated`, `columns`, `sample_rows`(≤5, 객체), `date_ranges`, `distinct_counts`, `statistics`,
   `top_groups`(컬럼당 ≤10); simulation은 `simulation_type`·`scenario`·`summary`·`kpis`; SQL은 `purpose`만)만 반환하고,
-  `prepare_*` 대신 flat(스칼라 인자) Tool 4개를 등록한다: `present_sql_preview(sql, title?)`,
+  flat(스칼라 인자) Tool 4개를 등록한다: `present_sql_preview(sql, title?)`,
   `present_chart(result_id, chart_type, x_column, y_column, group_by_column?, aggregation?, title?)`,
   `present_table(result_id, columns?, title?)`, `present_simulation(scenario, summary, kpis, result_id?)`.
   (과거에는 `present` tool 하나가 UI 트리 전체를 `tree` JSON-문자열 하나로 받았으나, 실제
@@ -134,9 +128,6 @@ Backend가 소유하는 범위는 다음과 같다.
 
 ### P1
 
-- [ ] **`RESULT_UI_MODE=present` 운영 전환**: flat `present_*` Tool로 재설계한 뒤(2026-09-22, 아래
-  완료 이력 참고) 실제 provider 환경에서 호출 성공률을 계속 관찰하고 기본값을 정한 뒤, legacy
-  `prepare_*`·`/api/visualizations`·자동 표 보완의 삭제 계획을 별도로 만든다.
 - [ ] **후속질문 동적 생성**: 성공한 `done`에 2~4개 제안을 선택적으로 추가한다.
   모델 출력 파싱 실패 시 빈 배열로 안전하게 종료한다. 소비자 파서는 이미 준비돼 있다(2~4개·각 1~120자).
 
@@ -156,6 +147,34 @@ Backend가 소유하는 범위는 다음과 같다.
   계획으로 설계한다.
 
 ## 완료 이력 요약
+
+### 2026-09-22 — legacy 결과 표시 모드 삭제
+
+- `RESULT_UI_MODE` 플래그와 `legacy` 모드(`prepare_table`·`prepare_visualization` Tool,
+  `GET /api/visualizations/{id}`, 자동 표 보완, `services/table_service.py`·
+  `visualization_service.py`·`visualization_store.py`·`visualization_models.py`,
+  `tools/table_tool.py`·`visualization_tool.py`)를 통째로 삭제했다. 결과 표시는 이제
+  `present_*` flat Tool과 `/api/query-results/*`만 사용하는 단일 경로다.
+- 사용자 결정으로 원래 계획했던 "실제 provider 관찰 후 기본값 전환" 관찰 게이트를
+  건너뛰고 바로 legacy를 제거했다 — `present` 모드는 이미 실제 provider(OpenRouter
+  GLM-5.3-flash)로 검증됐고 legacy를 유지할 이유가 없다고 판단했다.
+- `agent/agent_sdk_present/`를 `agent/agent_sdk/`로 옮겨 유일한 런타임 지침
+  디렉터리로 만들었다. `agent.py`의 `agent_sdk_cwd(mode)`/`AGENT_SDK_PRESENT_CWD`,
+  `sdk_tools.py`의 `mode` 매개변수(`planning_tools`·`tool_names`·
+  `build_planning_mcp_server`·`tool_catalog`)를 제거하고 두 값 중 하나를 고르던
+  분기를 없앴다. `agent.py`의 표 자동 보완(`_needs_table_fallback` 등)도 함께
+  삭제했다.
+- `services/mock/mock_sql_service.py`·`mock_simulation_service.py`가 `result_ui_mode()`로
+  갈라졌던 legacy/`present` 분기를 없애고 항상 `tool_preview`(bounded preview)만
+  반환하도록 정리했다. `chart_projection.py`가 `visualization_service.py`에서 가져오던
+  `_json_value`·`_identity`·`_time_key`·`_label_column` 헬퍼는 `chart_projection.py`
+  자체로 옮겨 의존을 끊었다.
+- `test_prompt_consistency.py`(legacy)와 `test_prompt_consistency_present.py`를 하나로
+  합쳐 `test_prompt_consistency.py`로 재작성했다(두 디렉터리를 비교하던 로직 삭제,
+  단일 디렉터리 기준 검증만 유지). `test_result_ui_mode.py`는 삭제하고 남길 가치가
+  있는 assertion은 `test_services.py`·`test_event_adapter.py`로 옮겼다.
+- 검증: `python -m pytest -q` 354 passed, 6 deselected (자세한 내역은 아래
+  "검증 기준과 알려진 한계" 참고).
 
 ### 2026-09-22 — 개발 문서 역할 정리
 
@@ -297,10 +316,10 @@ Backend가 소유하는 범위는 다음과 같다.
 ## 검증 기준과 알려진 한계
 
 - 기본 검증: `source .venv/bin/activate && python -m pytest -q`.
-- 2026-09-22 기준 전체 개발 검증: **426 passed, 6 deselected**. 마커 제외
-  프로필(`not smt2020 and not smt2020_bundle and not mock_service and not e2e`)은
-  **266 passed, 68 deselected**다. SMT2020 자산을 제외한 clean 복사본 수치는 이 변경 후 다시
-  측정하지 않았다.
+- 2026-09-22(legacy 결과 표시 모드 삭제 뒤) 기준 전체 개발 검증: **354 passed, 6
+  deselected**. 마커 제외 프로필(`not smt2020 and not smt2020_bundle and not
+  mock_service and not e2e`)은 **294 passed, 66 deselected**다. SMT2020 자산을
+  제외한 clean 복사본 수치는 이 변경 후 다시 측정하지 않았다.
 - 재측정한 검증은 Starlette TestClient의 upstream deprecation warning 1건만 남는다.
 - E2E는 실제 CLI/provider 인증이 있는 환경에서만 `python -m pytest -m e2e`로
   실행한다.

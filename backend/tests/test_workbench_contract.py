@@ -98,32 +98,3 @@ def test_workbench_terminal_states_on_sse_wire(sdk_fixture, case):
         assert [e["data"]["status"] for e in results] == ["error", "ok"]
         assert events[-2]["type"] == "text"
     assert all("access_scope" not in e.get("data", {}).get("args", {}) for e in calls.values())
-
-
-@pytest.mark.parametrize("has_result", [False, True])
-def test_unrelated_markdown_table_is_not_declared_duplicate_by_fallback(sdk_fixture, monkeypatch, has_result):
-    result_id = "a" * 32
-    metric = "| 지표 | 비율 |\n| --- | --- |\n| 불량률 | 2% |"
-    messages = [tool_call("sql-1"), tool_result("sql-1", {**ZERO, **({"result_id": result_id} if has_result else {})}),
-        AssistantMessage(content=[TextBlock(text=metric)], model="fixture")]
-    sdk_fixture(messages)
-    prepared = []
-
-    async def prepare(result_id, *, access_scope):
-        prepared.append((result_id, access_scope))
-        return {"status": "ok", "result_id": result_id, "title": "WIP", "columns": ["제품", "WIP"],
-            "rows": [["A", 20]], "row_count": 1, "displayed_count": 1, "source_truncated": False}
-
-    monkeypatch.setattr(agent_module, "prepare_table", prepare)
-    events = collect_sse()
-    assert next(e["content"] for e in events if e["type"] == "text") == metric
-    tables = [e for e in events if e["type"] == "tool_result" and e["tool_name"] == "prepare_table"]
-    assert len(tables) == int(has_result)
-    if has_result:
-        assert prepared[0][0] == result_id and prepared[0][1]
-        assert tables[0]["data"]["columns"] == ["제품", "WIP"]
-        call = next(e for e in events if e["type"] == "tool_call" and e["tool_name"] == "prepare_table")
-        assert call["tool_call_id"] == tables[0]["tool_call_id"]
-        assert "access_scope" not in call["data"]["args"]
-    else:
-        assert not prepared

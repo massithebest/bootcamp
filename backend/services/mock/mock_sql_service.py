@@ -10,17 +10,12 @@ import sqlite3
 
 import pandas as pd
 
-from core.config import result_ui_mode
 from services.knowledge_service import get_store
 from services.mock._sqlite import MISSING_DB_MESSAGE, Smt2020DbMissingError, connect
 from services.query_result_service import tool_preview
-from services.result_store import get_result_store, summarize_dataframe
+from services.result_store import get_result_store
 from services.service_logging import logged_service_operation
 from services.sql_guard import MAX_ROWS, SqlGuardError, check_sql
-
-
-INLINE_ROW_THRESHOLD = 100
-SAMPLE_ROW_COUNT = 10
 
 
 def _error(message: str, sql: str) -> dict:
@@ -79,33 +74,12 @@ class MockSQLService:
             access_scope=access_scope,
         )
 
-        if result_ui_mode() == "present":
-            return tool_preview(
-                meta,
-                pd.DataFrame(rows, columns=columns),
-                kind="database",
-                purpose=purpose,
-            )
-
-        result = {
-            "status": "ok",
-            "kind": "database",
-            "type": "inline" if len(rows) <= INLINE_ROW_THRESHOLD else "large_result",
-            "result_id": meta.result_id,
-            "sql": sql,
-            "purpose": purpose,
-            "row_count": len(rows),
-            "columns": [
-                {"name": column.name, "dtype": column.dtype, "role": column.role}
-                for column in meta.columns
-            ],
-        }
-        if len(rows) <= INLINE_ROW_THRESHOLD:
-            result["table"] = {"columns": columns, "rows": rows}
-        else:
-            result["sample_rows"] = rows[:SAMPLE_ROW_COUNT]
-            result["summary"] = summarize_dataframe(pd.DataFrame(rows, columns=columns))
-        return result
+        return tool_preview(
+            meta,
+            pd.DataFrame(rows, columns=columns),
+            kind="database",
+            purpose=purpose,
+        )
 
 
 _service = MockSQLService()

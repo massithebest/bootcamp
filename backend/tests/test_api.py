@@ -17,11 +17,6 @@ import agent.agent as agent_module
 from agent import session_store
 from api.schemas import AgentEvent
 from main import app
-from services import result_store, visualization_store
-from services.result_store import LocalParquetResultStore
-from services.visualization_models import VisualizationRequest
-from services.visualization_service import prepare_visualization
-from services.visualization_store import LocalVisualizationStore
 
 
 client = TestClient(app)
@@ -217,47 +212,6 @@ def test_chat_endpoint_issues_and_reuses_http_only_scope_cookie(monkeypatch) -> 
     assert "SameSite=lax" in first.headers["set-cookie"]
     assert "set-cookie" not in second.headers
     assert captured[0] == captured[1]
-
-
-def test_visualization_api_scope_lifecycle_and_payload(tmp_path, monkeypatch) -> None:
-    results = LocalParquetResultStore(tmp_path / "results")
-    visualizations = LocalVisualizationStore(tmp_path / "visualizations")
-    monkeypatch.setattr(result_store, "_store", results)
-    monkeypatch.setattr(visualization_store, "_store", visualizations)
-    source = results.save(
-        ["work_month", "actual"],
-        [["2026-08", 10], ["2026-09", 20]],
-        source="execute_sql",
-        conversation_id=None,
-        access_scope="scope-a",
-    )
-    saved = prepare_visualization(
-        VisualizationRequest(source.result_id, "line", "work_month", ("actual",)),
-        access_scope="scope-a",
-        result_store=results,
-        visualization_store=visualizations,
-    )
-
-    scoped_client = TestClient(app)
-    scoped_client.cookies.set("pp_session_scope", "scope-a")
-    response = scoped_client.get(f"/api/visualizations/{saved.visualization_id}")
-
-    assert response.status_code == 200
-    assert response.json()["chart"]["categories"] == ["2026-08", "2026-09"]
-    assert response.headers["cache-control"].startswith("private, max-age=")
-    assert response.headers["vary"] == "Cookie"
-
-    other_client = TestClient(app)
-    other_client.cookies.set("pp_session_scope", "scope-b")
-    hidden = other_client.get(f"/api/visualizations/{saved.visualization_id}")
-    missing = other_client.get(f"/api/visualizations/{'f' * 32}")
-    assert hidden.status_code == missing.status_code == 404
-    assert hidden.json() == missing.json()
-
-    results.delete(source.result_id)
-    gone = scoped_client.get(f"/api/visualizations/{saved.visualization_id}")
-    assert gone.status_code == 410
-    assert gone.json()["detail"]["code"] == "RESULT_UNAVAILABLE"
 
 
 def test_chat_request_fork_from_turn_id_defaults_to_none() -> None:

@@ -100,7 +100,6 @@ Copy-Item .env.example .env
 | --- | --- | --- |
 | `ENV` | `prod` | 폐쇄망 운영 모드 |
 | `SERVICE_MODE` | `real` | `prod`에서 다른 값은 시작 오류 |
-| `RESULT_UI_MODE` | `legacy`(운영 검증 뒤 `present`) | `legacy`·`present` 외 값은 시작 오류. `present`는 `agent/agent_sdk_present/` 지침을 함께 반입해야 한다 |
 | `KNOWLEDGE_DIR` | 운영 YAML의 별도 절대경로 | bundled SMT2020 지식 경로는 허용하지 않음 |
 | `LLM_PROVIDER` | 사내 지원 provider | 사내 LLM 반입 정책에 따름 |
 | provider 인증값 | 사내 발급 값 | 코드·문서·로그에 기록하지 않음 |
@@ -198,7 +197,7 @@ import 관계와 사용처를 확인한 뒤 대상과 필요성을 먼저 결정
 | --- | --- | --- |
 | `.env` | `backend/.env` | 양쪽 파일의 키를 비교해 필요한 설정만 키 단위로 병합한다. 대상 파일 전체를 덮어쓰거나 실제 값을 `.env.example`에 복사하지 않는다. |
 | `system_prompt.py` | `backend/agent/system_prompt.py` | real service에 맞게 수정된 역할·응답 규칙을 병합하되 `SYSTEM_PROMPT` 공개 이름과 현재 금지사항을 유지한다. |
-| `CLAUDE.md` | `backend/agent/agent_sdk/CLAUDE.md`(`present` 모드는 `agent_sdk_present/CLAUDE.md`) | real service용 Tool 사용 순서와 지식 조회 규칙을 병합한다. 등록 Tool 이름과 일치해야 한다. |
+| `CLAUDE.md` | `backend/agent/agent_sdk/CLAUDE.md` | real service용 Tool 사용 순서와 지식 조회 규칙을 병합한다. 등록 Tool 이름과 일치해야 한다. |
 | `config.py` | `backend/core/config.py` | 기존 설정을 유지하고 `local` provider 및 현재 파일에 없는 설정만 추가한다. |
 | `milvus_client.py` | `backend/services/real/milvus_client.py` | 새 보조 모듈로 추가한다. `get_embedding_function`, `get_milvus_client`를 제공한다. |
 | `common_sql_client.py` | `backend/services/real/common_sql_client.py` | 새 보조 모듈로 추가하고 DB 연결·실행 로직만 맡긴다. |

@@ -262,3 +262,24 @@ def test_sdk_tool_error_does_not_expose_internal_content():
     assert events[0].data["status"] == "error"
     assert "private-path-placeholder" not in events[0].model_dump_json()
     assert events[1].data["status"] == "error"
+
+
+def test_present_call_flows_through_event_adapter() -> None:
+    adapter = AgentEventAdapter()
+    args = {"result_id": "a" * 32, "columns": ["part"], "title": "표"}
+    call = adapter.convert(AssistantMessage(
+        content=[ToolUseBlock(
+            id="present-1",
+            name="mcp__planning__present_table",
+            input=args,
+        )], model="x",
+    ))
+    result = adapter.convert(UserMessage(content=[ToolResultBlock(
+        tool_use_id="present-1", content=[{"type": "text", "text": "{}"}],
+    )]))
+
+    assert call[0].type == "tool_call" and call[0].tool_name == "present_table"
+    assert call[0].data == {"args": args}
+    assert [e.type for e in result] == ["tool_result", "status"]
+    assert result[0].data == {} and result[0].tool_call_id == "present-1"
+    assert result[1].data["status"] == "completed"

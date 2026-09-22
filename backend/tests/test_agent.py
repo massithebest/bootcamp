@@ -7,17 +7,9 @@
 
 import asyncio
 from collections.abc import AsyncIterator
-import json
 
 import pytest
-from claude_agent_sdk import (
-    AssistantMessage,
-    ResultMessage,
-    TextBlock,
-    ToolResultBlock,
-    ToolUseBlock,
-    UserMessage,
-)
+from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
 from mcp_types import CallToolRequestParams, PaginatedRequestParams
 
 import agent.agent as agent_module
@@ -96,24 +88,9 @@ def test_build_options_fork_point_enables_fork_session() -> None:
 
 
 def test_build_options_binds_scope_without_exposing_model_argument() -> None:
-    from agent.sdk_tools import _prepare_table_tool, _prepare_visualization_tool
-
     options = _build_options(None, access_scope="scope-a")
-    prepare_tool = _prepare_visualization_tool("scope-a")
-    table_tool = _prepare_table_tool("scope-a")
 
     assert options.mcp_servers["planning"]["type"] == "sdk"
-    assert "access_scope" not in prepare_tool.input_schema.__annotations__
-    assert prepare_tool.input_schema.__required_keys__ == {
-        "result_id",
-        "kind",
-        "x",
-        "y",
-    }
-    assert prepare_tool.input_schema.__optional_keys__ == {"group_by"}
-    assert "access_scope" not in table_tool.input_schema.__annotations__
-    assert table_tool.input_schema.__required_keys__ == {"result_id"}
-    assert table_tool.input_schema.__optional_keys__ == {"columns", "title"}
 
 
 def test_optional_catalog_filters_are_optional_on_the_mcp_wire() -> None:
@@ -142,22 +119,6 @@ def test_optional_catalog_filters_are_optional_on_the_mcp_wire() -> None:
     )
 
     assert result.is_error is not True
-
-
-@pytest.mark.parametrize(
-    ("message", "response", "expected"),
-    [
-        ("결과를 표로 보여줘", "조회했습니다.", True),
-        ("테이블로 보여줘", "조회했습니다.", True),
-        ("show a table", "Done.", True),
-        ("목표 대비 지표와 대표 제품을 알려줘", "조회했습니다.", False),
-        ("stable 상태를 알려줘", "조회했습니다.", False),
-        ("결과를 알려줘", "| 항목 | 값 |\n| --- | ---: |\n| A | 1 |", True),
-        ("결과를 알려줘", "총 1건입니다.", False),
-    ],
-)
-def test_table_fallback_detection(message: str, response: str, expected: bool) -> None:
-    assert agent_module._needs_table_fallback(message, response) is expected
 
 
 # ---- run_agent (query() 를 대체) ------------------------------------------
@@ -226,107 +187,6 @@ def test_run_agent_plain_turn_records_new_anchor_and_yields_turn_id(
     # AssistantMessage 의 uuid 만 남아야 한다 — ResultMessage 의 uuid 는
     # Transcript 에 없어 포크 지점으로 쓸 수 없다 (실제 CLI 로 확인).
     assert anchor.last_entry_uuid == "assistant-uuid"
-
-
-@pytest.mark.parametrize("model_prepares_table", [False, True])
-def test_run_agent_adds_table_only_when_model_has_not_prepared_one(
-    monkeypatch, model_prepares_table,
-) -> None:
-    import asyncio
-
-    result_id = "a" * 32
-    prepare_calls: list[dict[str, object]] = []
-
-    async def fake_query(*, prompt, options) -> AsyncIterator[object]:
-        yield AssistantMessage(
-            content=[
-                ToolUseBlock(
-                    id="sql-1",
-                    name="mcp__planning__execute_sql",
-                    input={"sql": "SELECT step, qty FROM route"},
-                )
-            ],
-            model="x",
-        )
-        yield UserMessage(
-            content=[
-                ToolResultBlock(
-                    tool_use_id="sql-1",
-                    content=[
-                        {
-                            "type": "text",
-                            "text": json.dumps(
-                                {"status": "ok", "result_id": result_id}
-                            ),
-                        }
-                    ],
-                )
-            ]
-        )
-        if model_prepares_table:
-            yield AssistantMessage(content=[ToolUseBlock(
-                id="model-table", name="mcp__planning__prepare_table",
-                input={"result_id": result_id},
-            )], model="x")
-            yield UserMessage(content=[ToolResultBlock(
-                tool_use_id="model-table",
-                content=json.dumps({"status": "ok", "result_id": result_id, "displayed_count": 1}),
-            )])
-        yield AssistantMessage(
-            content=[
-                TextBlock(
-                    text="결과입니다.\n\n| step | qty |\n| --- | ---: |\n| 1 | 2 |"
-                )
-            ],
-            model="x",
-            uuid="assistant-table",
-        )
-        yield ResultMessage(
-            subtype="success",
-            duration_ms=1,
-            duration_api_ms=1,
-            is_error=False,
-            num_turns=1,
-            session_id="sess-table",
-            uuid="result-table",
-        )
-
-    async def fake_prepare_table(
-        result_id: str,
-        *,
-        access_scope: str | None,
-    ) -> dict[str, object]:
-        prepare_calls.append(
-            {"result_id": result_id, "access_scope": access_scope}
-        )
-        return {
-            "status": "ok",
-            "result_id": result_id,
-            "title": "조회 결과",
-            "columns": ["step", "qty"],
-            "rows": [[1, 2]],
-            "row_count": 1,
-            "displayed_count": 1,
-            "source_truncated": False,
-        }
-
-    monkeypatch.setattr(agent_module, "query", fake_query)
-    monkeypatch.setattr(agent_module, "prepare_table", fake_prepare_table)
-
-    events = asyncio.run(
-        _collect(run_agent("표로 보여줘", access_scope="scope-a"))
-    )
-
-    expected_calls = [] if model_prepares_table else [{"result_id": result_id, "access_scope": "scope-a"}]
-    assert prepare_calls == expected_calls
-    assert events[-1].type == "done"
-    table_results = [
-        event
-        for event in events
-        if event.type == "tool_result" and event.tool_name == "prepare_table"
-    ]
-    assert len(table_results) == 1
-    assert table_results[0].data["displayed_count"] == 1
 
 
 def test_run_agent_second_turn_resumes_bound_session_without_forking(

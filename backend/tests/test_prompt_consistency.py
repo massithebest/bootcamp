@@ -11,25 +11,21 @@ from pathlib import Path
 import pytest
 
 from agent.agent import AGENT_SDK_CWD
-from agent.sdk_tools import (
-    TOOL_NAMES,
-    _prepare_table_tool,
-    _prepare_visualization_tool,
-)
+from agent.sdk_tools import TOOL_NAMES, planning_tools
 from agent.system_prompt import SYSTEM_PROMPT
 from services.knowledge_service import get_store
 
 
-SKILLS_DIR = Path(AGENT_SDK_CWD) / ".claude" / "skills"
 CLAUDE_MD = Path(AGENT_SDK_CWD) / "CLAUDE.md"
+SKILLS = sorted((Path(AGENT_SDK_CWD) / ".claude" / "skills").glob("*/SKILL.md"))
 
 EXPECTED_SKILLS = {"kpi-shortfall-analysis", "sql-analysis", "simulation"}
 
 SHORT_TOOL_NAMES = {name.rsplit("__", 1)[-1] for name in TOOL_NAMES}
 
-
-def _skill_files() -> list[Path]:
-    return sorted(SKILLS_DIR.glob("*/SKILL.md"))
+#: 결과 표시가 `present_*` Tool로 통일되기 전에 쓰던 legacy 전용 용어.
+#: 되살아나면 지침이 삭제된 legacy mode 를 다시 안내하는 회귀다.
+LEGACY_ONLY_TERMS = ("prepare_table", "prepare_visualization", "visualization_id", "large_result")
 
 
 def _frontmatter(text: str) -> dict[str, str]:
@@ -63,17 +59,17 @@ def test_claude_md_tool_table_matches_tool_names() -> None:
 def test_claude_md_lists_actual_skills() -> None:
     text = CLAUDE_MD.read_text(encoding="utf-8")
     listed = set(re.findall(r"^- `([\w-]+)` →", text, re.M))
-    actual = {path.parent.name for path in _skill_files()}
+    actual = {path.parent.name for path in SKILLS}
 
     assert actual == EXPECTED_SKILLS
     assert listed == actual
 
 
 def test_skill_directories_exist() -> None:
-    assert {path.parent.name for path in _skill_files()} == EXPECTED_SKILLS
+    assert {path.parent.name for path in SKILLS} == EXPECTED_SKILLS
 
 
-@pytest.mark.parametrize("skill_path", _skill_files(), ids=lambda p: p.parent.name)
+@pytest.mark.parametrize("skill_path", SKILLS, ids=lambda p: p.parent.name)
 def test_skill_description_marks_agent_only(skill_path: Path) -> None:
     """개발자가 이 저장소에서 Claude Code 를 열면 이 Skill 들도 보인다 (설계 §6)."""
 
@@ -82,12 +78,12 @@ def test_skill_description_marks_agent_only(skill_path: Path) -> None:
     assert description.startswith("생산계획 Agent 전용.")
 
 
-@pytest.mark.parametrize("skill_path", _skill_files(), ids=lambda p: p.parent.name)
+@pytest.mark.parametrize("skill_path", SKILLS, ids=lambda p: p.parent.name)
 def test_skill_name_matches_directory(skill_path: Path) -> None:
     assert _frontmatter(skill_path.read_text(encoding="utf-8"))["name"] == skill_path.parent.name
 
 
-@pytest.mark.parametrize("skill_path", _skill_files(), ids=lambda p: p.parent.name)
+@pytest.mark.parametrize("skill_path", SKILLS, ids=lambda p: p.parent.name)
 def test_skill_does_not_copy_schema(skill_path: Path) -> None:
     """Skill 은 절차만 담는다. 테이블명을 복사하면 카탈로그와 어긋난다."""
 
@@ -97,7 +93,7 @@ def test_skill_does_not_copy_schema(skill_path: Path) -> None:
         assert table not in body, f"{skill_path.parent.name} 에 테이블명이 복사돼 있다: {table}"
 
 
-@pytest.mark.parametrize("skill_path", _skill_files(), ids=lambda p: p.parent.name)
+@pytest.mark.parametrize("skill_path", SKILLS, ids=lambda p: p.parent.name)
 def test_skill_mentions_only_existing_tools(skill_path: Path) -> None:
     body = skill_path.read_text(encoding="utf-8")
     referenced = set(re.findall(r"`(\w+)\(", body))
@@ -106,64 +102,40 @@ def test_skill_mentions_only_existing_tools(skill_path: Path) -> None:
     assert referenced <= known, f"존재하지 않는 도구를 안내한다: {referenced - known}"
 
 
-def test_no_deleted_simulate_tools_remain() -> None:
-    """삭제된 `simulate_*` 도구 안내가 되살아나지 않게 한다."""
+@pytest.mark.parametrize("path", [CLAUDE_MD, *SKILLS], ids=lambda p: p.name)
+def test_no_legacy_only_instructions_remain(path: Path) -> None:
+    text = path.read_text(encoding="utf-8")
 
-    for path in [CLAUDE_MD, *_skill_files()]:
-        assert "simulate_" not in path.read_text(encoding="utf-8"), path
-
-
-def test_chart_procedure_uses_validated_tool_ui_result_without_marker() -> None:
-    claude_text = CLAUDE_MD.read_text(encoding="utf-8")
-    sql_skill = (SKILLS_DIR / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
-    simulation_skill = (SKILLS_DIR / "simulation" / "SKILL.md").read_text(
-        encoding="utf-8"
-    )
-
-    for text in (claude_text, sql_skill, simulation_skill):
-        assert "prepare_visualization" in text
-        assert "visualization_id" in text
-        assert "최대 2회" in text
-        assert "Tool UI" in text
-        assert "코드 펜스를 반복하지 않는다" in text
-    assert "result_id +" not in claude_text
-    assert "```chart" not in claude_text
+    for term in LEGACY_ONLY_TERMS:
+        assert term not in text, f"{path}: {term}"
+    assert "simulate_" not in text
 
 
-def test_table_procedure_uses_standalone_tool_ui_and_100_row_limit() -> None:
-    claude_text = CLAUDE_MD.read_text(encoding="utf-8")
-    sql_skill = (SKILLS_DIR / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
-    simulation_skill = (SKILLS_DIR / "simulation" / "SKILL.md").read_text(
-        encoding="utf-8"
-    )
-
-    for text in (claude_text, sql_skill, simulation_skill):
-        assert "prepare_table" in text
-        assert "100행" in text
-        assert "Tool UI" in text
-        assert "반드시" in text
-        assert "도입 설명 → Tool UI → 결과 해석" in text
-        assert "Result Store 데이터를 Markdown 표로 작성하지 않는다" in text
+def test_present_procedure_is_documented_in_every_presenting_file() -> None:
+    for path in (CLAUDE_MD, *(p for p in SKILLS if p.parent.name != "kpi-shortfall-analysis")):
+        text = path.read_text(encoding="utf-8")
+        assert "present_" in text and "result_id" in text, path
+        assert "행·차트 data 배열" in text, path
+        assert "present_table" in text and "최대 2회" in text, path
+        assert "위·아래·다음 표/차트" in text and "표에는…" in text and "차트에서는…" in text, path
+        assert "도입 설명 → present_* 호출 → 결과 해석" in text, path
 
 
-def test_post_visualization_explanations_do_not_depend_on_screen_position() -> None:
-    claude_text = CLAUDE_MD.read_text(encoding="utf-8")
-    sql_skill = (SKILLS_DIR / "sql-analysis" / "SKILL.md").read_text(
-        encoding="utf-8"
-    )
-    simulation_skill = (SKILLS_DIR / "simulation" / "SKILL.md").read_text(
-        encoding="utf-8"
-    )
+def test_present_tool_descriptions_forbid_position_words_and_raw_tree() -> None:
+    tools = {t.name: t for t in planning_tools(access_scope="scope-a")}
 
-    for text in (claude_text, sql_skill, simulation_skill):
-        assert "위·아래·다음 표/차트" in text
-        assert "표에는…" in text
-        assert "차트에서는…" in text
+    chart = tools["present_chart"].description
+    table = tools["present_table"].description
+    sql_preview = tools["present_sql_preview"].description
+    simulation = tools["present_simulation"].description
 
-    table_description = _prepare_table_tool("scope-a").description
-    chart_description = _prepare_visualization_tool("scope-a").description
-    assert "답변 아래" not in table_description
-    assert "위/아래/다음 표" in table_description
-    assert "표에는" in table_description
-    assert "위/아래/다음 차트" in chart_description
-    assert "차트에서는" in chart_description
+    for description in (chart, table, sql_preview, simulation):
+        assert "tree" not in description and "$type" not in description and "children" not in description
+
+    assert "위/아래" in chart and "차트에서는" in chart and "result_id" in chart
+    assert "위/아래" in table and "표에는" in table and "result_id" in table
+
+
+def test_system_prompt_still_lists_no_present_mode_tools() -> None:
+    for name in SHORT_TOOL_NAMES:
+        assert name not in SYSTEM_PROMPT

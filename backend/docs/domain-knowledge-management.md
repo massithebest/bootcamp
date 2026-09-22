@@ -390,7 +390,7 @@ CTE를 추가할 때는 다음 순서로 검토한다.
 
 `visualization_hints`는 Agent의 제안 자료이며 차트 종류나 컬럼을 강제하지 않는다.
 최종 SQL의 alias나 grain이 CTE와 달라질 수 있으므로 차트는 실제 Result Store
-컬럼과 grain을 `prepare_visualization`에서 다시 검증한다.
+컬럼과 grain을 `present_chart`에서 다시 검증한다.
 
 ## 검증 Scenario 작성
 
