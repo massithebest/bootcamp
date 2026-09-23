@@ -137,7 +137,7 @@ function Composer({ autoFocus }: { autoFocus: boolean }) {
         </AuiIf>
         <AuiIf condition={(s) => s.thread.isRunning}>
           <ComposerPrimitive.Cancel asChild>
-            <TooltipIconButton tooltip="중단" className="size-8 rounded-md bg-ink text-canvas hover:bg-ink-strong hover:text-canvas"><SquareIcon className="fill-current" /></TooltipIconButton>
+            <TooltipIconButton tooltip="중단" className="size-8 rounded-md bg-accent text-accent-ink hover:bg-accent-hover hover:text-accent-ink"><SquareIcon className="fill-current" /></TooltipIconButton>
           </ComposerPrimitive.Cancel>
         </AuiIf>
         </div>

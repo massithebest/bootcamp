@@ -38,11 +38,6 @@
   --accent-weak: #eef2fc;
   --accent-ink: #ffffff;
 
-  /* 무채색 hover 톤. 1차 CTA(전송 등)는 이제 accent 채움을 쓰므로, 이 색은
-     중단(취소)처럼 accent CTA와 구분해야 하는 무채색 액션의 hover와 ink
-     계열 보조 요소에 쓴다. */
-  --ink-strong: #0d141d;
-
   /* Radius — assistant-ui의 의미 기반 6단계(문서/컨트롤/서피스/플로팅 카드/
      스레드/캡슐) 중 프로젝트가 실제로 쓰는 5단계. thread(16px)는
      rounded-2xl, capsule(9999px)는 rounded-full을 그대로 쓴다. */

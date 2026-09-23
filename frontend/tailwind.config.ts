@@ -25,8 +25,6 @@ const config: Config = {
         "accent-hover": "var(--accent-hover)",
         "accent-weak": "var(--accent-weak)",
         "accent-ink": "var(--accent-ink)",
-        // 1차 액션(CTA) 채움 — accent 아닌 무채색
-        "ink-strong": "var(--ink-strong)",
         // 상태 3색 (저채도)
         "ok-ink": "var(--ok-ink)",
         "ok-weak": "var(--ok-weak)",

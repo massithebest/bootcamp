@@ -720,3 +720,21 @@ Composer 전송 버튼과 메시지 편집 후 "저장하고 다시 실행" 버�
 **대체 관계**: "assistant-ui 디자인 적용 범위(2026-09-22)"의 "CTA는 ink
 계열을 쓴다" 불릿을 대체한다. 기존 텍스트 링크·pane resize affordance의
 accent 유지 결정은 그대로 유효하다.
+
+## Composer 중단(취소) 버튼도 signature color 사용 (2026-09-23, 활성)
+
+**배경**: 바로 위 "accent를 signature color로 확장" 결정은 중단(취소) 버튼을
+"1차 CTA가 아닌 상태 전환 액션"으로 보고 ink 계열 예외로 남겼다. 이후 제품
+요구로 전송·중단 두 Composer 액션의 시각적 일관성이 signature color 구분보다
+우선한다고 판단했다.
+
+**결정**: Composer의 `ComposerPrimitive.Cancel`(중단) 버튼도 전송 버튼과 같은
+`bg-accent text-accent-ink hover:bg-accent-hover` 채움을 쓴다. 아이콘(SquareIcon)
+전환만으로 전송/중단 상태를 구분하고 배경색은 구분에 쓰지 않는다.
+
+**영향**: 이 버튼 hover에만 쓰이던 `--ink-strong` 토큰(및 Tailwind `ink-strong`
+색 매핑)은 다른 사용처가 없어 함께 제거했다. 필요해지면 다시 추가한다.
+
+**대체 관계**: "accent를 signature color로 확장(2026-09-23)"의 "Composer의
+중단(취소) 버튼처럼 1차 CTA가 아닌 상태 전환 액션은 계속 ink 계열을 쓴다"
+문장을 대체한다.
