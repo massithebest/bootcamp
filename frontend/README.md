@@ -10,9 +10,7 @@ Frontend는 `http://localhost:3100`을 사용한다.
 - Chat: streaming 답변, 공개 실행 단계, Tool 상세, 편집·재생성(분기 보존)·중단·복사, 세션 내 다중 대화
 - Context Inspector: Tool·Skill·지식의 읽기 전용 컨텍스트
 - Knowledge Manager: 구조화 YAML 조회와 버전형 텍스트 지식 관리
-- Standalone Table: 최대 100행 검색·정렬·페이지 이동
-- Visualization: Backend가 검증한 bar·line 차트와 데이터 표 대안
-- `present` 결과: flat Tool로 전달된 SQL·차트(bar·line·area)·서버 page 표·시뮬레이션 요약
+- `present_*` 결과: flat Tool로 전달된 SQL preview·서버 검색·정렬·페이지 표·차트(bar·line·area)·시뮬레이션 요약
 
 채팅 UI는 `@assistant-ui/react`의 `useLocalRuntime`(`ChatModelAdapter`)과 thread 목록 runtime을
 사용한다. 대화 목록과 분기는 이번 브라우저 세션 동안만 유지된다(새로고침하면 사라진다). 브라우저는
@@ -72,7 +70,7 @@ bundle에는 포함되지 않는다.
 
 - 세션 목록과 대화 분기는 브라우저 메모리에만 있으며 영속 저장소가 아니다.
 - Composer의 첨부·모델 선택·추론 강도 제어는 표시만 제공하는 비활성 UI다.
-- 새 응답은 standalone Tool UI를 사용하며 과거 chart marker는 호환용으로만 읽는다.
+- 결과는 `present_*` Tool UI로 표시한다.
 - 모바일 환경은 지원하지 않으며 검증하지 않는다. 데스크톱 브라우저에서만 구동한다.
 
 ## 참고

@@ -22,8 +22,10 @@ Windows PowerShell에서는 `py -3.11 -m venv .venv`와
 
 주요 환경변수는 다음과 같다.
 
-- `ENV=dev|prod`: `prod`에서는 real service와 별도 운영 지식 경로를 강제
-- `SERVICE_MODE=mock|real`: SQL·RAG·simulation service 선택. `prod`는 `real`만 허용
+- `ENV=dev|prod`: `prod`에서는 production service와 별도 운영 지식 경로를 강제
+- `SERVICE_MODE=mock|production`: SQL·RAG·simulation service 선택. `real`은 호환 별칭이며
+  `prod`는 `production`을 사용
+- `API_TIMEOUT_SECONDS=60`: 폐쇄망 production API 요청 timeout(초). production adapter에서 사용할 설정이며 현재는 미사용
 - 결과 표시는 bounded preview와 flat `present_sql_preview`·`present_chart`·
   `present_table`·`present_simulation` Tool, `/api/query-results/*`만 사용한다
 - `LLM_PROVIDER`, `AGENT_MODEL`, provider key: 실제 Agent SDK 설정
@@ -38,23 +40,32 @@ Windows PowerShell에서는 `py -3.11 -m venv .venv`와
 
 ## 로컬 개발 자산
 
-`datasets/`, `data/`, `scripts/`는 Git과 폐쇄망 반입 대상이 아니다.
-`scripts/seed_local_documents.py`는 `datasets/rag_docs/**/*.md`를 텍스트 지식
-저장소에 등록·검토·활성화하는 개발용 스크립트이며 반입 자산이 아니다.
-폐쇄망의 텍스트 지식은 문서 관리 API로 등록한다.
+`data/`는 Git과 폐쇄망 반입 대상이 아니다(생성되는 SQLite 파일이 담긴다).
+`scripts/`는 실제 데이터를 다루지 않는 순수 코드이므로 Git에 포함되며 어떤
+환경에서도(폐쇄망 포함) 그대로 실행할 수 있다.
 
-### SMT2020
+### 합성 mock 데이터
 
-Mock SQL과 입력 검증 simulation은 HVLM/LVHM을 합친 SQLite DB를 사용한다.
-원본 dataset, 생성 DB와 변환용 `scripts/build_smt2020_db.py`는 Git과 폐쇄망
-반입 대상에서 제외되는 개발 전용 자산이다. 자산이 준비된 개발 환경에서만 다음을
-실행한다.
+Mock SQL과 입력 검증 simulation은 `scripts/generate_mock_database.py`가 매번
+결정적(seed 고정)으로 생성하는 SQLite DB(SEG_A/SEG_B 두 생산 세그먼트)를
+사용한다. 외부 원본 파일이 필요 없다.
 
 ```bash
-python -m scripts.build_smt2020_db
+python -m scripts.generate_mock_database
+python -m scripts.generate_mock_documents   # RAG mock 검색용 일반 생산계획 용어집
 ```
 
-두 benchmark의 ID가 겹치므로 SQL JOIN에는 업무 키와 `dataset`을 함께 사용한다.
+두 세그먼트의 ID가 겹치므로 SQL JOIN에는 업무 키와 `dataset`을 함께 사용한다.
+폐쇄망의 텍스트 지식은 이 생성 스크립트 대신 문서 관리 API로 등록한다.
+
+## Service 디렉터리
+
+- `services/knowledge`: YAML 카탈로그, 문서 저장소, 변경 승인과 검색
+- `services/results`: Result Store, 결과 조회·차트 투영·표시 검증
+- `services/sql/guard.py`: mock과 production이 공유하는 읽기 전용 SQL 가드
+- `services/simulation`: 공통 시뮬레이션 정의와 입력 검증
+- `services/mock` / `services/production`: 실행 모드별 SQL·RAG·simulation 구현
+- `services/service_logging.py`: 공통 서비스 로깅
 
 ## 실행 모드
 
@@ -67,10 +78,11 @@ curl http://localhost:8100/health
 
 `/api/chat`은 항상 실제 Claude Agent SDK를 호출하므로 `.env`에 provider와 CLI
 설정이 필요하다. 지식·시각화 API와 `pytest`는 provider 없이 동작하며, 테스트는
-SDK `query`를 대체해 Agent 이벤트 흐름을 검증한다. `services/real`은 폐쇄망 사내 DB·RAG·simulation 구현으로
-교체하는 경계이며 mock과 함수 시그니처·반환 형태를 유지해야 한다.
+SDK `query`를 대체해 Agent 이벤트 흐름을 검증한다. `services/production`은 폐쇄망
+사내 DB·RAG·simulation 구현으로 교체하는 경계이며 mock과 함수 시그니처·반환 형태를
+유지해야 한다.
 
-폐쇄망 운영은 `ENV=prod`, `SERVICE_MODE=real`과 별도 `KNOWLEDGE_DIR`을 모두
+폐쇄망 운영은 `ENV=prod`, `SERVICE_MODE=production`과 별도 `KNOWLEDGE_DIR`을 모두
 요구한다. 조건을 충족하지 않으면 서버는 시작 단계에서 실패한다.
 
 ## API 진입점
@@ -102,7 +114,7 @@ Result Store와 `/api/query-results/*`는 세션 범위 쿠키 `pp_session_scope
 
 Agent는 SQL 작성 전 사용하는 table마다 `describe_table`을 호출한다. recipe를
 사용하면 `get_recipe`의 CTE와 동일한 규칙을 함께 적용한다. 작성·검토 절차는
-[도메인 지식 관리 지침](docs/domain-knowledge-management.md)을 따른다.
+[도메인 지식 관리 지침](docs/DOMAIN-KNOWLEDGE-MANAGEMENT.md)을 따른다.
 
 ## 검증
 
@@ -111,13 +123,14 @@ python -m pytest -q
 python -m pytest -m e2e  # 실제 CLI/provider 인증이 있는 환경에서만 실행
 ```
 
-SMT2020 자산이 없으면 `smt2020` 테스트만 자동 skip된다. 번들 지식 YAML의 고정 값
-(`wip`, `initial_wip` 등)을 단정하는 테스트는 `smt2020_bundle` 마커가 붙고
-`bundled_knowledge` fixture로 `KNOWLEDGE_DIR`과 무관하게 번들 YAML을 읽는다.
-폐쇄망에서 real 구현과 공통 계약만 검증할 때는 다음 프로필을 사용한다.
+합성 mock DB 생성기를 사용하는 테스트는 `mock_service` 마커가 붙는다(항상 실행).
+번들 지식 YAML의 고정 값(`wip`, `initial_wip` 등)을 단정하는 테스트는
+`bundled_knowledge` 마커가 붙고 같은 이름의 fixture로 `KNOWLEDGE_DIR`과 무관하게
+번들 YAML을 읽는다. 폐쇄망에서 production 구현과 공통 계약만 검증할 때는 다음
+프로필을 사용한다.
 
 ```bash
-python -m pytest -q -m "not smt2020 and not smt2020_bundle and not mock_service and not e2e"
+python -m pytest -q -m "not bundled_knowledge and not mock_service and not e2e"
 ```
 
 E2E가 아닌 공통 테스트가 외부 provider나 인터넷에 의존하도록 만들지 않는다.
@@ -126,5 +139,5 @@ E2E가 아닌 공통 테스트가 외부 provider나 인터넷에 의존하도�
 
 - [Backend 작업 지침](AGENTS.md)
 - [폐쇄망 배포 및 실서비스 이식](docs/CLOSED_NETWORK_SETUP.md)
-- [도메인 지식·테이블·CTE 관리](docs/domain-knowledge-management.md)
+- [도메인 지식·테이블·CTE 관리](docs/DOMAIN-KNOWLEDGE-MANAGEMENT.md)
 - [Backend 계획과 완료 이력](plan/Todo.md)

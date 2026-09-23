@@ -10,11 +10,13 @@ Python 3.11 FastAPI 서비스다. `/api/chat`은 Claude Agent SDK 이벤트를
   route에 SQL, provider 설정, 결과 검증과 업무 로직을 넣지 않는다.
 - API 계약은 `api/schemas.py`, 이벤트 변환은 `agent/event_adapter.py`, 등록 Tool은
   `agent/sdk_tools.py`, 구조화 지식은 `knowledge/` YAML을 기준으로 한다.
-- SQL은 `services/sql_guard.py`를 통과한 읽기 전용 쿼리만 허용한다.
-  `services/mock`과 `services/real`의 공개 시그니처·반환 형태를 맞춘다.
+- SQL은 `services/sql/guard.py`를 통과한 읽기 전용 쿼리만 허용한다.
+  `services/mock`과 `services/production`의 공개 시그니처·반환 형태를 맞춘다.
 - 환경변수는 `core/config.py`에서 읽고 새 키는 비밀값 없이 `.env.example`에 추가한다.
-- 폐쇄망·real service 작업은 `docs/CLOSED_NETWORK_SETUP.md`, 지식 작업은
-  `docs/domain-knowledge-management.md`를 먼저 확인한다.
+- 폐쇄망·production service 작업은 `docs/CLOSED_NETWORK_SETUP.md`, 지식 작업은
+  `docs/DOMAIN-KNOWLEDGE-MANAGEMENT.md`를 먼저 확인한다.
+- `docs/`에 새로 작성하는 문서는 파일 이름을 대문자로 작성한다
+  (예: `DOMAIN-KNOWLEDGE-MANAGEMENT.md`). 기존 문서 이름을 변경하면 모든 참조도 갱신한다.
 
 ## Agent와 결과 계약
 

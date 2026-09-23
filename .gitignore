@@ -38,9 +38,10 @@ npm-debug.log*
 # ── 작업용 스크린샷/산출물 (커밋 금지) ─────────────────────
 artifacts/
 
-# 로컬 SMT2020 원본·생성 DB 및 데이터 변환 스크립트
-/backend/datasets/
-/backend/scripts/
-
 # 사용자가 작성한 지식과 SQLite 부속 파일
 /backend/data/knowledge.sqlite3*
+# 이전 로컬 원본 데이터 디렉터리도 반입·추적하지 않는다.
+/backend/datasets/
+
+# 폐쇄망 pntfp 반입 원본 (이식 완료 후 별도 보관·제거, Git 추적 금지)
+/backend/pntfp/

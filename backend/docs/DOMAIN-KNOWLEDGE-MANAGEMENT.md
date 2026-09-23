@@ -7,9 +7,9 @@
 작성 원칙과 예시는 특정 데이터셋에 종속되지 않는다. 실제 업무 테이블에는 여러
 독립 세그먼트(예: 사업부, 라인, benchmark 데이터셋)가 섞여 있을 수 있으므로
 아래 예시는 세그먼트 구분 키를 `segment_key`처럼 일반 이름으로 표기한다. 개발
-환경에서 원칙을 검증하는 데 쓰는 SMT2020 fixture는 [개발용 SMT2020 데이터와
-검증](#개발용-smt2020-데이터와-검증) 절에서만 다루며, 그 절 밖에서는 SMT2020
-고유 값을 예시로 복사하지 않는다.
+환경에서 원칙을 검증하는 데 쓰는 합성 mock fixture는 [개발용 합성 mock 데이터와
+검증](#개발용-합성-mock-데이터와-검증) 절에서만 다루며, 그 절 밖에서는 mock
+전용 값을 예시로 복사하지 않는다.
 
 ## 지식의 단일 기준
 
@@ -144,8 +144,8 @@ KPI는 표시 이름과 동의어, 업무 정의, 공식, 원천 테이블, 기�
 | `diagnostics` | 이상 원인을 확인할 SQL·simulation 가설과 참조 대상 |
 
 파일명은 `<kpi_id>.yaml`로 맞춘다. 새 KPI는 구조와 SQL을 테스트했더라도 현업
-정의·단위·판정 기준을 검토하기 전까지 `draft`로 둔다. 개발용 SMT2020 fixture에
-적용한 참고 예시는 [개발용 SMT2020 데이터와 검증](#개발용-smt2020-데이터와-검증)
+정의·단위·판정 기준을 검토하기 전까지 `draft`로 둔다. 개발용 합성 mock fixture에
+적용한 참고 예시는 [개발용 합성 mock 데이터와 검증](#개발용-합성-mock-데이터와-검증)
 절의 [initial_wip.yaml](../knowledge/kpi/initial_wip.yaml)에 있다.
 
 다음은 필수 필드와 연결 방식을 보여주는 작성 예다. 실제 KPI를 추가할 때는
@@ -280,7 +280,7 @@ Simulation YAML은 `type`, `name`, `aliases`, `when_to_use`, `params`,
 
 table·recipe와 같이 `aggregation_rules`는 집계 의미, `visualization_hints`는
 표현 권고로 구분한다. 실행 절차와 파라미터 제약은 `when_to_use`와 `params`에 둔다.
-참고 예시는 [SMT2020_입력검증.yaml](../knowledge/simulations/SMT2020_입력검증.yaml)이다.
+참고 예시는 [입력_정합성_검증.yaml](../knowledge/simulations/입력_정합성_검증.yaml)이다.
 
 ## Recipe와 CTE 작성
 
@@ -300,7 +300,7 @@ Recipe YAML은 다음 필드로 질문을 실행 가능한 결과 계약에 연�
 
 파일명은 `<recipe_id>.yaml`로 맞추고 `recipe_id`와 `cte_name`에는 SQL 식별자로
 안전한 소문자 `snake_case`를 사용한다. 새 파일은 담당자 검토 전까지 `draft`로
-시작한다. 개발용 SMT2020 fixture에 적용한 참고 예시는
+시작한다. 개발용 합성 mock fixture에 적용한 참고 예시는
 [initial_wip_by_part.yaml](../knowledge/recipes/initial_wip_by_part.yaml)과
 [part_route_tool_summary.yaml](../knowledge/recipes/part_route_tool_summary.yaml)에
 있다.
@@ -411,9 +411,9 @@ tool은 없다. 향후 runtime tool로 공개하려면 tool payload와 프론트
 | `expected.table_counts` | 고정 원본에서 반드시 일치해야 하는 테이블별 행 수 |
 | `expected.unmatched_rows` | 입력 관계 검사별 허용 미연결 행 수 |
 
-개발용 SMT2020 fixture에 적용한 참고 샘플은
-[hvlm_input_integrity.yaml](../knowledge/scenarios/hvlm_input_integrity.yaml)과
-[lvhm_input_integrity.yaml](../knowledge/scenarios/lvhm_input_integrity.yaml)에 있다.
+개발용 합성 mock fixture에 적용한 참고 샘플은
+[seg_a_input_integrity.yaml](../knowledge/scenarios/seg_a_input_integrity.yaml)과
+[seg_b_input_integrity.yaml](../knowledge/scenarios/seg_b_input_integrity.yaml)에 있다.
 최소 형태는 다음과 같다.
 
 ```yaml
@@ -466,8 +466,8 @@ python -m pytest -q \
 
 테스트는 YAML schema, recipe 참조, CTE의 catalog table 사용, 모든 sample query의
 실행 가능 여부, scenario의 table count와 입력 관계 기대값을 확인한다. 개발용
-SMT2020 fixture를 사용하는 경우의 데이터셋 정합성 검증은 [개발용 SMT2020
-데이터와 검증](#개발용-smt2020-데이터와-검증) 절을 따른다.
+합성 mock fixture를 사용하는 경우의 데이터셋 정합성 검증은 [개발용 합성 mock
+데이터와 검증](#개발용-합성-mock-데이터와-검증) 절을 따른다.
 
 ## Agent 주입 경계
 
@@ -482,17 +482,19 @@ SMT2020 fixture를 사용하는 경우의 데이터셋 정합성 검증은 [개�
 작성하기 전 `describe_table`을 호출하고 `query_rules`의 기본 조건을 반영하며,
 `draft` 지식을 사용한 계산은 답변에 미검증 기준임을 표시한다.
 
-## 개발용 SMT2020 데이터와 검증
+## 개발용 합성 mock 데이터와 검증
 
-`scripts/build_smt2020_db.py`는 `datasets/SMT2020_HVLM`과
-`datasets/SMT2020_LVHM`의 tab 구분 원본을 하나의 SQLite로 변환한다. 모든
-테이블에 `dataset`을 추가하며 SQL 서비스와 입력 검증 mock은 같은 DB를 사용한다.
-원본은 수정하지 않고 생성 DB는 완성 후 원자적으로 교체한다.
-이 자산과 bundled YAML은 개발용 mock 회귀에만 사용하며 폐쇄망에는 반입하지 않는다.
+`scripts/generate_mock_database.py`는 외부 원본 없이 결정적(seed 고정)으로
+합성 production-planning SQLite를 생성한다. `SEG_A`, `SEG_B` 두 생산 세그먼트를
+모두 `dataset` 컬럼으로 구분하며 SQL 서비스와 입력 검증 mock은 같은 DB를
+사용한다. 생성 DB는 완성 후 원자적으로 교체한다. `scripts/generate_mock_documents.py`는
+같은 방식으로 RAG mock 검색용 일반 생산계획 용어집 문서를 등록한다. 이 자산과
+bundled YAML은 개발용 mock 회귀에만 사용하며 폐쇄망에는 반입하지 않는다.
 
 ```bash
 cd backend
-python -m scripts.build_smt2020_db
+python -m scripts.generate_mock_database
+python -m scripts.generate_mock_documents
 python -m pytest -q
 ```
 
@@ -502,9 +504,9 @@ join 및 입력 관계 unmatched 건수를 포함한다.
 
 ## 폐쇄망 반입과 운영
 
-- 운영 YAML과 Skill은 애플리케이션 소스와 함께 검토해 반입한다. bundled SMT2020
+- 운영 YAML과 Skill은 애플리케이션 소스와 함께 검토해 반입한다. bundled mock
   YAML은 운영 `KNOWLEDGE_DIR`로 사용하지 않는다.
-- 반입 후에는 SMT2020 없이 공통 계약 테스트와 real service 관통 검증을 실행한다.
+- 반입 후에는 합성 mock 데이터 없이 공통 계약 테스트와 production service 관통 검증을 실행한다.
 - 비정형 문서 원본은 승인된 반입 절차를 따르고 문서별 owner, source와 갱신일을
   보존한다.
 - Milvus와 임베딩 모델은 Phase 3 착수 전에 사내 제공 버전, wheel·이미지,
@@ -513,7 +515,7 @@ join 및 입력 관계 unmatched 건수를 포함한다.
   절차와 검증 query를 함께 실행한다.
 - 환경변수와 실제 endpoint는 `core/config.py`와 로컬 `.env`로 주입한다.
 
-전체 설치와 real 서비스 이식은 [폐쇄망 배포 및 이식 가이드](CLOSED_NETWORK_SETUP.md)를
+전체 설치와 production 서비스 이식은 [폐쇄망 배포 및 이식 가이드](CLOSED_NETWORK_SETUP.md)를
 따른다.
 
 ## 구조화 지식 변경 요청과 승인
@@ -530,7 +532,7 @@ table·KPI·recipe·simulation·glossary·scenario YAML은 관리 화면에서 �
 
 - 작성자만 자기 요청을 수정·제출·철회한다. 승인 권한자는 승인·반려한다.
 - 제출은 모델 검증과 정합성 검사를 통과해야 한다. 승인 시점에 다시 검사한다.
-- 정합성 검사는 `services/knowledge_integrity.py`의 규칙(참조 table·KPI sources·recipe
+- 정합성 검사는 `services/knowledge/integrity.py`의 규칙(참조 table·KPI sources·recipe
   cte_sql·diagnostics·scenario·용어집 링크 등)을 쓴다. 변경 전에 이미 있던 문제는
   막지 않고 **이번 변경이 새로 만든 문제**만 막는다.
 - 승인·반려는 근거 메모가 필수다. 작성자 본인 승인은 기본 차단이며
@@ -595,7 +597,7 @@ table·KPI·recipe·simulation·glossary·scenario YAML은 관리 화면에서 �
 `KNOWLEDGE_SEARCH_BACKEND=local`이 기본이며 SQL의 SERVICE_MODE와 독립이다.
 한글·영문을 NFKC 정규화한 단어/부분일치로 제목·태그·본문을 검색해 최대 10개 발췌를
 반환한다. 의미 유사도나 벡터 검색이 아니며 결과가 없으면 빈 목록을 반환한다.
-`service`는 기존 mock/real 어댑터 연결용이고 real Milvus 구현은 여전히 후속이다.
+`service`는 기존 mock/production 어댑터 연결용이고 production Milvus 구현은 여전히 후속이다.
 문서의 지시문은 실행 권한이 아니며 Agent는 제목·출처·버전을 근거로 인용한다.
 
 ### 백업과 복구
@@ -619,12 +621,3 @@ PY
 KNOWLEDGE_DB_PATH에 복사한다. 소유자·쓰기 권한을 확인하고 서버를 시작한다.
 문서 수·활성 버전·이력과 대표 검색어를 확인한다. Result Store 정리 작업은 이 DB를
 삭제하지 않는다. 최초 실행 시 빈 스키마를 만들며 기존 문서를 자동 활성화하지 않는다.
-
-### SMT2020 진단 범위
-
-`wip_integrity_diagnostics`는 WIP→Part, 현재 Step→Route, Route→설비 Family 누락과
-교차 dataset 연결·Route 조인 중복 합산의 위험을 확인한다. 정상 Route 다중 Step은
-입력 오류가 아니다. cross_dataset_part_matches와 route_join_rows는 쿼리를 잘못
-작성할 때의 위험이며 실제 생산 부진의 증거로 사용할 수 없다.
-새 recipe와 diagnostics를 확장한 initial_wip KPI는 현업 재검토 전 draft다.
-원본 benchmark를 변경하지 않으며 오류는 테스트 전용 fixture에서 재현한다.

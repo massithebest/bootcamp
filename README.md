@@ -1,8 +1,9 @@
 # Production Planning Agent
 
 제조 생산계획 데이터를 자연어로 조회·분석·시뮬레이션하는 폐쇄망용
-Agent 애플리케이션이다. 개발용 mock 회귀에는 선택적으로 SMT2020 HVLM/LVHM을
-사용하며, 폐쇄망 운영은 별도 지식과 real service만 사용한다.
+Agent 애플리케이션이다. 개발용 mock 회귀에는 결정적으로 생성되는 합성
+데이터(SEG_A/SEG_B 두 생산 세그먼트)를 사용하며, 폐쇄망 운영은 별도 지식과
+production service만 사용한다.
 
 ## 주요 기능
 
@@ -10,8 +11,7 @@ Agent 애플리케이션이다. 개발용 mock 회귀에는 선택적으로 SMT2
 - table·KPI·recipe·scenario YAML과 버전형 텍스트 지식 조회·관리
 - 카탈로그의 조회·집계 규칙을 적용한 읽기 전용 SQL
 - 최대 1,000행 Result Store, 결과 요약·구간 조회
-- legacy 모드의 최대 100행 독립 표와 검증된 bar·line 차트
-- `present` 모드의 서버 페이지 표, bar·line·area 차트와 시뮬레이션 요약
+- `present_*` Tool의 서버 페이지 표, bar·line·area 차트와 시뮬레이션 요약
 - 질문 편집·재생성·중단과 3-pane Agent Workbench
 
 ```text
@@ -19,7 +19,7 @@ Frontend (Vite 7 + React 18 + assistant-ui)
   └─ POST /api/chat (SSE AgentEvent)
 Backend (FastAPI + Claude Agent SDK)
   ├─ Knowledge tools ─ YAML catalog / SQLite text knowledge
-  ├─ SQL / Simulation ─ mock 또는 real service
+  ├─ SQL / Simulation ─ mock 또는 production service
   └─ Result Store ─ Table / Visualization
 ```
 
@@ -44,12 +44,12 @@ python -m pip install -r requirements-dev.txt
 cp .env.example .env
 ```
 
-SMT2020 원본, 생성 DB와 `scripts/build_smt2020_db.py`는 Git과 폐쇄망 반입
-대상에서 제외되는 개발용 mock 자산이다. 해당 자산이 있는 개발 환경에서만 다음
-명령으로 DB를 생성한다.
+`scripts/generate_mock_database.py`는 외부 원본 없이 합성 mock SQLite DB를
+결정적으로 생성하는 Git 포함 스크립트다. 아무 환경에서나 실행할 수 있다.
 
 ```bash
-python -m scripts.build_smt2020_db
+python -m scripts.generate_mock_database
+python -m scripts.generate_mock_documents
 ```
 
 ```bash
@@ -86,8 +86,9 @@ npm run build
 npm run lint
 ```
 
-SMT2020 자산이 없으면 관련 테스트만 자동으로 skip된다. 폐쇄망의 real 전용 검증
-절차는 [폐쇄망 배포 가이드](backend/docs/CLOSED_NETWORK_SETUP.md)를 따른다.
+Backend 테스트는 합성 mock DB 생성기를 항상 사용할 수 있어 별도 자산 없이
+전체가 실행된다. 폐쇄망의 production 전용 검증 절차는
+[폐쇄망 배포 가이드](backend/docs/CLOSED_NETWORK_SETUP.md)를 따른다.
 
 브라우저 자동화 산출물인 `.playwright-mcp/`와 `artifacts/`는 Git에서 제외한다.
 
@@ -98,7 +99,7 @@ SMT2020 자산이 없으면 관련 테스트만 자동으로 skip된다. 폐쇄�
 - [Backend 실행·운영](backend/README.md)
 - [Frontend 실행·검증](frontend/README.md)
 - [Frontend UI 디자인 기준](frontend/docs/assistant-ui-design.md)
-- [도메인 지식 관리](backend/docs/domain-knowledge-management.md)
+- [도메인 지식 관리](backend/docs/DOMAIN-KNOWLEDGE-MANAGEMENT.md)
 - [개발 Agent 작업 지침](AGENTS.md)
 
 현재 실제 사내 DB·RAG·simulation 연결, 대화 영속 저장과 동적 후속질문은 후속

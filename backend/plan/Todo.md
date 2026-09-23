@@ -16,7 +16,7 @@ Backend가 소유하는 범위는 다음과 같다.
 
 - API schema, SSE 변환, Agent 실행과 세션·포크·취소 lifecycle
 - 구조화 YAML 및 버전형 텍스트 지식의 로드·검증·검색
-- 읽기 전용 SQL 가드, mock/real service 경계와 simulation registry
+- 읽기 전용 SQL 가드, mock/production service 경계와 simulation registry
 - Result Store, 표 payload, 시각화 명세와 access scope·TTL
 - 폐쇄망 실행·운영 문서, 오류 은닉과 service logging
 
@@ -32,8 +32,8 @@ Backend가 소유하는 범위는 다음과 같다.
 | 구조화 지식 | 완료 | table·KPI·recipe·scenario·simulation·glossary YAML 검증과 조회 Tool |
 | 텍스트 지식 | 완료 | SQLite 버전·revision 충돌·검토·활성화·보관·local 검색 |
 | 구조화 지식 변경·승인 | 완료 | 변경 요청(초안·제출·승인·반려)·정합성 게이트·승인 시 YAML 원자 반영·즉시 reload, principal 스텁 |
-| SQL | Mock 완료 / Real 미구현 | 등록 table만 허용하는 SELECT/WITH, 1,000행 저장 상한 |
-| Simulation | Mock 완료 / Real 미구현 | SMT2020 HVLM/LVHM 입력 관계·정합성 검증 |
+| SQL | Mock 완료 / Production stub | 등록 table만 허용하는 SELECT/WITH, 1,000행 저장 상한 |
+| Simulation | Mock 완료 / Production stub | 합성 mock SEG_A/SEG_B 입력 관계·정합성 검증 |
 | Result Store | 1차 완료 | parquet+metadata, TTL·용량 정리, browser access scope |
 | 결과 API·표·시각화 | 완료 | `/api/query-results/{id}/preview|table|chart`, `present_sql_preview`·`present_chart`·`present_table`·`present_simulation` flat Tool·검증(유일한 결과 표시 경로, 최대 500 points·8 series) |
 | RAG | Local 완료 / Vector 미구현 | 활성 검토 문서 local 검색; Milvus·문서 색인 후속 |
@@ -84,14 +84,14 @@ Backend가 소유하는 범위는 다음과 같다.
 - `knowledge/` YAML이 구조화 지식의 source of truth다.
 - `query_rules`, `aggregation_rules`, `visualization_hints`의 역할을 섞지 않는다.
 - table/recipe `sample_queries`는 `question`, `sql`만 허용한다.
-- SQL은 항상 조회 전용이며 mock과 real 구현의 함수 시그니처·반환 형태를 맞춘다.
-- `ENV=prod`는 `SERVICE_MODE=real`과 bundled SMT2020 지식이 아닌 명시적인
+- SQL은 항상 조회 전용이며 mock과 production 구현의 함수 시그니처·반환 형태를 맞춘다.
+- `ENV=prod`는 `SERVICE_MODE=production`(기존 `real` 별칭 허용)과 bundled mock 지식이 아닌 명시적인
   운영 `KNOWLEDGE_DIR`을 요구한다. 조건이 맞지 않으면 시작 단계에서 실패한다.
 
 ### 구조화 지식 변경 요청·승인
 
 구조화 YAML은 직접 수정 API가 없고 변경 요청이 승인될 때만 파일이 바뀐다. 상세 절차와
-운영 전제는 `docs/domain-knowledge-management.md`의 "구조화 지식 변경 요청과 승인"이 기준이다.
+운영 전제는 `docs/DOMAIN-KNOWLEDGE-MANAGEMENT.md`의 "구조화 지식 변경 요청과 승인"이 기준이다.
 
 - 권한: 요청마다 `X-User-Id`(생략 시 `KNOWLEDGE_DEFAULT_PRINCIPAL`)를 `KNOWLEDGE_PRINCIPALS`와
   대조한다. 권한은 `knowledge:write`(작성·제출·철회), `knowledge:approve`(승인·반려)다.
@@ -103,7 +103,7 @@ Backend가 소유하는 범위는 다음과 같다.
   `fields[]`는 `{name, path, label, help, required, readonly, widget, example?, group?,
   options?, item_widget?, fields?, value?}`이며 widget은 string·text·sql·boolean·number·date·enum·
   string_list·record_list·object·map·json이다. 구조는 pydantic 모델, 문구는
-  `services/knowledge_guides.py`가 소유한다. `item_widget`(string|text)은 string_list 항목이 여러 줄 입력이 필요한지 알린다.
+  `services/knowledge/guides.py`가 소유한다. `item_widget`(string|text)은 string_list 항목이 여러 줄 입력이 필요한지 알린다.
   `template`은 필수 필드만 빈 값으로 채운 골격이다.
 - `GET /api/knowledge/source/{kind}/{key}` → `{kind, key, yaml, data}` 현재 항목의 정규화 내용(404).
 - `POST /api/knowledge/validate` `{kind, key?, yaml|data}` → 200 `{ok, parsed, yaml, data, key,
@@ -145,13 +145,149 @@ Backend가 소유하는 범위는 다음과 같다.
 ### P3
 
 - [ ] 로컬 vector DB 기반 문서 색인·검색·출처 반환 RAG를 구현한다.
-- [ ] `services/real`에 실제 사내 DB·RAG·simulation provider를 연결한다.
+- [ ] `services/production`에 실제 사내 DB·RAG·simulation provider를 연결한다.
+  인터페이스·설정 가드레일(`common_sql_client.py`·`milvus_client.py`·
+  `simulation_api_client.py` 스텁과 env var 자리는 선행 준비를 마쳤다(2026-09-23).
+  `/anthropic` 경로와 `LLM_PROVIDER=local` 설정은 유지하되 프록시 본문은 비워
+  두었으며, 폐쇄망에서 사용할 구현을 반입한 뒤 채운다. 남은 작업은 실제 pntfp
+  HTTP 호출 로직 이식이다.
+- [ ] 실제 폐쇄망 DB 스키마·RAG 문서 구조 정보를 확보하면
+  `scripts/generate_mock_database.py`의 `SEGMENTS`(세그먼트 규모)와
+  `scripts/generate_mock_documents.py`의 문서 주제·카테고리를 재검토해 실제
+  구조와의 유사도를 높인다. 테이블/컬럼명은 실제 스키마가 크게 다르면 그때
+  다시 정한다.
 - [ ] 인증 principal, 영속 대화·분기 저장과 실제 모델 설정 조회 계약을 별도
   계획으로 설계한다. 착수 전 실제 인증 principal과 폐쇄망에 반입 가능한 저장소를
   정하고, 소유권·재시작 후 fork·보존 기간·24시간 Result Store TTL이 지난 결과 참조의
   표시 정책을 함께 결정한다. 현재 임시 principal을 보안 경계로 사용하지 않는다.
 
 ## 완료 이력 요약
+
+### 2026-09-23 — PKT 목표수량 Swap knowledge 반영과 mock 시뮬레이션
+
+- 사용자가 제공한 실제 사내 "PNS PNT-FP API"(PktTarget swap 산출) 스펙을 근거로
+  `knowledge/simulations/PKT_목표수량_스왑산출.yaml`을 새 simulation_type으로
+  등록했다. `view`(all/swapped/by_ids)와 `plan_prod_ids`(by_ids일 때만 필요) 파라미터를
+  갖는다. `glossary.yaml`에 "PKT 목표수량 Swap"·"Swap 우선순위 정책" 용어를 draft로
+  추가했다 — 기존 `VUI_FP_TARGET_I`(배치 반영 이력)와는 별개 원천임을 명시했다.
+- `services/mock/mock_pkt_swap.py`(신규)에 고정 seed 기반 합성 데이터로 `targetQty =
+  planQty - poutQty` 계산과 우선순위 기반 근사 GIVE/RECEIVE swap을 재현하는
+  `generate_pkt_swap_response(view, plan_prod_ids)`를 구현했다.
+  `services/mock/mock_simulation_service.py`가 기존 `run_simulation` Tool 경로로 이
+  simulation_type을 그대로 처리하도록 분기를 추가했다(새 SDK Tool 없음).
+- 폐쇄망 실제 REST 연동(`services/production/*.py`)은 범위 밖으로 남겼다 — 폐쇄망
+  접근 없이는 검증할 수 없으므로 기존 `NotImplementedError` 스텁 그대로 두었고, 이번에
+  확보한 실제 API 스펙은 `docs/CLOSED_NETWORK_SETUP.md` Part 2 이식 작업 때 참고한다.
+  Product/ProductAssignment/Configuration(swap-priority 조회) 엔드포인트는 별도
+  Tool로 만들지 않고 PKT swap mock 계산용 내부 합성 데이터로만 반영했다.
+- 검증: `python -m pytest -q` **377 passed, 6 deselected**.
+
+### 2026-09-23 — 도메인 지식 관리 문서 파일명 대문자화
+
+- 도메인 지식 관리 문서 이름을 대문자로 변경하고 README·계획·코드 주석의
+  참조를 갱신했다.
+- 앞으로 `docs/`에 작성하는 문서 파일명은 대문자로 쓰도록 root 및 Backend
+  `AGENTS.md` 지침에 추가했다.
+
+### 2026-09-23 — `/anthropic` 프록시 구현을 폐쇄망 반입 대상으로 전환
+
+- 사용자 지시에 따라 오픈망 작업본의 게이트웨이 전달 구현을 제거하고,
+  `/anthropic/{path}` 경로는 유지하면서 반입 전 요청에 501을 반환하도록 했다.
+- `LLM_PROVIDER=local` 설정은 유지했다. 폐쇄망 구현을 반입하기 전에는 이 설정으로
+  Agent 요청을 처리할 수 없다.
+- 기존 전달 테스트와 폐쇄망 안내를 미구현 상태에 맞게 갱신했다.
+
+### 2026-09-23 — pntfp 반입 대비 사전 준비(`/anthropic` 프록시·production 가드레일·missing_params, 이후 프록시 501 전환)
+
+- 다음 폐쇄망 pntfp 반입 때 오픈망에서 미리 끝낼 수 있는 작업만 골라
+  구현했다. 실제 사내 API 스펙(엔드포인트·스키마)이 없는 부분은 인터페이스와
+  설정 가드레일까지만 만들고 `NotImplementedError`로 남겼다.
+- 당시 `/anthropic` 프록시(`api/routes_anthropic_proxy.py`)와 `LLM_PROVIDER=local`
+  분기(`core/config.py::agent_provider_env`)를 구현했다 — 사내 LLM
+  게이트웨이(HCP)가 Claude CLI User-Agent를 차단하는 문제를, CLI 요청을
+  백엔드 자신의 `/anthropic/*`로 보내 User-Agent만 교체해 전달하는 방식으로
+  우회하는 방식이었다. `BACKEND_PORT`, `PRIVATE_LLM_MODEL_NAME/ENDPOINT/KEY` 설정을
+  추가했다. 당시 로컬 mock 게이트웨이로 스트리밍·헤더 교체·인증 전달을 수동 검증했으나,
+  전달 본문은 위의 501 전환에서 제거했다.
+- `services/production/{common_sql_client,milvus_client,simulation_api_client}.py`
+  스텁을 추가하고, `COMMON_SQL_API_URL`/`SIMULATION_API_URL`/`MILVUS_*`/
+  `IFLOW_EMBEDDING_*`/`RERANKER_*`/`RAG_DOC_URL_BASE` env var 자리와
+  `core.config.require_production_env` 호출 시점 가드레일을 마련했다. 실제
+  HTTP 로직은 이식 대상으로 `docs/CLOSED_NETWORK_SETUP.md` §2-4를 가리키는
+  TODO만 남겼다.
+- `services/simulation/registry.py::validate_simulation_request`가 문자열
+  대신 구조화 dict를 반환하도록 바꿨다 — 필수 파라미터가 없으면
+  `{"status": "missing_params", "missing": [...]}`을 반환해 agent가 추측
+  재시도 대신 사용자에게 직접 되묻는다. mock/production `simulation_service`와
+  `simulation` Skill 4단계를 함께 갱신했다.
+- `tests/test_real_services.py`(신규)에 production 어댑터 설정 가드레일,
+  `missing_params` 구조화 응답 테스트를 추가했다. 프록시 전달 테스트는 위의
+  501 전환에서 미구현 응답 테스트로 교체했다. 이식 후에는 같은 파일에 SQL/RAG/simulation
+  성공 경로 테스트를 더한다.
+- `.gitignore`에 `/backend/pntfp/`를 추가하고, `docs/CLOSED_NETWORK_SETUP.md`에
+  `/anthropic` 프록시 사용법과 Milvus 컬렉션 스키마 대조·시뮬레이션 API 응답
+  대조·프록시 스트리밍 검증을 이식 후 검증 절차에 추가했다.
+- 검증: `python -m pytest -q` **372 passed, 6 deselected**.
+- 미수행: 실제 pntfp HTTP 호출 로직(SQL/RAG/simulation 성공 경로), 실제
+  Milvus/Simulation API 응답 스키마 대조, 사내 게이트웨이 실환경에서의
+  `/anthropic` 프록시 관통 검증(로컬 mock 게이트웨이로만 확인함).
+
+### 2026-09-23 — Production API timeout 설정 추가
+
+- `.env`와 `.env.example`에 `API_TIMEOUT_SECONDS=60`을 설정하고 `core.config`에서 정수 초 단위로 읽도록 했다.
+- 폐쇄망 production adapter가 사용할 설정으로 README와 폐쇄망 가이드에 기록했다. 현재 API 호출부는 아직 연결되지 않아 설정값만 준비했다.
+
+### 2026-09-23 — 사용자 의도에 따른 SQL·simulation·문서 검색 경로 안내
+
+- `agent/agent_sdk/CLAUDE.md`에 질의 경로 표를 추가했다. "시뮬레이션 수행/실행"은 등록 simulation 확인·실행으로, "DB/데이터베이스/SQL 조회"는 읽기 전용 SQL로, 정의·버튼·변경 위치·방법 질문은 문서 검색으로 연결한다. "알려줘/보여줘" 같은 말투는 경로 판별 기준에서 제외한다.
+- 직전 결과를 가리키는 후속 질문은 성공한 Tool 출처와 `result_id`를 이어받도록 했고, 대상·결과가 불명확하면 확인한다. 등록되지 않은 simulation은 임의 실행이나 SQL 결과로 대체하지 않고 미지원으로 안내한다.
+- SQL·simulation Skill과 세 Tool 설명에도 같은 기준을 반영했다. API·AgentEvent·Tool payload 계약은 변경하지 않았다.
+- `test_prompt_consistency.py`에 경로 정책과 Tool 설명의 일치 검사를 추가했다. 전체 Backend 테스트 **362 passed, 6 deselected**로 검증했다(Starlette TestClient deprecation warning 1건).
+
+### 2026-09-23 — Backend service 패키지 구조화와 production 명칭 정리
+
+- 지식 서비스는 `services/knowledge/`, 결과 처리는 `services/results/`, SQL guard는
+  `services/sql/guard.py`, 공통 simulation schema는 `services/simulation/`으로 묶었다.
+- `services/real/`을 `services/production/`으로 옮겼다. `SERVICE_MODE=production`을
+  표준으로 하고 기존 `SERVICE_MODE=real` 입력은 호환 별칭으로 정규화한다.
+- mock/production public API, HTTP·Tool payload 계약은 유지한다. 각 패키지의 import와
+  회귀 테스트·폐쇄망 문서를 새 경로에 맞췄다. 전체 Backend 검증은 360 passed,
+  6 deselected로 완료했다.
+
+
+### 2026-09-23 — SMT2020/rag_docs 의존성을 합성 mock 생성기로 교체
+
+- `backend/datasets/`(SMT2020 원본 TSV, 생성 DB, 반도체 rag_docs)와
+  `backend/scripts/build_smt2020_db.py`·`seed_local_documents.py`(둘 다 Git
+  비추적)를 삭제했다. 대신 외부 원본 없이 결정적(seed 고정)으로 합성 데이터를
+  만드는 `scripts/generate_mock_database.py`·`generate_mock_documents.py`를
+  추가했다 — 실제 데이터를 다루지 않는 순수 코드이므로 Git에 포함시켜 어떤
+  환경에서도 실행 가능하다.
+- 테이블·컬럼 스키마(`part`/`route_step`/`tool`/`orders`/`wip`/`setup`/
+  `setup_group`/`down_calendar`/`pm_calendar`/`calendar_attach`/`transport`)는
+  그대로 유지해 `knowledge/catalog/`·`sql_guard`·mock SQL/simulation service를
+  바꾸지 않았다. `dataset` 값만 `HVLM`/`LVHM` → `SEG_A`/`SEG_B`로 중립화했고,
+  `core.config.SMT2020_DB_PATH` → `MOCK_DB_PATH`(기본 경로
+  `backend/data/mock_planning.db`), `Smt2020DbMissingError` →
+  `MockDbMissingError`, simulation type `SMT2020_입력검증` →
+  `입력_정합성_검증`으로 이름을 바꿨다.
+- `knowledge/` YAML 전체(11개 table, joins, glossary, kpi, recipes 3종,
+  simulations, scenarios 2종)에서 SMT2020/HVLM/LVHM 리터럴을 제거하고
+  scenario 파일도 `seg_a_input_integrity.yaml`/`seg_b_input_integrity.yaml`로
+  옮겼다. RAG mock 문서는 반도체 용어집 대신 일반 생산계획 용어집(Route·WIP·
+  Setup·Downtime/PM Calendar·Transport·Lot·Tool Capacity·세그먼트 전략) 9건으로
+  교체했다.
+- `pytest.ini`의 `smt2020`/`smt2020_bundle` 마커(자산 유무에 따른 skip 목적)를
+  없앴다 — 생성기가 항상 Git에 있어 더 이상 skip이 필요 없다. `mock_service`는
+  유지하고 `smt2020_bundle`은 `bundled_knowledge`로 이름을 바꿨다(기능은 동일).
+  `tests/test_smt2020_dataset.py`를 `test_mock_database.py`로 옮기고 TSV 파싱
+  전용이던 두 테스트(padding, header 오류)를 새 생성기에 맞는 형태로 교체했다.
+- 검증: `python -m pytest -q` **359 passed, 6 deselected**(e2e만 제외).
+  `python -m scripts.generate_mock_database`·`generate_mock_documents` 수동
+  실행과 5개 입력 관계 unmatched=0, `PRAGMA integrity_check=ok`, 두 번 빌드
+  결과 동일함(결정적 재현성)을 확인했다.
+- 미수행: 실제 폐쇄망 DB 스키마·RAG 문서 구조 정보 반영(위 P3 참고). 현재
+  세그먼트 규모·컬럼은 기존 SMT2020 값을 그대로 복제한 placeholder다.
 
 ### 2026-09-23 — Result Store·SSE·RAG 경계 보강
 
@@ -210,8 +346,8 @@ Backend가 소유하는 범위는 다음과 같다.
 
 ### 2026-09-22 — 결과 API·`present` Tool·플래그
 
-- 저장 없는 preview·table·chart API(`services/query_result_service.py`, `chart_projection.py`)와 `present` Tool
-  (`services/present_service.py`, `tools/present_tool.py`), 플래그 `RESULT_UI_MODE`(기본 `legacy`)를 구현했다.
+- 저장 없는 preview·table·chart API(`services/results/query.py`, `chart_projection.py`)와 `present` Tool
+  (`services/results/present.py`, `tools/present_tool.py`), 플래그 `RESULT_UI_MODE`(기본 `legacy`)를 구현했다.
 - `present` vocabulary는 여러 결과를 묶는 `Card`와 도메인 `SqlPreview`·`QueryChart`·`QueryTable`·
   `SimulationSummary`만 허용한다. 일반 설명·상태·경고는 공개 답변 text 또는 검증된 도메인 UI가 담당한다.
   `present` 모드는 preview-only payload, Tool 집합 교체, 자동 표 보완 제거, `agent/agent_sdk_present/` 지침을 함께 전환한다.
@@ -235,7 +371,7 @@ Backend가 소유하는 범위는 다음과 같다.
   것을 직접 재현해 확인했다. MCP는 이 SDK(0.2.152)에서 custom tool 등록의 유일한 경로이고
   이 강제 검증도 끌 수 없어(비-MCP 우회 불가), 이중 인코딩 자체를 없애는 재설계로 해결했다.
 - `present` 하나를 `present_sql_preview`·`present_chart`·`present_table`·`present_simulation`
-  4개 flat Tool로 교체했다(`services/present_service.py`, `tools/present_tool.py`,
+  4개 flat Tool로 교체했다(`services/results/present.py`, `tools/present_tool.py`,
   `agent/sdk_tools.py`). `VOCABULARY`·`present_input_schema`·`decode_present_input`·
   `to_assistant_ui_tree`·`_walk`(재귀 검증)를 삭제하고 tool별 `*_input_schema()`와
   `validate_present_<x>()`로 교체했다. `event_adapter.py`의 present 전용 디코딩 분기도 삭제해
@@ -293,7 +429,7 @@ Backend가 소유하는 범위는 다음과 같다.
 - 구조화 YAML 6종의 변경 요청 워크플로를 구현했다. 초안·이력은 SQLite, 승인 시 정규화 YAML을
   원자적으로 쓰고 store를 즉시 reload하며 실패하면 파일을 복구한다. 기준 YAML 해시가 바뀌면
   409로 막고, 정합성은 이번 변경이 새로 만든 문제만 게이트한다.
-- 정합성 규칙을 `tests`에서 `services/knowledge_integrity.py`로 옮겨 승인 게이트와 공유했다.
+- 정합성 규칙을 `tests`에서 `services/knowledge/integrity.py`로 옮겨 승인 게이트와 공유했다.
   `KnowledgeStore`는 항목별 출처 경로를 기억해 파일명과 키가 다른 파일도 제자리에서 갱신한다.
 - 인증 전환용 `Principal`과 권한 단위 의존성을 추가했다(스텁, 보안 경계 아님).
 - 결정: 초안·이력은 SQLite/최종은 YAML(단일 기준 유지), 자기 승인 기본 차단, 삭제 없이
@@ -308,7 +444,7 @@ Backend가 소유하는 범위는 다음과 같다.
 - 상세 날짜형 계획을 이 문서로 통합하고 Backend workspace 독립 계획 체계로
   전환했다.
 - SMT2020 원본·생성 DB·변환 도구를 개발용 mock 회귀 자산으로 한정했다. 자산이
-  없는 환경에서는 관련 테스트만 skip하며, 폐쇄망은 prod/real/별도 운영 지식을
+  없는 환경에서는 관련 테스트만 skip하며, 폐쇄망은 prod/production/별도 운영 지식을
   fail-fast 계약으로 강제한다.
 - 도메인 지식 관리 문서의 테이블·KPI·recipe·scenario 작성 원칙과 예시를
   SMT2020 고유 값(HVLM/LVHM, wip 등) 대신 `segment_key` 같은 데이터셋 비종속
@@ -340,10 +476,9 @@ Backend가 소유하는 범위는 다음과 같다.
 ## 검증 기준과 알려진 한계
 
 - 기본 검증: `source .venv/bin/activate && python -m pytest -q`.
-- 2026-09-22(legacy 결과 표시 모드 삭제 뒤) 기준 전체 개발 검증: **354 passed, 6
-  deselected**. 마커 제외 프로필(`not smt2020 and not smt2020_bundle and not
-  mock_service and not e2e`)은 **294 passed, 66 deselected**다. SMT2020 자산을
-  제외한 clean 복사본 수치는 이 변경 후 다시 측정하지 않았다.
+- 2026-09-23 기준 전체 개발 검증: **377 passed, 6 deselected**. 마커 제외
+  프로필(`not bundled_knowledge and not mock_service and not e2e`)은
+  **312 passed, 71 deselected**다. 이 검증은 실제 사내 provider 연결을 포함하지 않는다.
 - 재측정한 검증은 Starlette TestClient의 upstream deprecation warning 1건만 남는다.
 - E2E는 실제 CLI/provider 인증이 있는 환경에서만 `python -m pytest -m e2e`로
   실행한다.

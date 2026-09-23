@@ -15,12 +15,12 @@
 
 ## 공통 계약
 
-- SQL과 real/mock service는 읽기 전용이며 공개 함수의 시그니처와 반환 형태를 맞춘다.
+- SQL과 production/mock service는 읽기 전용이며 공개 함수의 시그니처와 반환 형태를 맞춘다.
 - `AgentEvent`, Tool payload, Result Store와 결과 UI 계약은 소비자와 함께 변경한다.
 - 구조화 지식은 `query_rules`, `aggregation_rules`, `visualization_hints`의 역할을
   구분하고 `sample_queries`에는 `question`, `sql`만 둔다.
-- `.env*`, `.playwright-mcp/`, `artifacts/`, `backend/data/`, 로컬 SMT2020 원본·DB·
-  변환 스크립트는 Git 및 폐쇄망 반입 대상이 아니다. README에는 Git 포함 자산과
+- `.env*`, `.playwright-mcp/`, `artifacts/`, `backend/data/`(생성된 합성 mock
+  SQLite 포함)는 Git 및 폐쇄망 반입 대상이 아니다. README에는 Git 포함 자산과
   별도 반입 자산을 구분한다.
 
 ## UI 작업
@@ -39,6 +39,8 @@
 - `README.md`: 사용자의 설치·실행·검증 진입점.
 - `*/plan/Todo.md`: 현재 계약·다음 작업·완료 이력의 기준.
 - `*/docs/`: 반복해서 참고하는 운영·설계 문서. 일정과 체크리스트는 두지 않는다.
+- `*/docs/`에 새로 작성하는 문서의 파일명은 대문자로 쓴다. 기존 문서를 이동하거나
+  이름을 바꾸면 README·계획·코드 주석의 링크도 함께 갱신한다.
 
 ## 기본 검증
 
