@@ -28,16 +28,19 @@
   --ink-2: #55606d;
   --ink-3: #8b939e;
 
-  /* 액센트 — 차분한 블루. streaming·running·connected·selected 등 live 상태
-     전용이며 그 연장인 focus에만 쓴다. 장식이나 일반 CTA 강조로 쓰지 않는다 —
-     1차 액션(전송 등)은 --ink 계열을 쓴다. */
+  /* 액센트 — 차분한 블루. streaming·running·connected·selected 등 live 상태와
+     focus 표시에 더해, 프로젝트 유일의 signature color를 겸한다: 1차 액션
+     (CTA) 채움, 탭 active 상태, 사이드바 로고 배지가 대상이다. 두 번째 브랜드
+     색은 들이지 않고 이 accent 하나만 확장해서 쓴다("single accent" 원칙
+     유지). live·브랜드 의미가 없는 장식적 배경이나 본문 강조에는 쓰지 않는다. */
   --accent: #2f5fd0;
   --accent-hover: #2650b4;
   --accent-weak: #eef2fc;
   --accent-ink: #ffffff;
 
-  /* 1차 액션(전송 등) 채움색과 hover. accent가 아닌 무채색 — CTA는 live
-     상태가 아니므로 accent를 쓰지 않는다. */
+  /* 무채색 hover 톤. 1차 CTA(전송 등)는 이제 accent 채움을 쓰므로, 이 색은
+     중단(취소)처럼 accent CTA와 구분해야 하는 무채색 액션의 hover와 ink
+     계열 보조 요소에 쓴다. */
   --ink-strong: #0d141d;
 
   /* Radius — assistant-ui의 의미 기반 6단계(문서/컨트롤/서피스/플로팅 카드/
@@ -145,9 +148,9 @@ body {
   --shadcn-card-foreground: var(--ink);
   --shadcn-popover: var(--canvas);
   --shadcn-popover-foreground: var(--ink);
-  /* primary는 1차 액션(CTA)이며 live 상태가 아니므로 accent가 아닌 ink를 쓴다. */
-  --shadcn-primary: var(--ink);
-  --shadcn-primary-foreground: var(--canvas);
+  /* primary는 1차 액션(CTA)이며 accent가 signature color를 겸하므로 accent를 쓴다. */
+  --shadcn-primary: var(--accent);
+  --shadcn-primary-foreground: var(--accent-ink);
   --shadcn-secondary: var(--surface-2);
   --shadcn-secondary-foreground: var(--ink);
   --shadcn-muted: var(--surface);

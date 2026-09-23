@@ -148,6 +148,24 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 
 ## 완료 이력 요약
 
+### 2026-09-23 — accent를 signature color로 확장
+
+- `--accent`(blue)를 live 상태(streaming·running·connected·selected)·focus
+  전용에서 프로젝트 유일의 signature color 겸용으로 넓혔다. Composer 전송
+  버튼, 메시지 편집 후 "저장하고 다시 실행" 버튼, 지식 편집기의 검토 요청·
+  승인·승인하고 반영 버튼, 지식 관리 탭(`tabs.tsx` line variant)의 active
+  밑줄, 사이드바 로고 배지를 ink에서 accent 채움으로 바꿨다(`globals.css`,
+  `entry-editor.tsx`, `thread.aui.tsx`, `edit-message.aui.tsx`,
+  `app-sidebar.tsx`, `ui/tabs.tsx`). `--shadcn-primary`도 accent로
+  재매핑했다. Composer 중단(취소) 버튼은 1차 CTA가 아니므로 ink를 유지했다.
+- 새 색상 토큰은 도입하지 않고 기존 `--accent`/`--accent-hover`/
+  `--accent-weak`/`--accent-ink`만 재사용했다. 라이트 테마 유지, dark mode
+  미도입 결정은 그대로다.
+- 결정과 근거는 `docs/decisions.md`의 "accent를 signature color로 확장"을
+  따른다(2026-09-22 "CTA는 ink" 결정을 대체).
+- 검증: `npm test` 101 passed, `npm run build` 성공(기존 대형 bundle warning만
+  유지), `npm run lint` 오류 0(기존 warning 4, 신규 없음).
+
 ### 2026-09-23 — 결과 조회 수명·지식 편집 lifecycle 분리
 
 - Result API client는 동일한 진행 중 요청만 공유하고 완료 응답은 보관하지 않는다.
@@ -392,10 +410,12 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 - Radius는 document(6px, `rounded`)/control(8px, `rounded-md`)/surface(10px,
   `rounded-lg`)/floating card(12px, `rounded-xl`)/thread(16px, `rounded-2xl`,
   Composer 전용)/capsule(9999px, `rounded-full`) 5단계 의미 체계를 따른다.
-  `--accent`(blue)는 streaming·running·connected·selected와 focus 전용이며
-  1차 액션(CTA)은 `--ink`/`--ink-strong`을 쓴다. 상세는
+  `--accent`(blue)는 streaming·running·connected·selected·focus에 더해
+  프로젝트 유일의 signature color를 겸해 1차 CTA·탭 active·사이드바 로고
+  배지에도 쓴다. Composer 중단 버튼 등 1차 CTA가 아닌 상태 전환 액션은
+  `--ink`/`--ink-strong`을 유지한다. 상세는
   [assistant-ui 디자인 기준](../docs/assistant-ui-design.md)과
-  `docs/decisions.md`의 "assistant-ui 디자인 적용 범위"를 참고한다.
+  `docs/decisions.md`의 "accent를 signature color로 확장"을 참고한다.
 - Tool 실행은 최종 답변보다 낮은 위계로 두고 완료 후 자동으로 접는다.
 - 표·코드에는 가로·세로 scroll cap을 적용하고 숫자·식별자는 mono와
   tabular-nums를 사용한다.

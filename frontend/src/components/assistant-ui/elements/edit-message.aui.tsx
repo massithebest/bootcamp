@@ -16,7 +16,7 @@ export function EditMessage({ children }: { children: ReactNode }) {
       )}
       <div className="flex justify-end gap-2">
         <ComposerPrimitive.Cancel className="rounded-md px-2 py-1 text-2xs text-ink-2 hover:bg-surface-2">취소</ComposerPrimitive.Cancel>
-        <ComposerPrimitive.Send className="rounded-md bg-ink px-2 py-1 text-2xs text-canvas hover:bg-ink-strong disabled:opacity-40">저장하고 다시 실행</ComposerPrimitive.Send>
+        <ComposerPrimitive.Send className="rounded-md bg-accent px-2 py-1 text-2xs text-accent-ink hover:bg-accent-hover disabled:opacity-40">저장하고 다시 실행</ComposerPrimitive.Send>
       </div>
     </ComposerPrimitive.Root>
   );

@@ -643,6 +643,7 @@ Inspector는 `absolute` overlay만 적용해 중앙 Chat의 grid 폭을 소비�
   thread(16px), capsule 체계를 사용한다. thread radius는 Composer 등 제품 surface에만 쓴다.
 - blue accent는 streaming·running·connected·selected와 focus에 사용하고, CTA는 ink 계열을 쓴다.
   기존 텍스트 링크와 pane resize affordance의 accent는 범위를 넓히지 않는 조건으로 유지한다.
+  (2026-09-23 결정으로 대체, "accent를 signature color로 확장" 참고.)
 - 장식적 gradient·glass·과도한 shadow와 전면 카드화를 피하고 상태는 색만으로 전달하지 않는다.
 
 ## assistant-ui 통합 전환 (2026-09-22, 활성)
@@ -697,3 +698,25 @@ Inspector는 `absolute` overlay만 적용해 중앙 Chat의 grid 폭을 소비�
   `/api/visualizations` client(`visualization-api.ts`)는 2026-09-22에 삭제했다. Backend가
   더 이상 `prepare_table`/`prepare_visualization`을 호출하지 않는다(사용자 결정으로 별도
   observation gate 없이 즉시 제거).
+
+## accent를 signature color로 확장 (2026-09-23, 활성)
+
+**배경**: "assistant-ui 디자인 적용 범위(2026-09-22)"에서 accent를 live 상태
+(streaming·running·connected·selected)와 focus 전용으로 좁히고 CTA는 ink로
+되돌렸다. 이후 제품 요구로 프로젝트 전체에 드러나는 signature color가
+필요해졌고, 새 색을 들이는 대신 기존 accent를 그 용도로 겸하기로 했다.
+
+**결정**: accent(blue, `#2f5fd0`)는 이제 live 상태·focus에 더해 프로젝트
+유일의 signature color를 겸한다. 1차 CTA 채움(지식 편집기 검토 요청·승인,
+Composer 전송 버튼과 메시지 편집 후 "저장하고 다시 실행" 버튼), 탭 active
+상태, 사이드바 로고 배지에 적용한다. 두 번째 브랜드 색은 들이지 않는다
+("single accent" 원칙 유지). Composer의 중단(취소) 버튼처럼 1차 CTA가 아닌
+상태 전환 액션은 계속 ink 계열을 쓴다.
+
+**영향**: `--shadcn-primary`를 `--ink`에서 `--accent`로 바꿔 shadcn 기본
+`<Button variant="default">`도 같은 정책을 따르게 했다(현재 이 variant를
+쓰는 feature 코드는 없어 시각적 영향은 없음).
+
+**대체 관계**: "assistant-ui 디자인 적용 범위(2026-09-22)"의 "CTA는 ink
+계열을 쓴다" 불릿을 대체한다. 기존 텍스트 링크·pane resize affordance의
+accent 유지 결정은 그대로 유효하다.

@@ -132,7 +132,7 @@ function Composer({ autoFocus }: { autoFocus: boolean }) {
         <div className="flex shrink-0 items-center gap-2">
         <AuiIf condition={(s) => !s.thread.isRunning}>
           <ComposerPrimitive.Send asChild>
-            <TooltipIconButton tooltip="전송" className="size-8 rounded-md bg-ink text-canvas hover:bg-ink-strong hover:text-canvas disabled:bg-surface-2 disabled:text-ink-3"><ArrowUpIcon /></TooltipIconButton>
+            <TooltipIconButton tooltip="전송" className="size-8 rounded-md bg-accent text-accent-ink hover:bg-accent-hover hover:text-accent-ink disabled:bg-surface-2 disabled:text-ink-3"><ArrowUpIcon /></TooltipIconButton>
           </ComposerPrimitive.Send>
         </AuiIf>
         <AuiIf condition={(s) => s.thread.isRunning}>

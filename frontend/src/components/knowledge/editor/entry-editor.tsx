@@ -24,8 +24,8 @@ type Content = { mode: "form"; data: FieldData } | { mode: "yaml"; yaml: string 
 type Tab = "form" | "yaml" | "review";
 const TABS: { id: Tab; label: string }[] = [{ id: "form", label: "입력 폼" }, { id: "yaml", label: "원문 YAML" }, { id: "review", label: "변경 검토" }];
 const payload = (content: Content): ChangeContent => content.mode === "form" ? { data: content.data } : { yaml: content.yaml };
-// 승인·검토 요청 등 1차 액션. live 상태가 아니므로 accent가 아닌 ink 채움을 쓴다.
-const primaryButton = "rounded border border-ink bg-ink px-3 py-1.5 text-ui text-canvas hover:bg-ink-strong focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
+// 승인·검토 요청 등 1차 액션. accent가 signature color를 겸하므로 accent 채움을 쓴다.
+const primaryButton = "rounded border border-accent bg-accent px-3 py-1.5 text-ui text-accent-ink hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
 
 /** 구조화 지식 하나의 편집·검토·승인 화면. 초안은 서버 변경 요청으로 저장되고 승인 전에는 런타임에 반영되지 않는다. */
 export const EntryEditor = forwardRef<EntryEditorHandle, Props>(function EntryEditor({ target, me, onDirtyChange, onTarget, onClose }, ref) {

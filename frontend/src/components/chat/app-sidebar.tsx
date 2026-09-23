@@ -27,7 +27,7 @@ export function AppSidebar({ onSelectSession, onNewChat, onCollapse, onOpenKnowl
   return (
     <div className="flex h-full flex-col bg-surface">
       <div className="flex h-14 shrink-0 items-center gap-2 px-3">
-        <span className="grid size-6 place-items-center rounded bg-ink text-2xs font-semibold text-canvas">FP</span>
+        <span className="grid size-6 place-items-center rounded bg-accent text-2xs font-semibold text-accent-ink">FP</span>
         <span className="flex-1 text-ui font-semibold">P&amp;T FP agent</span>
         <TooltipIconButton tooltip="사이드바 접기" onClick={onCollapse}><PanelLeftCloseIcon /></TooltipIconButton>
       </div>
