@@ -1,37 +1,33 @@
-"""SMT2020 converter schema, counts, atomic replacement, and joins."""
+"""Synthetic mock database generator: schema, counts, atomic replacement, and joins."""
 
-import csv
-import shutil
 import sqlite3
 from pathlib import Path
 
 import pytest
 
 from core.config import KNOWLEDGE_DIR
-from services.knowledge_service import KnowledgeStore
+from scripts import generate_mock_database
+from services.knowledge.catalog import KnowledgeStore
 from services.mock.mock_simulation_service import _input_validation
-from services.sql_guard import check_sql
+from services.sql.guard import check_sql
 
 
-pytestmark = [pytest.mark.smt2020, pytest.mark.mock_service]
+pytestmark = [pytest.mark.mock_service]
 
 
 EXPECTED_COUNTS = {
-    "HVLM": {"part": 2, "route_step": 926, "tool": 106, "orders": 5, "wip": 2255,
-             "setup": 13, "setup_group": 9, "down_calendar": 11, "pm_calendar": 292,
-             "calendar_attach": 303, "transport": 1},
-    "LVHM": {"part": 10, "route_step": 4013, "tool": 106, "orders": 21, "wip": 2156,
-             "setup": 13, "setup_group": 9, "down_calendar": 11, "pm_calendar": 292,
-             "calendar_attach": 303, "transport": 1},
+    "SEG_A": {"part": 2, "route_step": 926, "tool": 106, "orders": 5, "wip": 2255,
+              "setup": 13, "setup_group": 9, "down_calendar": 11, "pm_calendar": 292,
+              "calendar_attach": 303, "transport": 1},
+    "SEG_B": {"part": 10, "route_step": 4013, "tool": 106, "orders": 21, "wip": 2156,
+              "setup": 13, "setup_group": 9, "down_calendar": 11, "pm_calendar": 292,
+              "calendar_attach": 303, "transport": 1},
 }
 
 
 @pytest.fixture(scope="module")
-def db(tmp_path_factory, smt2020_assets) -> Path:
-    return smt2020_assets.main(
-        smt2020_assets.DEFAULT_SOURCE_ROOT,
-        tmp_path_factory.mktemp("smt") / "smt2020.db",
-    )
+def db(tmp_path_factory, mock_database) -> Path:
+    return mock_database.main(tmp_path_factory.mktemp("mock") / "mock_planning.db")
 
 
 def test_tables_and_counts(db: Path) -> None:
@@ -39,13 +35,18 @@ def test_tables_and_counts(db: Path) -> None:
         tables = {row[0] for row in conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table'"
         )}
-        assert tables == set(EXPECTED_COUNTS["HVLM"])
+        assert tables == set(EXPECTED_COUNTS["SEG_A"]) | set(
+            generate_mock_database.STANDALONE_TABLE_COLUMNS
+        )
         for dataset, expected in EXPECTED_COUNTS.items():
             for table, count in expected.items():
                 actual = conn.execute(
                     f'SELECT COUNT(*) FROM "{table}" WHERE dataset = ?', (dataset,)
                 ).fetchone()[0]
                 assert actual == count, (dataset, table)
+        for table, count in generate_mock_database.STANDALONE_ROW_COUNTS.items():
+            actual = conn.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
+            assert actual == count, table
 
 
 def test_schema_types_and_reserved_names(db: Path) -> None:
@@ -96,14 +97,6 @@ def test_expected_indexes_exist(db: Path) -> None:
             "SELECT name FROM sqlite_master WHERE type='index'"
         )}
     assert expected <= actual
-
-
-def test_hvlm_short_wip_row_is_padded_with_null(db: Path) -> None:
-    with sqlite3.connect(db) as conn:
-        row = conn.execute(
-            "SELECT hotlot, trace FROM wip WHERE dataset='HVLM' AND lot='Init_Lot_3_2'"
-        ).fetchone()
-    assert row == (None, None)
 
 
 @pytest.mark.parametrize(
@@ -161,7 +154,7 @@ def test_scenario_expectations_match_generated_database(
 ) -> None:
     from core import config
 
-    monkeypatch.setattr(config, "SMT2020_DB_PATH", db)
+    monkeypatch.setattr(config, "MOCK_DB_PATH", db)
     store = KnowledgeStore.load(KNOWLEDGE_DIR)
 
     for scenario in store.scenarios.values():
@@ -180,34 +173,28 @@ def test_scenario_expectations_match_generated_database(
         }
 
 
-def test_repeated_build_is_deterministic(tmp_path: Path, smt2020_assets) -> None:
-    target = tmp_path / "smt2020.db"
-    smt2020_assets.main(smt2020_assets.DEFAULT_SOURCE_ROOT, target)
+def test_repeated_build_is_deterministic(tmp_path: Path, mock_database) -> None:
+    target = tmp_path / "mock_planning.db"
+    mock_database.main(target)
     with sqlite3.connect(target) as conn:
         first = conn.execute("SELECT dataset, part, route FROM part ORDER BY 1,2").fetchall()
-    smt2020_assets.main(smt2020_assets.DEFAULT_SOURCE_ROOT, target)
+    mock_database.main(target)
     with sqlite3.connect(target) as conn:
         second = conn.execute("SELECT dataset, part, route FROM part ORDER BY 1,2").fetchall()
     assert first == second
 
 
-def test_failed_rebuild_keeps_previous_database(tmp_path: Path, smt2020_assets) -> None:
-    target = tmp_path / "smt2020.db"
-    smt2020_assets.main(smt2020_assets.DEFAULT_SOURCE_ROOT, target)
+def test_failed_build_keeps_previous_database(
+    tmp_path: Path, mock_database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "mock_planning.db"
+    mock_database.main(target)
     before = target.read_bytes()
-    broken = tmp_path / "datasets"
-    shutil.copytree(
-        smt2020_assets.DEFAULT_SOURCE_ROOT / "SMT2020_HVLM",
-        broken / "SMT2020_HVLM",
-    )
-    shutil.copytree(
-        smt2020_assets.DEFAULT_SOURCE_ROOT / "SMT2020_LVHM",
-        broken / "SMT2020_LVHM",
-    )
-    part = broken / "SMT2020_HVLM" / "part.txt"
-    rows = list(csv.reader(part.open(encoding="utf-8"), delimiter="\t"))
-    rows[0][0] = "BROKEN"
-    part.write_text("\n".join("\t".join(row) for row in rows) + "\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="헤더"):
-        smt2020_assets.main(broken, target)
+
+    def _broken(*args, **kwargs):
+        raise RuntimeError("synthetic failure")
+
+    monkeypatch.setattr(mock_database, "_create_database", _broken)
+    with pytest.raises(RuntimeError, match="synthetic failure"):
+        mock_database.main(target)
     assert target.read_bytes() == before

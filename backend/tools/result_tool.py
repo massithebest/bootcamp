@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from services.result_store import ResultMeta, ResultStore, get_result_store, summarize_dataframe
+from services.results.store import ResultMeta, ResultStore, get_result_store, summarize_dataframe
 
 
 def _not_found(result_id: str) -> dict:

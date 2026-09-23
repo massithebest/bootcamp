@@ -12,9 +12,9 @@ from typing import Any
 
 import pandas as pd
 
-from services.chart_projection import _json_value, project_chart
-from services.query_result_errors import QueryResultError, query_error
-from services.result_store import (
+from services.results.chart import _json_value, project_chart
+from services.results.errors import QueryResultError, query_error
+from services.results.store import (
     ResultMeta,
     ResultStore,
     dataframe_rows,

@@ -1,5 +1,5 @@
 recipe_id: part_route_tool_summary
-name: SMT2020 Part별 Route·설비 연결 요약
+name: Part별 Route·설비 연결 요약
 description: Part의 Route Step 수와 요구·연결된 설비 Family 수를 dataset-safe JOIN으로 계산한다.
 cte_name: part_route_tool_summary
 cte_sql: |
@@ -22,17 +22,17 @@ sources: [part, route_step, tool]
 when_to_use:
   - Part별 전체 공정 Step 수를 조회할 때
   - Route가 요구하는 설비 Family가 tool master에 연결되는지 확인할 때
-  - HVLM과 LVHM의 Route 복잡도를 비교할 때
+  - SEG_A와 SEG_B의 Route 복잡도를 비교할 때
 output_grain: [dataset, part, route]
 output_columns:
-  - {name: dataset, role: category, desc: benchmark 구분}
+  - {name: dataset, role: category, desc: 세그먼트 구분}
   - {name: part, role: category, desc: Part ID}
   - {name: route, role: category, desc: Route ID}
   - {name: step_count, role: measure, unit: step, desc: Route의 공정 Step 수}
   - {name: required_tool_family_count, role: measure, unit: family, desc: Route가 참조하는 고유 STNFAM 수}
   - {name: matched_tool_family_count, role: measure, unit: family, desc: tool master에 연결된 고유 STNFAM 수}
 query_rules:
-  - 특정 benchmark 질문은 바깥 SELECT에서 dataset을 필수로 제한한다
+  - 특정 세그먼트 질문은 바깥 SELECT에서 dataset을 필수로 제한한다
   - Route 복잡도 순위는 step_count를 기준으로 정렬하고 동률이면 part를 함께 정렬한다
   - 설비 연결 누락은 required_tool_family_count와 matched_tool_family_count의 차이로 필터한다
 aggregation_rules:
@@ -43,11 +43,11 @@ visualization_hints:
   - Part별 step_count 비교에는 bar 차트가 적합하다
   - 연결 누락은 required_tool_family_count와 matched_tool_family_count의 차이로 표에 표시한다
 sample_queries:
-  - question: LVHM에서 Route Step이 가장 많은 Part는 무엇이야?
+  - question: SEG_B에서 Route Step이 가장 많은 Part는 무엇이야?
     sql: |
       SELECT *
       FROM part_route_tool_summary
-      WHERE dataset = 'LVHM'
+      WHERE dataset = 'SEG_B'
       ORDER BY step_count DESC
       LIMIT 1
   - question: 설비 Family 연결이 완전하지 않은 Part가 있어?
@@ -60,4 +60,4 @@ active: true
 status: draft
 owner: ""
 updated: 2026-09-15
-source: SMT2020 part.txt, route_*.txt, tool.txt.1l과 생성 SQLite 검증
+source: scripts/generate_mock_database.py 합성 생성 결과 검증

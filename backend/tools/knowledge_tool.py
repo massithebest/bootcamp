@@ -8,7 +8,7 @@
 (`search_documents`) 결과 렌더링에 쓰고 있어 충돌한다.
 """
 
-from services.knowledge_service import get_store
+from services.knowledge.catalog import get_store
 
 
 def _catalog(catalog_type: str, data, verified: bool | None = None) -> dict:

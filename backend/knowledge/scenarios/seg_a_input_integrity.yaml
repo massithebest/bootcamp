@@ -1,24 +1,24 @@
-scenario_id: hvlm_input_integrity
-name: SMT2020 HVLM 초기 WIP·Route 입력 검증
-description: HVLM의 초기 WIP 집계, Part별 Route 연결과 simulation 입력 정합성을 함께 확인한다.
-dataset: HVLM
-question: HVLM의 제품별 초기 WIP와 공정 Step 수를 조회하고 입력 관계가 완전한지 확인해줘.
+scenario_id: seg_a_input_integrity
+name: SEG_A 초기 WIP·Route 입력 검증
+description: SEG_A의 초기 WIP 집계, Part별 Route 연결과 simulation 입력 정합성을 함께 확인한다.
+dataset: SEG_A
+question: SEG_A의 제품별 초기 WIP와 공정 Step 수를 조회하고 입력 관계가 완전한지 확인해줘.
 steps:
   - action: recipe
     ref: initial_wip_by_part
-    params: {dataset: HVLM}
-    expectation: 2개 Part의 합계가 2255 Lot, 56375 pieces다.
+    params: {dataset: SEG_A}
+    expectation: 2개 Part의 초기 WIP Lot 합계가 2255건이다.
   - action: recipe
     ref: part_route_tool_summary
-    params: {dataset: HVLM}
+    params: {dataset: SEG_A}
     expectation: 2개 Part와 926개 Route Step이 조회되고 설비 Family 연결 차이가 없다.
   - action: recipe
     ref: wip_integrity_diagnostics
-    params: {dataset: HVLM}
+    params: {dataset: SEG_A}
     expectation: 세 연결 누락 지표가 0이고 dataset 생략 및 Route 조인 위험을 원본 오류와 구분한다.
   - action: simulation
-    ref: SMT2020_입력검증
-    params: {dataset: HVLM}
+    ref: 입력_정합성_검증
+    params: {dataset: SEG_A}
     expectation: 다섯 핵심 관계의 unmatched_rows가 모두 0이다.
 expected:
   table_counts:
@@ -43,4 +43,4 @@ active: true
 status: draft
 owner: ""
 updated: 2026-09-15
-source: SMT2020 HVLM 원본과 생성 SQLite의 고정 인수 기준
+source: scripts/generate_mock_database.py 합성 생성 결과의 고정 인수 기준

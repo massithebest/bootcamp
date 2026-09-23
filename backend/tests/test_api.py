@@ -247,7 +247,7 @@ def test_knowledge_catalog_endpoint() -> None:
 
     assert response.status_code == 200
     tables = response.json()
-    assert len(tables) == 11
+    assert len(tables) == 12
     assert {table["table"] for table in tables} == {
         "part",
         "route_step",
@@ -260,6 +260,7 @@ def test_knowledge_catalog_endpoint() -> None:
         "pm_calendar",
         "calendar_attach",
         "transport",
+        "FP_TARGET",
     }
     assert set(tables[0]) == {"table", "description", "grain", "tags", "verified"}
 

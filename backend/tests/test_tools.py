@@ -6,9 +6,9 @@ import inspect
 import pytest
 
 from agent.sdk_tools import TOOL_NAMES
-from services import result_store
-from services.document_store import KnowledgeError
-from services.result_store import LocalParquetResultStore
+from services.results import store as result_store
+from services.knowledge.documents import KnowledgeError
+from services.results.store import LocalParquetResultStore
 from tools.knowledge_tool import (
     describe_table,
     get_kpi,
@@ -50,11 +50,9 @@ ALL_TOOLS = (
 
 
 @pytest.fixture()
-def seeded_db(tmp_path, monkeypatch, smt2020_assets):
-    db_path = smt2020_assets.main(
-        smt2020_assets.DEFAULT_SOURCE_ROOT, tmp_path / "smt2020.db"
-    )
-    monkeypatch.setattr("core.config.SMT2020_DB_PATH", db_path)
+def seeded_db(tmp_path, monkeypatch, mock_database):
+    db_path = mock_database.main(tmp_path / "mock_planning.db")
+    monkeypatch.setattr("core.config.MOCK_DB_PATH", db_path)
     monkeypatch.setattr(
         result_store, "_store", LocalParquetResultStore(tmp_path / "results")
     )
@@ -74,7 +72,7 @@ def test_tool_names_cover_every_tool() -> None:
 
 def test_execute_sql_returns_database_kind(seeded_db) -> None:
     result = asyncio.run(
-        execute_sql("SELECT part FROM part WHERE dataset='HVLM'", purpose="Part 확인")
+        execute_sql("SELECT part FROM part WHERE dataset='SEG_A'", purpose="Part 확인")
     )
 
     assert result["status"] == "ok"
@@ -115,8 +113,8 @@ def test_list_simulation_returns_dict() -> None:
 def test_run_simulation_returns_dict(seeded_db) -> None:
     result = asyncio.run(
         run_simulation(
-            simulation_type="SMT2020_입력검증",
-            params={"dataset": "HVLM"},
+            simulation_type="입력_정합성_검증",
+            params={"dataset": "SEG_A"},
         )
     )
     assert isinstance(result, dict)
@@ -183,7 +181,7 @@ def test_get_result_summary_unknown_id_is_error() -> None:
 def test_get_result_page_returns_slice(seeded_db) -> None:
     saved = asyncio.run(
         execute_sql(
-            "SELECT part, route FROM part WHERE dataset='LVHM' ORDER BY part",
+            "SELECT part, route FROM part WHERE dataset='SEG_B' ORDER BY part",
             purpose="Part 목록 확인",
         )
     )
@@ -191,7 +189,7 @@ def test_get_result_page_returns_slice(seeded_db) -> None:
     result = asyncio.run(get_result_page(saved["result_id"], offset=1, limit=2))
 
     assert result["status"] == "ok"
-    assert result["rows"] == [["part_10", "r_10"], ["part_2", "r_2"]]
+    assert result["rows"] == [["part_10", "route_10"], ["part_2", "route_2"]]
     assert result["row_count"] == 10
 
 

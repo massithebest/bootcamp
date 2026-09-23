@@ -5,7 +5,7 @@ import os
 import pytest
 
 from core import config
-from services.document_store import DocumentStore
+from services.knowledge.documents import DocumentStore
 
 pytestmark = pytest.mark.e2e
 

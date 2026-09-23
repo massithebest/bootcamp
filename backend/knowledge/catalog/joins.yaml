@@ -3,7 +3,7 @@
   to: route_step
   on: [dataset, route]
   kind: left
-  note: dataset이 빠지면 HVLM/LVHM의 동일 route가 교차 조인된다
+  note: dataset이 빠지면 SEG_A/SEG_B의 동일 route가 교차 조인된다
 - name: Route Step의 설비 Family
   from: route_step
   to: tool

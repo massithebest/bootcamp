@@ -6,8 +6,8 @@ import pytest
 
 from core import config
 from main import app
-from services.document_store import DocumentStore, KnowledgeError
-from services.knowledge_service import get_store
+from services.knowledge.documents import DocumentStore, KnowledgeError
+from services.knowledge.catalog import get_store
 from agent.sdk_tools import TOOL_NAMES, build_planning_mcp_server
 from mcp_types import PaginatedRequestParams
 from tools.rag_tool import search_documents

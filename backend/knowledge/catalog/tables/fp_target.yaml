@@ -1,0 +1,59 @@
+table: FP_TARGET
+description: >-
+  FP(생산계획) 결과 IF 테이블. 계획·실적·swap 수량과 제품 속성을 담는 생산계획
+  단일원천(single source of truth)이다.
+grain: [FAC_ID, PLAN_PROD_ID, WORK_DT, SALES_BATCH_CD]
+time_column: WORK_DT
+tags: [FP, 생산계획, 계획실적, Swap]
+columns:
+  - {name: MP_VER, type: varchar, desc: MP(마스터플랜) 버전}
+  - {name: FAC_ID, type: varchar, desc: "공정 ID. 사이트 식별용 PNT_SITE_CD와 혼동하지 않는다"}
+  - {name: PLAN_DT, type: datetime, desc: "FP IF 결과 생성일. WORK_DT(실제 작업일)와 다른 개념"}
+  - {name: PLAN_OPT_CD, type: varchar, desc: 계획옵션코드, codes: {X: 미수립계획, N: "정상 계획(그 외 값 포함)"}}
+  - {name: PLAN_PROD_ID, type: varchar, desc: "계획 제품 ID. 제품/계획 질의의 필수 컬럼"}
+  - {name: WORK_YM, type: varchar, desc: 제품 계획 년월(실제 작업 월, YYYYMM)}
+  - {name: PLAN_QTY, type: number, desc: "계획수량. 계획 질의에서는 통상 0보다 큰 행만 본다"}
+  - {name: ACT_QTY, type: number, desc: "조치수량(실적). NULL 가능 — 집계 시 NVL(ACT_QTY, 0) 사용"}
+  - {name: REMAIN_PLAN_QTY, type: number, desc: 잔여계획수량}
+  - {name: GRADE_CD, type: varchar, desc: 등급코드}
+  - {name: SWAP_QTY, type: number, desc: "스와핑 수량. 스왑잔여계획수량·swap 완료 여부 판단용"}
+  - {name: SALES_BATCH_CD, type: varchar, desc: "영업배치코드. 계획실적 질의 시 필수"}
+  - {name: PNT_SITE_CD, type: varchar, desc: "PNT 사이트 코드. 사이트 식별용, FAC_ID(공정 ID)와 혼동하지 않는다"}
+  - {name: COMPLT_DT, type: datetime, desc: 완료 납기일자}
+  - {name: PLAN_STATE_DT, type: datetime, desc: 계획시작일자(YYYYMMDD)}
+  - {name: PRIORTY, type: int, desc: "우선순위. 숫자가 작을수록 우선순위가 높다"}
+  - {name: PRODUCT_GUBUN, type: varchar, desc: 제품구분}
+  - {name: OUT_AREA, type: varchar, desc: 출하 지역코드}
+  - {name: USER_TARGET_QTY, type: number, desc: 사용자 타겟 수량}
+  - {name: TARGET_QTY, type: number, desc: "타겟수량. 일할(비례배분) 수량이 저장될 수 있어 정수로 반올림하지 않는다"}
+  - {name: WORK_DT, type: datetime, desc: 제품 계획 일자(YYYYMMDD, 실제 작업일자)}
+joins: []
+caveats:
+  - "FAC_ID(공정 ID)와 PNT_SITE_CD(사이트 ID)는 서로 다른 식별자이므로 섞어 쓰지 않는다"
+  - ACT_QTY는 NULL일 수 있으므로 합계·평균 계산 시 NVL(ACT_QTY, 0)을 적용한다
+  - TARGET_QTY는 일할 계산으로 소수 값이 저장될 수 있어 정수로 취급하지 않는다
+  - "grain(FAC_ID, PLAN_PROD_ID, WORK_DT, SALES_BATCH_CD)은 실제 PK가 아직 확인되지 않은 추정값이다"
+query_rules:
+  - 제품 기준 질의는 PLAN_PROD_ID를 필수로 포함한다
+  - 계획실적(계획 대비 실적) 질의는 SALES_BATCH_CD를 필수로 포함한다
+  - 계획 수량 기준 질의는 PLAN_QTY > 0 조건을 기본으로 적용한다
+  - 미수립계획(PLAN_OPT_CD = 'X')을 포함할지는 질문에서 명시적으로 요청했을 때만 포함한다
+aggregation_rules:
+  - "실적 합계는 SUM(NVL(ACT_QTY, 0))로 계산하고 ACT_QTY IS NULL 행을 제외하지 않는다"
+  - PLAN_QTY, ACT_QTY, TARGET_QTY는 단위가 같다고 단정하지 않고 컬럼별로 따로 집계한다
+visualization_hints:
+  - PLAN_PROD_ID 또는 FAC_ID별 PLAN_QTY·ACT_QTY 비교에는 bar 차트가 적합하다
+  - WORK_DT 추이에 따른 계획 대비 실적 비교에는 line 차트가 적합하다
+sample_queries:
+  - question: FAC_ID별 계획수량과 실적수량 합계는 얼마야?
+    sql: |
+      SELECT FAC_ID, SUM(PLAN_QTY) AS plan_qty_sum, SUM(COALESCE(ACT_QTY, 0)) AS act_qty_sum
+      FROM FP_TARGET
+      WHERE PLAN_QTY > 0
+      GROUP BY FAC_ID
+      ORDER BY FAC_ID
+active: true
+status: draft
+owner: ""
+updated: 2026-09-23
+source: 사용자 제공 실제 폐쇄망 테이블 정의(2026-09-23) — 값 도메인·row 규모는 합성 추정치

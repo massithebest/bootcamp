@@ -15,15 +15,15 @@ from api.schemas import (KnowledgeDocumentInput, KnowledgeDocumentUpdate, Knowle
     KnowledgeValidationResponse)
 from core.config import KNOWLEDGE_PERMISSION_APPROVE, KNOWLEDGE_PERMISSION_WRITE
 from core.principal import Principal, current_principal, require
-from services import knowledge_writer
-from services.document_store import KnowledgeError, get_document_store
-from services.knowledge_browser import entries
-from services.knowledge_change_store import get_change_store
-from services.knowledge_guides import guide
-from services.knowledge_yaml import model_to_data
+from services.knowledge import writer as knowledge_writer
+from services.knowledge.documents import KnowledgeError, get_document_store
+from services.knowledge.browser import entries
+from services.knowledge.changes import get_change_store
+from services.knowledge.guides import guide
+from services.knowledge.yaml_codec import model_to_data
 
 from agent.agent import AGENT_SDK_CWD
-from services.knowledge_service import get_store
+from services.knowledge.catalog import get_store
 
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])

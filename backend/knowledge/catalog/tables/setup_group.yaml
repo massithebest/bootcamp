@@ -1,9 +1,9 @@
 table: setup_group
-description: SMT2020 setup group별 setup 상태와 최소 run 조건
+description: setup group별 setup 상태와 최소 run 조건
 grain: [dataset, setup]
-tags: [SMT2020, Setup, Group]
+tags: [Setup, Group]
 columns:
-  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: dataset, type: varchar, desc: "생산 세그먼트 구분 (SEG_A 또는 SEG_B)"}
   - {name: setupgrp, type: varchar, desc: Setup group}
   - {name: setup, type: varchar, desc: Setup 상태}
   - {name: minrun, type: int, desc: 최소 run 값}
@@ -13,15 +13,15 @@ joins:
 caveats:
   - 빈 setupgrp은 NULL로 보존하며 이전 행의 group을 채우지 않는다
 query_rules:
-  - 특정 benchmark 질문은 dataset을 필수로 제한한다
+  - 특정 세그먼트 질문은 dataset을 필수로 제한한다
   - tool과 조인할 때 dataset과 setupgrp을 함께 사용하고 NULL setupgrp을 다른 행 값으로 채우지 않는다
 aggregation_rules:
   - setup 상태 수는 dataset과 setup 기준으로 센다
 visualization_hints:
-  - benchmark 또는 setupgrp별 setup 상태 수 비교에는 bar 차트가 적합하다
+  - 세그먼트 또는 setupgrp별 setup 상태 수 비교에는 bar 차트가 적합하다
   - setupgrp·setup·minrun의 개별 관계는 차트보다 표가 적합하다
 sample_queries:
-  - question: benchmark별 setup group 상태는 몇 건이야?
+  - question: 세그먼트별 setup group 상태는 몇 건이야?
     sql: |
       SELECT dataset, COUNT(*) AS setup_state_count
       FROM setup_group
@@ -31,4 +31,4 @@ active: true
 status: verified
 owner: ""
 updated: 2026-09-15
-source: SMT2020 setupgrp.txt 직접 확인
+source: scripts/generate_mock_database.py 합성 생성 확인

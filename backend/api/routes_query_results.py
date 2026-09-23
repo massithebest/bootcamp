@@ -9,9 +9,9 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from api.schemas import QueryChartResponse, QueryPreviewResponse, QueryTableResponse
 from core.config import SESSION_SCOPE_COOKIE_NAME
-from services.query_result_errors import QueryResultError
-from services.query_result_service import read_chart, read_preview, read_table
-from services.result_store import get_result_store
+from services.results.errors import QueryResultError
+from services.results.query import read_chart, read_preview, read_table
+from services.results.store import get_result_store
 
 
 router = APIRouter()

@@ -1,7 +1,7 @@
 """Read-only projection of YAML and versioned text knowledge for the UI."""
-from services.knowledge_service import get_store
-from services.document_store import get_document_store, normalize
-from services.knowledge_change_store import get_change_store
+from services.knowledge.catalog import get_store
+from services.knowledge.documents import get_document_store, normalize
+from services.knowledge.changes import get_change_store
 from services.service_logging import logged_service_operation
 
 

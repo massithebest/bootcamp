@@ -1,4 +1,4 @@
-"""Mock SQL service — SMT2020 SQLite를 실제로 조회한다. (설계 §4)
+"""Mock SQL service — 합성 mock SQLite를 실제로 조회한다. (설계 §4)
 
 더미 행을 만들지 않는다. 지식 → SQL → 결과 → 원인 판정 흐름을 실제 DB 없이도
 끝까지 시험할 수 있어야 하기 때문이다.
@@ -10,12 +10,12 @@ import sqlite3
 
 import pandas as pd
 
-from services.knowledge_service import get_store
-from services.mock._sqlite import MISSING_DB_MESSAGE, Smt2020DbMissingError, connect
-from services.query_result_service import tool_preview
-from services.result_store import get_result_store
+from services.knowledge.catalog import get_store
+from services.mock._sqlite import MISSING_DB_MESSAGE, MockDbMissingError, connect
+from services.results.query import tool_preview
+from services.results.store import get_result_store
 from services.service_logging import logged_service_operation
-from services.sql_guard import MAX_ROWS, SqlGuardError, check_sql
+from services.sql.guard import MAX_ROWS, SqlGuardError, check_sql
 
 
 def _error(message: str, sql: str) -> dict:
@@ -23,7 +23,7 @@ def _error(message: str, sql: str) -> dict:
 
 
 class MockSQLService:
-    """RealSQLService 와 동일한 인터페이스를 갖는 mock 구현."""
+    """ProductionSQLService 와 동일한 인터페이스를 갖는 mock 구현."""
 
     async def execute_sql(
         self, sql: str, purpose: str, *, access_scope: str | None = None
@@ -38,7 +38,7 @@ class MockSQLService:
 
         try:
             conn = connect()
-        except Smt2020DbMissingError:
+        except MockDbMissingError:
             return _error(MISSING_DB_MESSAGE, sql)
 
         allowed_lower = {name.lower() for name in allowed_tables}

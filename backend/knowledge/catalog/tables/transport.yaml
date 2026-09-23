@@ -1,9 +1,9 @@
 table: transport
-description: SMT2020 위치 간 운반 시간 분포
+description: 위치 간 운반 시간 분포
 grain: [dataset, fromloc, toloc]
-tags: [SMT2020, 물류, 이동시간, Location]
+tags: [물류, 이동시간, Location]
 columns:
-  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: dataset, type: varchar, desc: "생산 세그먼트 구분 (SEG_A 또는 SEG_B)"}
   - {name: fromloc, type: varchar, desc: 출발 위치}
   - {name: toloc, type: varchar, desc: 도착 위치}
   - {name: ddist, type: varchar, desc: 이동시간 분포}
@@ -14,7 +14,7 @@ joins: []
 caveats:
   - dtime/dtime2는 ddist와 dunits를 포함해 해석한다
 query_rules:
-  - 특정 benchmark 질문은 dataset을 필수로 제한한다
+  - 특정 세그먼트 질문은 dataset을 필수로 제한한다
   - 운반시간을 조회할 때 fromloc, toloc, ddist, dunits를 함께 조회한다
 aggregation_rules:
   - 이동시간은 dataset과 위치 쌍별 분포 파라미터이며 단순 실적 합계가 아니다
@@ -22,7 +22,7 @@ visualization_hints:
   - 같은 분포·단위의 위치 쌍별 dtime 비교에는 bar 차트가 적합하다
   - 분포 파라미터 전체 설명은 차트보다 표가 적합하다
 sample_queries:
-  - question: benchmark의 Fab 내부 운반시간 분포는 어떻게 정의돼 있어?
+  - question: 세그먼트의 Fab 내부 운반시간 분포는 어떻게 정의돼 있어?
     sql: |
       SELECT dataset, fromloc, toloc, ddist, dtime, dtime2, dunits
       FROM transport
@@ -31,4 +31,4 @@ active: true
 status: verified
 owner: ""
 updated: 2026-09-15
-source: SMT2020 fromto.txt 직접 확인
+source: scripts/generate_mock_database.py 합성 생성 확인

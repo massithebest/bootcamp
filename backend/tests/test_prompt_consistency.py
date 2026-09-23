@@ -13,7 +13,7 @@ import pytest
 from agent.agent import AGENT_SDK_CWD
 from agent.sdk_tools import TOOL_NAMES, planning_tools
 from agent.system_prompt import SYSTEM_PROMPT
-from services.knowledge_service import get_store
+from services.knowledge.catalog import get_store
 
 
 CLAUDE_MD = Path(AGENT_SDK_CWD) / "CLAUDE.md"
@@ -134,6 +134,37 @@ def test_present_tool_descriptions_forbid_position_words_and_raw_tree() -> None:
 
     assert "위/아래" in chart and "차트에서는" in chart and "result_id" in chart
     assert "위/아래" in table and "표에는" in table and "result_id" in table
+
+
+def test_routing_policy_uses_requested_operation_and_evidence() -> None:
+    """호칭 표현보다 실행·조회 목적을 우선하는 공통 라우팅 규칙을 유지한다."""
+
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+    sql_skill = next(p for p in SKILLS if p.parent.name == "sql-analysis").read_text(encoding="utf-8")
+    simulation_skill = next(p for p in SKILLS if p.parent.name == "simulation").read_text(encoding="utf-8")
+
+    assert '"시뮬레이션을 수행/실행해 줘"' in claude
+    assert '"데이터베이스/DB/SQL에서 조회해 줘"' in claude
+    assert '"DB에 저장된 시뮬레이션 결과를 조회"' in claude
+    assert "방법·위치·의미를 묻는 질문은 문서 검색" in claude
+    assert '"알려줘/보여줘"' in claude
+    assert "미지원임을 알린다" in claude
+
+    assert '"DB/데이터베이스/SQL에서 조회해 줘"' in sql_skill
+    assert '"DB에 저장된 simulation 결과를 조회"' in sql_skill
+    assert '"수행/실행해 줘"' in simulation_skill
+    assert '"DB에 저장된 simulation 결과를 조회"' in simulation_skill
+    assert '직전 성공한 결과의 출처와 범위' in simulation_skill
+
+
+def test_data_tool_descriptions_distinguish_sql_simulation_and_documents() -> None:
+    tools = {t.name: t for t in planning_tools(access_scope="scope-a")}
+
+    assert "DB/데이터베이스/SQL 조회" in tools["execute_sql"].description
+    assert "등록 simulation" in tools["run_simulation"].description
+    assert "임의의 종류" in tools["run_simulation"].description
+    assert "화면 버튼·변경 위치·조회 방법" in tools["search_documents"].description
+    assert "실제 저장 수치 조회나 simulation 실행을 대신하지 않는다" in tools["search_documents"].description
 
 
 def test_system_prompt_still_lists_no_present_mode_tools() -> None:

@@ -1,16 +1,16 @@
-type: SMT2020_입력검증
-name: SMT2020 simulation 입력 검증
-aliases: [SMT2020 검증, 입력 데이터 검증, benchmark 정합성]
-when_to_use: 실제 simulation을 호출하기 전에 선택한 HVLM/LVHM 입력의 테이블 건수와 핵심 관계를 확인할 때.
+type: 입력_정합성_검증
+name: Mock simulation 입력 검증
+aliases: [입력 데이터 검증, 정합성 검증]
+when_to_use: 실제 simulation을 호출하기 전에 선택한 세그먼트(SEG_A/SEG_B) 입력의 테이블 건수와 핵심 관계를 확인할 때.
 params:
-  dataset: {required: true, description: "검증할 benchmark (HVLM 또는 LVHM, 대소문자 무관)", example: LVHM}
+  dataset: {required: true, description: "검증할 생산 세그먼트 (SEG_A 또는 SEG_B, 대소문자 무관)", example: SEG_B}
 output_schema:
   kpis: {type: array, desc: "part, route step, tool family, 초기 WIP lot 건수"}
   table: {type: object, desc: "11개 입력 테이블의 row count 표"}
   results: {type: array, desc: "핵심 관계별 source/matched/unmatched 건수"}
   summary: {type: string, desc: 실제 DES 결과가 아닌 입력 정합성 mock 설명}
 aggregation_rules:
-  - 테이블 건수와 관계별 unmatched 건수는 dataset 하나를 기준으로 집계하며 HVLM과 LVHM 값을 합산하지 않는다
+  - 테이블 건수와 관계별 unmatched 건수는 dataset 하나를 기준으로 집계하며 SEG_A와 SEG_B 값을 합산하지 않는다
   - unmatched 건수는 source row 중 대상이 없는 행 수이므로 관계 간에 더하지 않는다
 visualization_hints:
   - 11개 입력 테이블의 건수 비교에는 bar 차트가 적합하다
@@ -20,4 +20,4 @@ active: true
 status: verified
 owner: ""
 updated: 2026-09-15
-source: SMT2020 SQLite 변환 결과의 결정적 관계 검사
+source: scripts/generate_mock_database.py 합성 생성 결과의 결정적 관계 검사

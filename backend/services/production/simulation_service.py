@@ -1,13 +1,13 @@
 """Real production planning simulation service."""
 
-from services.simulation_registry import (
+from services.simulation.registry import (
     list_simulation_types,
     validate_simulation_request,
 )
 from services.service_logging import logged_service_operation
 
 
-class RealSimulationService:
+class ProductionSimulationService:
     """실적조회 / MP 조회 / SWAP 결과조회 등을 처리하는 실제 시뮬레이션 서비스."""
 
     async def list_simulation(self) -> dict:
@@ -20,20 +20,22 @@ class RealSimulationService:
     ) -> dict:
         """Run a simulation identified by `simulation_type` with `params`."""
 
-        error = validate_simulation_request(simulation_type, params)
-        if error is not None:
-            return {"status": "error", "message": error}
+        validation_error = validate_simulation_request(simulation_type, params)
+        if validation_error is not None:
+            return validation_error
 
         # TODO:
-        # 실제 Simulation MCP Server 호출 (simulation_type 별 분기)
+        # services/production/simulation_api_client.py::SimulationApiClient.run으로
+        # 실제 Simulation API 호출 (simulation_type 별 분기).
         # 결과를 Result Store에 저장할 때 mock과 동일하게 access_scope를 채운다.
+        # docs/CLOSED_NETWORK_SETUP.md §2-4 참고.
 
         raise NotImplementedError(
             "Simulation MCP integration is not implemented."
         )
 
 
-_service = RealSimulationService()
+_service = ProductionSimulationService()
 
 
 @logged_service_operation

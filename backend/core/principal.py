@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from fastapi import Depends, Header
 
 from core import config
-from services.document_store import KnowledgeError
+from services.knowledge.documents import KnowledgeError
 
 
 @dataclass(frozen=True)

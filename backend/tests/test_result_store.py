@@ -6,8 +6,8 @@ import json
 import pandas as pd
 import pytest
 
-from services import result_store
-from services.result_store import LocalParquetResultStore, _infer_role
+from services.results import store as result_store
+from services.results.store import LocalParquetResultStore, _infer_role
 
 
 def _save(store: LocalParquetResultStore, rows: list[list] | None = None):

@@ -40,7 +40,7 @@ output_columns:
   - {name: cross_dataset_part_matches, role: measure, unit: row, desc: dataset 키 생략 시 다른 dataset으로 잘못 연결되는 후보 수}
   - {name: route_join_rows, role: measure, unit: row, desc: 모든 Route Step 조인 시 행 수}
 query_rules:
-  - 진단 대상 benchmark의 dataset을 바깥 SELECT에서 필수로 제한한다
+  - 진단 대상 세그먼트의 dataset을 바깥 SELECT에서 필수로 제한한다
   - 결과가 0인 누락 지표도 생략하지 않고 함께 조회한다
   - 이 레시피 결과를 실제 생산실적이나 납기 성과로 해석하지 않는다
 aggregation_rules:
@@ -51,12 +51,12 @@ aggregation_rules:
   - 이 결과는 입력·집계 검증이며 실제 납기 지연이나 생산 부진 원인을 입증하지 않는다.
 visualization_hints: []
 sample_queries:
-  - question: LVHM WIP 입력 연결과 Route 조인 중복 위험은 어때?
-    sql: SELECT * FROM wip_integrity_diagnostics WHERE dataset = 'LVHM'
-  - question: HVLM WIP 입력 연결과 Route 조인 중복 위험은 어때?
-    sql: SELECT * FROM wip_integrity_diagnostics WHERE dataset = 'HVLM'
+  - question: SEG_B WIP 입력 연결과 Route 조인 중복 위험은 어때?
+    sql: SELECT * FROM wip_integrity_diagnostics WHERE dataset = 'SEG_B'
+  - question: SEG_A WIP 입력 연결과 Route 조인 중복 위험은 어때?
+    sql: SELECT * FROM wip_integrity_diagnostics WHERE dataset = 'SEG_A'
 active: true
 status: draft
 owner: ""
-source: SMT2020 입력 관계 및 테스트 전용 오류 fixture
+source: 합성 생성 입력 관계 및 테스트 전용 오류 fixture
 updated: 2026-09-16

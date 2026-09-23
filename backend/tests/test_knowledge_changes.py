@@ -13,9 +13,9 @@ from fastapi.testclient import TestClient
 
 from core import config
 from main import app
-from services import knowledge_service, knowledge_writer
-from services.knowledge_guides import guide
-from services.knowledge_service import KnowledgeStore, get_store, reset_store
+from services.knowledge import catalog as knowledge_service, writer as knowledge_writer
+from services.knowledge.guides import guide
+from services.knowledge.catalog import KnowledgeStore, get_store, reset_store
 
 WIP = """
     table: wip
@@ -514,4 +514,4 @@ def test_logs_do_not_contain_knowledge_bodies(client, caplog):
         change = submitted(client, description=secret)
         act(client, change, "approve", ADMIN)
     assert secret not in caplog.text
-    assert "knowledge_change_store" in caplog.text
+    assert "services.knowledge.changes" in caplog.text

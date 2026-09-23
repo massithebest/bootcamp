@@ -1,24 +1,24 @@
-scenario_id: lvhm_input_integrity
-name: SMT2020 LVHM 초기 WIP·Route 입력 검증
-description: LVHM의 초기 WIP 집계, Part별 Route 연결과 simulation 입력 정합성을 함께 확인한다.
-dataset: LVHM
-question: LVHM의 제품별 초기 WIP와 공정 Step 수를 조회하고 입력 관계가 완전한지 확인해줘.
+scenario_id: seg_b_input_integrity
+name: SEG_B 초기 WIP·Route 입력 검증
+description: SEG_B의 초기 WIP 집계, Part별 Route 연결과 simulation 입력 정합성을 함께 확인한다.
+dataset: SEG_B
+question: SEG_B의 제품별 초기 WIP와 공정 Step 수를 조회하고 입력 관계가 완전한지 확인해줘.
 steps:
   - action: recipe
     ref: initial_wip_by_part
-    params: {dataset: LVHM}
-    expectation: 10개 Part의 합계가 2156 Lot, 53900 pieces다.
+    params: {dataset: SEG_B}
+    expectation: 10개 Part의 초기 WIP Lot 합계가 2156건이다.
   - action: recipe
     ref: part_route_tool_summary
-    params: {dataset: LVHM}
+    params: {dataset: SEG_B}
     expectation: 10개 Part와 4013개 Route Step이 조회되고 설비 Family 연결 차이가 없다.
   - action: recipe
     ref: wip_integrity_diagnostics
-    params: {dataset: LVHM}
+    params: {dataset: SEG_B}
     expectation: 세 연결 누락 지표가 0이고 dataset 생략 및 Route 조인 위험을 원본 오류와 구분한다.
   - action: simulation
-    ref: SMT2020_입력검증
-    params: {dataset: LVHM}
+    ref: 입력_정합성_검증
+    params: {dataset: SEG_B}
     expectation: 다섯 핵심 관계의 unmatched_rows가 모두 0이다.
 expected:
   table_counts:
@@ -43,4 +43,4 @@ active: true
 status: draft
 owner: ""
 updated: 2026-09-15
-source: SMT2020 LVHM 원본과 생성 SQLite의 고정 인수 기준
+source: scripts/generate_mock_database.py 합성 생성 결과의 고정 인수 기준

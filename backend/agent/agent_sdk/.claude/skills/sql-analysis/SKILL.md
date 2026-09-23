@@ -5,6 +5,13 @@ description: 생산계획 Agent 전용. 실적·계획·재고 등 데이터를 
 
 # SQL 조회 절차
 
+## 적용할 질의
+
+- 사용자가 "DB/데이터베이스/SQL에서 조회해 줘"라고 명시하거나 저장된 계획·실적·제품 행과 수치를 묻는 요청에 적용한다. "알려줘/보여줘" 같은 표현은 경로 판단 기준이 아니다.
+- "차월 계획제품", "잔여 계획수량이 남지 않은 제품"처럼 조건이 분명한 조회는 SQL 경로다. 기준 날짜·월이 생략되면 직전 대화나 카탈로그 규칙에서 확인하고, 근거가 없으면 임의 날짜를 적용하지 않는다.
+- "DB에 저장된 simulation 결과를 조회"하는 요청은 저장값 조회이므로 SQL로 처리한다. 새 simulation 실행 요청은 이 절차 대신 `simulation` Skill로 보낸다.
+- 직전 조회나 simulation 결과를 가리키는 후속 질문이면 원래 결과의 출처를 유지한다. 직전 SQL `result_id`가 있으면 해당 결과의 summary/page를 사용하고, 결과를 특정할 수 없을 때만 되묻는다.
+
 1. **테이블 찾기**: 어떤 테이블인지 모르면 `list_tables(keyword=...)`. KPI 조회면 `get_kpi` 의 `sources`, `aggregation_rules`, `recipe_refs`, `sql_template` 를 확인한다.
 2. **집계 레시피 확인**: KPI 의 `recipe_refs` 가 있으면 `get_recipe` 로 조회한다. 그 외 집계·비교·추이 요청도 `list_recipes(keyword=...)` 로 적용 가능한 가이드를 찾는다. `when_to_use`, `output_grain`, `output_columns`, `query_rules`, `aggregation_rules` 를 읽고 요청한 기간·차원·비교 대상에 맞는지 확인한다. 맞으면 `cte_sql` 을 `WITH` 절로 조합한다. 레시피에 없는 차원을 이미 집계된 결과에서 복원하려 하지 않는다.
 3. **스키마 확인**: 쓰려는 테이블마다 `describe_table`. `grain`(원본 한 행의 의미), `columns` 의 코드값(`codes`), `joins`, `caveats`, `query_rules`, `aggregation_rules` 를 읽는다. 사용자가 다른 조건을 지정하지 않았다면 `query_rules`의 기본 날짜·필터 조건을 SQL에 반영한다. 필수 필터를 반영하고 조인 키 유일성·집계 단위·수량 단위 호환성을 확인한다. KPI·카탈로그·레시피가 충돌하면 임의로 선택하지 말고 확인이 필요한 기준을 밝힌다.

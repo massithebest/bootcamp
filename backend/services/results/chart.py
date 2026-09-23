@@ -13,8 +13,8 @@ from typing import Any
 
 import pandas as pd
 
-from services.query_result_errors import QueryResultError, query_error
-from services.result_store import ResultColumn
+from services.results.errors import QueryResultError, query_error
+from services.results.store import ResultColumn
 
 
 CHART_TYPES = ("bar", "line", "area")

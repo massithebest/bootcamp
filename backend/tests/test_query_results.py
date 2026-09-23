@@ -7,16 +7,16 @@ import pytest
 from fastapi.testclient import TestClient
 
 from main import app
-from services import result_store
-from services.chart_projection import project_chart
-from services.query_result_errors import QueryResultError
-from services.query_result_service import (
+from services.results import store as result_store
+from services.results.chart import project_chart
+from services.results.errors import QueryResultError
+from services.results.query import (
     build_preview,
     read_chart,
     read_preview,
     read_table,
 )
-from services.result_store import LocalParquetResultStore, ResultColumn
+from services.results.store import LocalParquetResultStore, ResultColumn
 
 SCOPE = "scope-a"
 
@@ -52,7 +52,7 @@ def _frame_project(frame, **kwargs):
 
 
 def _role(name, series):
-    from services.result_store import _infer_role
+    from services.results.store import _infer_role
 
     return _infer_role(name, str(series.dtype))
 

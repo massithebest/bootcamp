@@ -4,7 +4,7 @@ from asyncio import to_thread
 
 from core import config
 from services import rag_service
-from services.document_store import get_document_store
+from services.knowledge.documents import get_document_store
 from services.service_logging import logged_service_operation
 
 

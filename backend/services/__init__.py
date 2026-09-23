@@ -1,12 +1,12 @@
-"""Select mock or real service implementations."""
+"""Select mock or production service implementations."""
 
 from core.config import SERVICE_MODE
 
 
-if SERVICE_MODE == "real":
-    from services.real import rag_service
-    from services.real import simulation_service
-    from services.real import sql_service
+if SERVICE_MODE == "production":
+    from services.production import rag_service
+    from services.production import simulation_service
+    from services.production import sql_service
 elif SERVICE_MODE == "mock":
     from services.mock import mock_rag_service as rag_service
     from services.mock import mock_simulation_service as simulation_service

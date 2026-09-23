@@ -21,6 +21,9 @@ except ModuleNotFoundError:  # pragma: no cover
 ENV = os.getenv("ENV", "").strip().lower() or "dev"
 
 SERVICE_MODE = os.getenv("SERVICE_MODE", "").strip().lower() or "mock"
+# `real` remains a deployment compatibility alias; `production` is canonical.
+if SERVICE_MODE == "real":
+    SERVICE_MODE = "production"
 
 #: backend/ 디렉터리. 아래 경로 상수의 기준점.
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -30,31 +33,37 @@ DEFAULT_KNOWLEDGE_DIR = BACKEND_DIR / "knowledge"
 _CONFIGURED_KNOWLEDGE_DIR = os.getenv("KNOWLEDGE_DIR", "").strip()
 KNOWLEDGE_DIR = Path(_CONFIGURED_KNOWLEDGE_DIR or DEFAULT_KNOWLEDGE_DIR)
 
-#: 개발용 mock에서만 사용하는 SMT2020 SQLite 경로.
-#: 폐쇄망 운영(`ENV=prod`)은 real service만 사용하므로 이 값을 참조하지 않는다.
-SMT2020_DB_PATH = Path(
-    os.getenv("SMT2020_DB_PATH") or BACKEND_DIR / "datasets" / "smt2020.db"
+#: 백엔드 자신이 기동하는 포트. uvicorn `--port`와 반드시 일치해야 한다.
+#: `/anthropic` 프록시 구현이 반입된 뒤 CLI의 자기 참조 `ANTHROPIC_BASE_URL`을
+#: 구성할 때 쓰인다(LLM_PROVIDER=local).
+BACKEND_PORT = int(os.getenv("BACKEND_PORT") or "8100")
+
+#: 개발용 mock에서만 사용하는 합성(synthetic) 생산계획 SQLite 경로.
+#: `scripts/generate_mock_database.py`로 생성한다. 폐쇄망 운영(`ENV=prod`)은
+#: production service만 사용하므로 이 값을 참조하지 않는다.
+MOCK_DB_PATH = Path(
+    os.getenv("MOCK_DB_PATH") or BACKEND_DIR / "data" / "mock_planning.db"
 )
 
 
 def validate_runtime_configuration() -> None:
     """Fail fast when service or production knowledge isolation is unsafe."""
 
-    if SERVICE_MODE not in {"mock", "real"}:
-        raise RuntimeError("SERVICE_MODE must be either 'mock' or 'real'.")
+    if SERVICE_MODE not in {"mock", "production"}:
+        raise RuntimeError("SERVICE_MODE must be either 'mock' or 'production'.")
 
     if ENV != "prod":
         return
 
-    if SERVICE_MODE != "real":
-        raise RuntimeError("ENV=prod requires SERVICE_MODE=real.")
+    if SERVICE_MODE != "production":
+        raise RuntimeError("ENV=prod requires SERVICE_MODE=production.")
     if not _CONFIGURED_KNOWLEDGE_DIR:
         raise RuntimeError("ENV=prod requires an explicit KNOWLEDGE_DIR.")
     if not KNOWLEDGE_DIR.is_dir():
         raise RuntimeError("ENV=prod requires KNOWLEDGE_DIR to be an existing directory.")
     if KNOWLEDGE_DIR.resolve() == DEFAULT_KNOWLEDGE_DIR.resolve():
         raise RuntimeError(
-            "ENV=prod cannot use the bundled SMT2020 development knowledge directory."
+            "ENV=prod cannot use the bundled mock development knowledge directory."
         )
 
 
@@ -92,11 +101,58 @@ SESSION_SCOPE_COOKIE_NAME = "pp_session_scope"
 SESSION_COOKIE_SECURE = ENV == "prod"
 
 
+# ---- Production API clients ----
+# 폐쇄망 production SQL/RAG/simulation adapter의 외부 API 요청 timeout(초).
+# 현재 구현된 adapter는 아직 API를 호출하지 않지만, `.env`에서 미리 설정할 수 있다.
+API_TIMEOUT_SECONDS = int(os.getenv("API_TIMEOUT_SECONDS", "60"))
+
+#: 사내 공통 SQL 실행 API, Simulation API, Milvus, 임베딩·재랭커, RAG 문서
+#: base URL. 전부 빈 문자열 기본값이며 사내 IP·URL을 코드에 두지 않는다.
+#: 이식(`docs/CLOSED_NETWORK_SETUP.md` §2-1) 전까지는 어떤 service도 이 값을
+#: 읽지 않고, 이식된 adapter가 호출 시점에 `require_production_env`로 검증한다.
+COMMON_SQL_API_URL = os.getenv("COMMON_SQL_API_URL", "")
+SIMULATION_API_URL = os.getenv("SIMULATION_API_URL", "")
+MILVUS_HOST = os.getenv("MILVUS_HOST", "")
+MILVUS_PORT = os.getenv("MILVUS_PORT", "")
+MILVUS_COLLECTION = os.getenv("MILVUS_COLLECTION", "")
+IFLOW_EMBEDDING_ENDPOINT = os.getenv("IFLOW_EMBEDDING_ENDPOINT", "")
+IFLOW_EMBEDDING_KEY = os.getenv("IFLOW_EMBEDDING_KEY", "")
+RERANKER_ENDPOINT = os.getenv("RERANKER_ENDPOINT", "")
+RAG_DOC_URL_BASE = os.getenv("RAG_DOC_URL_BASE", "")
+
+
+def require_production_env(name: str, value: str) -> str:
+    """production 어댑터가 호출 시점에 필수 환경변수를 검증한다.
+
+    비어 있으면 어떤 키가 왜 필요한지 밝힌 오류를 낸다. mock 서비스는 이
+    헬퍼를 호출하지 않으므로 `SERVICE_MODE=mock`에는 영향이 없다. import
+    시점이 아니라 실제 호출 시점에 검사해야 mock 모드 기동이 막히지 않는다.
+    """
+
+    if not value:
+        raise RuntimeError(
+            f"SERVICE_MODE=production 어댑터에 필요한 환경변수 {name} 이(가) "
+            "비어 있습니다. backend/.env에 실제 값을 설정하세요."
+        )
+    return value
+
+
 # ---- LLM Provider ----
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic").lower()
 
+#: LLM_PROVIDER=local(사내 LLM 게이트웨이) 전용 설정. 값은 `backend/.env`에만
+#: 두고 코드·문서에 실제 모델명·endpoint·key를 남기지 않는다.
+PRIVATE_LLM_MODEL_NAME = os.getenv("PRIVATE_LLM_MODEL_NAME", "")
+PRIVATE_LLM_MODEL_ENDPOINT = os.getenv("PRIVATE_LLM_MODEL_ENDPOINT", "")
+PRIVATE_LLM_MODEL_KEY = os.getenv("PRIVATE_LLM_MODEL_KEY", "")
+
 #: Agent 가 사용할 모델. 비어 있으면 Claude Code 기본값을 쓴다.
-AGENT_MODEL = os.getenv("AGENT_MODEL") or None
+#: LLM_PROVIDER=local 이고 AGENT_MODEL 이 비어 있으면 PRIVATE_LLM_MODEL_NAME 으로 폴백한다.
+AGENT_MODEL = (
+    os.getenv("AGENT_MODEL")
+    or (PRIVATE_LLM_MODEL_NAME if LLM_PROVIDER == "local" else None)
+    or None
+)
 
 #: Claude Code CLI(`claude`) 실행 파일 경로.
 #: PATH 에 없어도 되도록 명시 경로 -> PATH 탐색 순으로 결정한다.
@@ -109,6 +165,8 @@ def agent_provider_env() -> dict[str, str]:
 
     - anthropic  : 기본 동작. 별도 주입 없음(ANTHROPIC_API_KEY 그대로 사용).
     - openrouter : base URL 을 OpenRouter 로 바꾸고 bearer 토큰으로 인증한다.
+    - local      : CLI 요청을 백엔드 자신의 `/anthropic` 경로로 보낸다. 이 경로의
+      실제 게이트웨이 전달 구현은 폐쇄망 반입 후 채운다.
     """
 
     if LLM_PROVIDER == "openrouter":
@@ -121,11 +179,18 @@ def agent_provider_env() -> dict[str, str]:
             "ANTHROPIC_API_KEY": "",
         }
 
+    if LLM_PROVIDER == "local":
+        return {
+            "ANTHROPIC_BASE_URL": f"http://127.0.0.1:{BACKEND_PORT}/anthropic",
+            "ANTHROPIC_AUTH_TOKEN": "local-proxy",
+            "ANTHROPIC_API_KEY": "",
+        }
+
     return {}
 
 # 텍스트 지식 저장소. 생산 DB와 분리하며 TTL로 삭제하지 않는다.
 KNOWLEDGE_DB_PATH = Path(os.getenv("KNOWLEDGE_DB_PATH") or BACKEND_DIR / "data" / "knowledge.sqlite3")
-# local은 SQL의 mock/real 모드와 독립. service는 향후 사내 RAG 어댑터용.
+# local은 SQL의 mock/production 모드와 독립. service는 향후 사내 RAG 어댑터용.
 KNOWLEDGE_SEARCH_BACKEND = os.getenv("KNOWLEDGE_SEARCH_BACKEND", "local")
 
 # ---- 구조화 지식 관리(변경 요청·승인) ----

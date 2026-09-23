@@ -1,6 +1,6 @@
 """Search reference material, never executable instructions."""
-from services import knowledge_search_service
-from services.document_store import KnowledgeError
+from services.knowledge import search as knowledge_search_service
+from services.knowledge.documents import KnowledgeError
 
 
 async def search_documents(query: str) -> dict:

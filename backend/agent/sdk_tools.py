@@ -20,7 +20,7 @@ from tools.knowledge_tool import (
     list_recipes,
     list_tables,
 )
-from services.present_service import (
+from services.results.present import (
     present_chart_input_schema,
     present_simulation_input_schema,
     present_sql_preview_input_schema,
@@ -62,7 +62,8 @@ def _ok(payload: dict[str, Any]) -> dict[str, Any]:
 def _execute_sql_tool(access_scope: str | None):
     @tool(
         "execute_sql",
-        "카탈로그에 등록된 테이블을 SELECT 로 조회한다. "
+        "데이터베이스/DB에 저장된 계획·실적·제품 행과 수치를 카탈로그 등록 테이블에서 SELECT 로 조회한다. "
+        "사용자가 DB/데이터베이스/SQL 조회를 명시한 경우 이 도구를 사용한다. "
         "테이블·컬럼은 describe_table 로 먼저 확인한다. "
         "purpose 에는 이 쿼리로 확인하려는 것을 한 줄로 쓴다.",
         {"sql": str, "purpose": str},
@@ -81,7 +82,9 @@ def _execute_sql_tool(access_scope: str | None):
 
 @tool(
     "search_documents",
-    "공정 매뉴얼·업무 용어·생산계획 정책 등 비정형 도메인 지식을 검색한다.",
+    "공정 매뉴얼·업무 용어·생산계획 정책 등 비정형 도메인 지식을 검색한다. "
+    "옵션·결과의 의미·화면 버튼·변경 위치·조회 방법을 설명할 때 사용한다. "
+    "실제 저장 수치 조회나 simulation 실행을 대신하지 않는다.",
     {"query": str},
 )
 async def _search_documents(args: dict[str, Any]) -> dict[str, Any]:
@@ -90,7 +93,8 @@ async def _search_documents(args: dict[str, Any]) -> dict[str, Any]:
 
 @tool(
     "list_simulation",
-    "사용 가능한 시뮬레이션 종류와 각 종류가 요구하는 파라미터 목록을 조회한다.",
+    "사용 가능한 시뮬레이션 종류와 별칭·사용 목적·입력 파라미터·출력 정의를 확인한다. "
+    "자연어 요청에 맞는 등록 종류가 있는지 실행 전에 찾을 때 사용한다.",
     {},
 )
 async def _list_simulation(args: dict[str, Any]) -> dict[str, Any]:
@@ -100,8 +104,9 @@ async def _list_simulation(args: dict[str, Any]) -> dict[str, Any]:
 def _run_simulation_tool(access_scope: str | None):
     @tool(
         "run_simulation",
-        "지정한 simulation_type 을 params 로 실행한다. "
-        "종류/파라미터를 모르면 list_simulation 을 먼저 호출한다.",
+        "사용자가 요청한 등록 simulation을 지정한 simulation_type 과 params 로 수행한다. "
+        "종류/파라미터를 모르면 list_simulation 을 먼저 호출한다. "
+        "적합한 등록 종류가 없으면 임의의 종류를 만들지 않는다.",
         {"simulation_type": str, "params": dict},
     )
     async def _run_simulation(args: dict[str, Any]) -> dict[str, Any]:

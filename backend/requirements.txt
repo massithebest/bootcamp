@@ -10,6 +10,7 @@ pymilvus==3.0.1
 pandas==3.0.5
 pyarrow==25.0.1
 requests==2.34.2
+httpx==0.28.1
 
 # 참고:
 # claude-agent-sdk 는 Node.js 및 Claude Code CLI(`claude`)를 필요로 한다.

@@ -1,9 +1,9 @@
 table: part
-description: SMT2020 제품/Part와 공정 Route의 매핑
+description: 제품/Part와 공정 Route의 매핑
 grain: [dataset, part]
-tags: [SMT2020, 제품, Part, Route, 마스터]
+tags: [제품, Part, Route, 마스터]
 columns:
-  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: dataset, type: varchar, desc: "생산 세그먼트 구분 (SEG_A 또는 SEG_B)"}
   - {name: partgrp, type: varchar, desc: Part group}
   - {name: partfam, type: varchar, desc: Part family}
   - {name: part, type: varchar, desc: Part ID}
@@ -14,18 +14,18 @@ joins:
   - {to: wip, on: [dataset, part], kind: one-to-many, note: "초기 WIP"}
   - {to: orders, on: [dataset, part], kind: one-to-many, note: "신규 Lot 투입"}
 caveats:
-  - HVLM과 LVHM에 같은 part와 route ID가 있으므로 dataset 없는 JOIN은 금지한다
+  - SEG_A와 SEG_B에 같은 part와 route ID가 있으므로 dataset 없는 JOIN은 금지한다
 query_rules:
-  - 특정 benchmark 질문은 dataset을 필수로 제한한다
+  - 특정 세그먼트 질문은 dataset을 필수로 제한한다
   - route_step, wip, orders와 조인할 때 dataset과 업무 키를 모두 조인 조건에 포함한다
 aggregation_rules:
   - Part 수는 dataset과 part의 조합으로 센다
   - route_step과 조인한 뒤 Part 수를 셀 때는 중복 Step을 제거한다
 visualization_hints:
-  - benchmark별 Part 수 또는 partgrp·partfam별 Part 수 비교에는 bar 차트가 적합하다
+  - 세그먼트별 Part 수 또는 partgrp·partfam별 Part 수 비교에는 bar 차트가 적합하다
   - Part와 Route의 개별 매핑은 차트보다 표가 적합하다
 sample_queries:
-  - question: benchmark별 Part는 몇 개야?
+  - question: 세그먼트별 Part는 몇 개야?
     sql: |
       SELECT dataset, COUNT(*) AS part_count
       FROM part
@@ -35,4 +35,4 @@ active: true
 status: verified
 owner: ""
 updated: 2026-09-15
-source: SMT2020 part.txt 직접 확인
+source: scripts/generate_mock_database.py 합성 생성 확인

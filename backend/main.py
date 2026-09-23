@@ -7,15 +7,16 @@ from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from services.document_store import KnowledgeError
+from services.knowledge.documents import KnowledgeError
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.routes_anthropic_proxy import router as anthropic_proxy_router
 from api.routes_chat import router as chat_router
 from api.routes_knowledge import router as knowledge_router
 from api.routes_me import router as me_router
 from api.routes_query_results import router as query_results_router
 from core.config import CORS_ALLOW_ORIGINS
-from services.result_store import cleanup_expired
+from services.results.store import cleanup_expired
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -84,6 +85,10 @@ app.include_router(
     query_results_router,
     prefix="/api",
 )
+
+# `/api` prefix가 없다 — Claude CLI가 ANTHROPIC_BASE_URL로 직접 참조하는 경로다
+# (LLM_PROVIDER=local, `core.config.agent_provider_env()` 참고).
+app.include_router(anthropic_proxy_router)
 
 
 @app.get("/health")

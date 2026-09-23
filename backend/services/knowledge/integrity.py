@@ -9,9 +9,9 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 
-from services.knowledge_service import KnowledgeStore
+from services.knowledge.catalog import KnowledgeStore
 
-#: `FROM`/`JOIN` 뒤의 이름. `services/sql_guard.py`의 `_TABLE_REF`와 같은 패턴.
+#: `FROM`/`JOIN` 뒤의 이름. `services/sql/guard.py`의 `_TABLE_REF`와 같은 패턴.
 #: `(?<![:\w.])` 는 `BETWEEN :from AND :to` 의 `:from` 을 FROM 절로 오인하지 않게 한다.
 _TABLE_REF = re.compile(r"(?<![:\w.])\b(?:FROM|JOIN)\s+([A-Za-z_][A-Za-z0-9_]*)", re.I)
 

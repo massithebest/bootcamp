@@ -5,10 +5,18 @@ description: 생산계획 Agent 전용. 등록된 시뮬레이션 또는 입력 
 
 # 시뮬레이션 절차
 
+## 적용할 질의
+
+- 사용자가 시뮬레이션을 "수행/실행해 줘"라고 명시하거나 등록 simulation의 산출 결과를 새로 요청할 때 적용한다. "알려줘/보여줘" 같은 표현보다 수행 대상과 결과의 의미를 기준으로 한다.
+- "오늘 필요량 산출 결과", 제품별 simulation 결과, 특정 `product_id`의 swap 결과 요청은 simulation 후보를 확인한다. `list_simulation`의 종류·별칭·입력·출력을 확인한 뒤 맞는 종류가 있을 때만 실행한다.
+- 적합한 종류가 목록에 없으면 미지원이라고 설명한다. 저장된 DB 수치를 simulation 실행 결과인 것처럼 대신 제시하지 않는다.
+- "DB에 저장된 simulation 결과를 조회"하는 것은 SQL 요청이다. 결과의 의미·옵션·실행 방법을 묻는 질문은 `search_documents`를 사용한다.
+- "그 중", 특정 제품 ID, "결과값이 궁금합니다" 같은 후속 질문은 직전 성공한 결과의 출처와 범위를 이어받는다. 직전 simulation 결과가 있으면 그 `result_id`를 상세 조회하고, 대상을 특정할 수 없을 때만 되묻는다.
+
 1. **종류 확인**: `list_simulation` 으로 종류와 `when_to_use`, `params`, `output_schema`, `aggregation_rules`, `visualization_hints` 를 본다. 질의의 표현이 `aliases` 에 있는지로 종류를 고른다.
 2. **선행 조건**: `follows` 에 적힌 시뮬레이션이 있으면 먼저 실행한다.
 3. **파라미터 구성**: `params` 의 `required: true` 는 전부 채운다. 형식은 `description` 과 `example` 을 따른다(예: 월은 yyyyMM). 모르는 값은 사용자에게 묻고, 선택 파라미터는 생략한다.
-4. **실행**: `run_simulation(simulation_type, params)`. `status` 가 error 면 메시지대로 파라미터를 고쳐 1회 재시도.
+4. **실행**: `run_simulation(simulation_type, params)`. `status` 가 `missing_params` 면 추측해서 채우거나 재시도하지 말고 `missing` 목록의 `description`·`example`을 그대로 사용자에게 되묻는다. `status` 가 `error` 면 메시지대로 파라미터를 고쳐 1회 재시도한다.
 5. **해석**: `output_schema` 의 필드 설명에 따라 읽는다. `aggregation_rules` 가 있으면 합산·비교 범위를 그대로 따른다. 다른 Tool 결과와 비교할 때는 집계 단위(월/일, 라인/품목)를 맞춘 뒤 비교한다.
 6. **표현 준비**: 결과는 전체 행이 아니라 `result_id`, `scenario`, `summary`, `kpis`와 preview다. 보여 줄 결과가 있으면 실제 `columns`와 grain을 확인하고(`visualization_hints` 는 권고로만 쓴다) 관련 `present_*` Tool을 scalar 인자로 직접 호출한다. 행·차트 data 배열은 어떤 Tool에도 넣지 않는다. 시나리오·요약·KPI는 `present_simulation(scenario, summary, kpis, result_id?)`, 사용자가 표를 요청했거나 표형 결과에서 2행 이상을 나열하려면 같은 `result_id`로 `present_table(result_id, columns?, title?)`, 비교·추이가 유용하거나 사용자가 차트를 요청하면 같은 `result_id`로 `present_chart(result_id, chart_type, x_column, y_column, group_by_column?, aggregation?)`를 별도로 호출하고 화면에서 자동으로 묶이지 않으므로 그 연결을 텍스트로 설명한다. 오류는 `code`와 `details.path`를 읽고 지원 파라미터 변경 또는 인자 수정으로 최대 2회 보정한다.
 7. **인용**: 결과 UI는 사용자에게 공개할 짧은 `도입 설명 → present_* 호출 → 결과 해석` 순서로 배치한다. 도입과 해석에는 해당 결과의 범위·핵심 수치·주의점만 쓰고 내부 추론은 쓰지 않는다. 호출 뒤의 해석에서는 `위·아래·다음 표/차트`처럼 화면 위치를 가리키지 말고 `표에는…`, `차트에서는…`처럼 대상 자체를 지칭한다. 성공한 결과 UI를 Markdown 표나 `chart` 코드 펜스로 다시 쓰지 않고 `result_id`도 최종 답변에 반복하지 않는다. 빈 결과·보정 실패·지원하지 않는 표현은 텍스트로 설명한다. 어떤 시뮬레이션의 어떤 필드인지 밝힌다.

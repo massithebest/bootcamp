@@ -65,20 +65,20 @@ def test_production_rejects_missing_or_bundled_knowledge(
     result = run_import(
         {
             "ENV": "prod",
-            "SERVICE_MODE": "real",
+            "SERVICE_MODE": "production",
             "KNOWLEDGE_DIR": knowledge_dir,
         }
     )
 
     assert result.returncode != 0
-    assert "KNOWLEDGE_DIR" in result.stderr or "SMT2020" in result.stderr
+    assert "KNOWLEDGE_DIR" in result.stderr or "mock" in result.stderr
 
 
 def test_production_rejects_nonexistent_knowledge_directory(tmp_path: Path) -> None:
     result = run_import(
         {
             "ENV": "prod",
-            "SERVICE_MODE": "real",
+            "SERVICE_MODE": "production",
             "KNOWLEDGE_DIR": str(tmp_path / "missing"),
         }
     )
@@ -87,15 +87,29 @@ def test_production_rejects_nonexistent_knowledge_directory(tmp_path: Path) -> N
     assert "existing directory" in result.stderr
 
 
-def test_production_selects_real_services(tmp_path: Path) -> None:
+def test_production_selects_production_services(tmp_path: Path) -> None:
     result = run_import(
         {
             "ENV": "prod",
-            "SERVICE_MODE": "real",
+            "SERVICE_MODE": "production",
             "KNOWLEDGE_DIR": str(tmp_path),
         },
         "import services; print(services.sql_service.__name__)",
     )
 
     assert result.returncode == 0
-    assert result.stdout.strip() == "services.real.sql_service"
+    assert result.stdout.strip() == "services.production.sql_service"
+
+
+def test_real_service_mode_is_accepted_as_compatibility_alias(tmp_path: Path) -> None:
+    result = run_import(
+        {
+            "ENV": "prod",
+            "SERVICE_MODE": "real",
+            "KNOWLEDGE_DIR": str(tmp_path),
+        },
+        "import core.config as config; import services; print(config.SERVICE_MODE, services.sql_service.__name__)",
+    )
+
+    assert result.returncode == 0
+    assert result.stdout.strip() == "production services.production.sql_service"

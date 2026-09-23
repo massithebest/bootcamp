@@ -1,9 +1,9 @@
 table: pm_calendar
-description: SMT2020 설비 예방보전 주기와 정비 시간 조건
+description: 설비 예방보전 주기와 정비 시간 조건
 grain: [dataset, pmcalname]
-tags: [SMT2020, 설비, 예방보전, PM, Calendar]
+tags: [설비, 예방보전, PM, Calendar]
 columns:
-  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: dataset, type: varchar, desc: "생산 세그먼트 구분 (SEG_A 또는 SEG_B)"}
   - {name: pmcalname, type: varchar, desc: PM calendar 이름}
   - {name: pmcaltype, type: varchar, desc: PM calendar 유형}
   - {name: mtbpm, type: int, desc: 예방보전 간 평균 주기}
@@ -17,7 +17,7 @@ joins: []
 caveats:
   - calendar_attach.calname과 연결할 때 caltype이 pm인지 함께 확인한다
 query_rules:
-  - 특정 benchmark 질문은 dataset을 필수로 제한한다
+  - 특정 세그먼트 질문은 dataset을 필수로 제한한다
   - 예방보전 주기나 정비 시간을 비교할 때 분포와 단위 컬럼을 함께 조회한다
 aggregation_rules:
   - mtbpm과 mttr은 각각의 분포와 단위를 포함해 해석한다
@@ -25,7 +25,7 @@ visualization_hints:
   - 같은 단위의 calendar별 mtbpm 또는 mttr 비교에는 bar 차트가 적합하다
   - mtbpm과 mttr은 의미가 다르므로 같은 수량 계열처럼 누적하지 않는다
 sample_queries:
-  - question: benchmark별 예방보전 캘린더는 몇 개야?
+  - question: 세그먼트별 예방보전 캘린더는 몇 개야?
     sql: |
       SELECT dataset, COUNT(*) AS calendar_count
       FROM pm_calendar
@@ -35,4 +35,4 @@ active: true
 status: verified
 owner: ""
 updated: 2026-09-15
-source: SMT2020 pmcal.txt 직접 확인
+source: scripts/generate_mock_database.py 합성 생성 확인

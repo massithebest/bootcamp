@@ -1,9 +1,9 @@
 table: tool
-description: SMT2020 설비 Family와 station 수량 및 운영 규칙
+description: 설비 Family와 station 수량 및 운영 규칙
 grain: [dataset, stnfam]
-tags: [SMT2020, 설비, Tool, Station, Capacity]
+tags: [설비, Tool, Station, Capacity]
 columns:
-  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: dataset, type: varchar, desc: "생산 세그먼트 구분 (SEG_A 또는 SEG_B)"}
   - {name: stnfam, type: varchar, desc: 설비 Family ID}
   - {name: stn, type: varchar, desc: Station ID}
   - {name: rule, type: varchar, desc: Dispatching rule}
@@ -28,17 +28,17 @@ joins:
 caveats:
   - stnqty는 원본이 실수 표기이며 실제 개별 장비 행이 아니라 Family별 수량이다
 query_rules:
-  - 특정 benchmark 질문은 dataset을 필수로 제한한다
+  - 특정 세그먼트 질문은 dataset을 필수로 제한한다
   - route_step 또는 setup_group과 조인할 때 dataset과 stnfam 또는 setupgrp을 함께 조인 조건에 포함한다
   - 설비 수량을 조회할 때 개별 Station 행으로 확장된 값으로 해석하지 않는다
 aggregation_rules:
   - 설비 수량은 dataset과 stnfam grain에서 stnqty를 한 번만 합산한다
   - route_step과 조인한 뒤 stnqty를 합산하면 Step 수만큼 중복되므로 먼저 설비 grain으로 집계한다
 visualization_hints:
-  - benchmark·stngrp·stnfam별 stnqty 비교에는 bar 차트가 적합하다
+  - 세그먼트·stngrp·stnfam별 stnqty 비교에는 bar 차트가 적합하다
   - dispatching rule 분포는 rule별 Family 수로 집계한 뒤 bar 차트로 표현한다
 sample_queries:
-  - question: benchmark별 설비 수량 합계는 얼마야?
+  - question: 세그먼트별 설비 수량 합계는 얼마야?
     sql: |
       SELECT dataset, SUM(stnqty) AS tool_qty
       FROM tool
@@ -48,4 +48,4 @@ active: true
 status: verified
 owner: ""
 updated: 2026-09-15
-source: SMT2020 tool.txt.1l 직접 확인
+source: scripts/generate_mock_database.py 합성 생성 확인

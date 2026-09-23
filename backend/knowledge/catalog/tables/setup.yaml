@@ -1,9 +1,9 @@
 table: setup
-description: SMT2020 setup 상태 변경과 소요 시간
+description: setup 상태 변경과 소요 시간
 grain: [dataset, cursetup, newsetup, ignore_value]
-tags: [SMT2020, Setup, Changeover]
+tags: [Setup, Changeover]
 columns:
-  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: dataset, type: varchar, desc: "생산 세그먼트 구분 (SEG_A 또는 SEG_B)"}
   - {name: cursetup, type: varchar, desc: 현재 setup}
   - {name: newsetup, type: varchar, desc: 변경할 setup}
   - {name: stime, type: int, desc: Setup 변경 시간}
@@ -13,7 +13,7 @@ joins: []
 caveats:
   - 빈 cursetup은 NULL로 보존하며 이전 행의 값을 채우지 않는다
 query_rules:
-  - 특정 benchmark 질문은 dataset을 필수로 제한한다
+  - 특정 세그먼트 질문은 dataset을 필수로 제한한다
   - setup 변경 시간을 조회할 때 stunits를 함께 조회하고 NULL cursetup을 임의 값으로 치환하지 않는다
 aggregation_rules:
   - stime은 stunits가 같은 행끼리만 비교하거나 합산한다
@@ -21,7 +21,7 @@ visualization_hints:
   - 같은 시간 단위의 setup 전환별 stime 비교에는 bar 차트가 적합하다
   - cursetup→newsetup 전환 관계는 차트보다 표가 적합하다
 sample_queries:
-  - question: benchmark별 setup 전환 정의는 몇 건이야?
+  - question: 세그먼트별 setup 전환 정의는 몇 건이야?
     sql: |
       SELECT dataset, COUNT(*) AS transition_count
       FROM setup
@@ -31,4 +31,4 @@ active: true
 status: verified
 owner: ""
 updated: 2026-09-15
-source: SMT2020 setup.txt 직접 확인
+source: scripts/generate_mock_database.py 합성 생성 확인

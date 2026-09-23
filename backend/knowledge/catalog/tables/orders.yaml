@@ -1,10 +1,10 @@
 table: orders
-description: SMT2020 simulation 시작 후 신규 투입되는 반복 Lot 계획
+description: simulation 시작 후 신규 투입되는 반복 Lot 계획
 grain: [dataset, lot]
 time_column: start
-tags: [SMT2020, Order, Lot, 투입, 납기]
+tags: [Order, Lot, 투입, 납기]
 columns:
-  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: dataset, type: varchar, desc: "생산 세그먼트 구분 (SEG_A 또는 SEG_B)"}
   - {name: lot, type: varchar, desc: Lot ID}
   - {name: part, type: varchar, desc: Part ID, ref: part.part}
   - {name: prior, type: int, desc: Priority}
@@ -23,17 +23,17 @@ joins:
 caveats:
   - 한 행을 rpt_no만큼 물리적으로 확장하지 않은 원본 투입 정의다
 query_rules:
-  - 특정 benchmark 질문은 dataset을 필수로 제한한다
+  - 특정 세그먼트 질문은 dataset을 필수로 제한한다
   - 기간 요청은 투입 기준이면 start, 납기 기준이면 due를 사용하고 어느 날짜인지 답변에 밝힌다
   - 사용자가 반복 Lot의 실제 생성량을 요청하면 repeat, runits, rpt_no, lotsperrpt 해석 기준을 먼저 확인한다
 aggregation_rules:
   - 행 수는 투입 정의 수이며 전체 생성 Lot 수와 동일하지 않다
   - pieces를 총 투입량으로 해석하려면 repeat/rpt_no/lotsperrpt 규칙을 별도로 적용해야 한다
 visualization_hints:
-  - benchmark 또는 part별 투입 정의 수 비교에는 bar 차트가 적합하다
+  - 세그먼트 또는 part별 투입 정의 수 비교에는 bar 차트가 적합하다
   - start 기준 추이는 동일 시간 단위로 집계한 line 차트가 적합하다
 sample_queries:
-  - question: benchmark별 신규 투입 정의는 몇 건이야?
+  - question: 세그먼트별 신규 투입 정의는 몇 건이야?
     sql: |
       SELECT dataset, COUNT(*) AS order_definition_count
       FROM orders
@@ -43,4 +43,4 @@ active: true
 status: verified
 owner: ""
 updated: 2026-09-15
-source: SMT2020 order.txt 직접 확인
+source: scripts/generate_mock_database.py 합성 생성 확인

@@ -6,7 +6,7 @@
   active: true
   status: verified
   updated: 2026-09-15
-  source: SMT2020 WIP.txt 설명
+  source: scripts/generate_mock_database.py wip 정의 참고
 - term: Route
   definition: Part가 거치는 순서 있는 공정 Step의 집합.
   aliases: [Routing, 공정 경로]
@@ -14,7 +14,7 @@
   active: true
   status: verified
   updated: 2026-09-15
-  source: SMT2020 part.txt와 route_*.txt 설명
+  source: scripts/generate_mock_database.py part/route_step 정의 참고
 - term: STNFAM
   definition: 공정 Step이 사용하는 station/equipment family 식별자.
   aliases: [설비 Family, Station Family]
@@ -22,20 +22,67 @@
   active: true
   status: verified
   updated: 2026-09-15
-  source: SMT2020 route_*.txt와 tool.txt.1l 설명
-- term: HVLM
-  definition: SMT2020 High Volume Low Mix benchmark. SQLite에서는 dataset='HVLM'으로 구분한다.
-  aliases: [High Volume Low Mix]
+  source: scripts/generate_mock_database.py route_step/tool 정의 참고
+- term: SEG_A
+  definition: 소품종 대량생산(고Volume-저Mix) 성격의 생산 세그먼트. SQLite에서는 dataset='SEG_A'로 구분한다.
+  aliases: [고Volume-저Mix, High Volume Low Mix]
   related_tables: [part, route_step, tool, orders, wip]
   active: true
   status: verified
   updated: 2026-09-15
-  source: SMT2020_HVLM 폴더
-- term: LVHM
-  definition: SMT2020 Low Volume High Mix benchmark. SQLite에서는 dataset='LVHM'으로 구분한다.
-  aliases: [Low Volume High Mix]
+  source: scripts/generate_mock_database.py SEGMENTS 정의 참고
+- term: SEG_B
+  definition: 다품종 소량생산(저Volume-고Mix) 성격의 생산 세그먼트. SQLite에서는 dataset='SEG_B'로 구분한다.
+  aliases: [저Volume-고Mix, Low Volume High Mix]
   related_tables: [part, route_step, tool, orders, wip]
   active: true
   status: verified
   updated: 2026-09-15
-  source: SMT2020_LVHM 폴더
+  source: scripts/generate_mock_database.py SEGMENTS 정의 참고
+- term: FP
+  definition: 생산계획(FP, Factory/Fabrication Plan) 결과. 계획·실적·swap 수량과 제품 속성을 담는 IF 데이터를 말한다.
+  aliases: [생산계획, Fab Plan]
+  related_tables: [FP_TARGET]
+  active: true
+  status: draft
+  updated: 2026-09-23
+  source: 사용자 제공 실제 폐쇄망 테이블 정의(2026-09-23)
+- term: Swap 수량
+  definition: 계획 수량 중 다른 조건으로 대체(swap)된 수량. 스왑잔여계획수량과 swap 완료 여부 판단에 쓰인다.
+  aliases: [SWAP_QTY, 스와핑 수량]
+  related_tables: [FP_TARGET]
+  active: true
+  status: draft
+  updated: 2026-09-23
+  source: 사용자 제공 실제 폐쇄망 테이블 정의(2026-09-23)
+- term: 잔여계획수량
+  definition: 계획수량에서 실적수량을 뺀, 아직 실행되지 않은 계획 수량.
+  aliases: [REMAIN_PLAN_QTY]
+  related_tables: [FP_TARGET]
+  active: true
+  status: draft
+  updated: 2026-09-23
+  source: 사용자 제공 실제 폐쇄망 테이블 정의(2026-09-23)
+- term: PKT 목표수량 Swap
+  definition: >-
+    PNT-FP가 적재한 스냅샷(계획·실적·제품담당자배정·swap 우선순위) 기준으로
+    targetQty(=planQty-poutQty)를 산출하고, 실적이 계획을 넘친 그룹에 swap
+    우선순위 정책을 적용해 재분배한 실시간 계산 결과. FP_TARGET의
+    TARGET_QTY(배치 반영 이력)와는 별개 원천이며 값이 다를 수 있다.
+  aliases: [PKT swap, targetQty swap, PKT 목표수량 swap 산출]
+  related_tables: []
+  active: true
+  status: draft
+  updated: 2026-09-23
+  source: 사용자 제공 PNS PNT-FP API 실제 스펙(2026-09-23)
+- term: Swap 우선순위 정책
+  definition: >-
+    제품군(PROD_GRP_NM)·구분(GBN_CD)별 FR/TO 우선순위 쌍. 같은 제품 내에서
+    이 우선순위 순서대로 실적 초과분을 양보(GIVE)하고 부족분을 충전(RECEIVE)해
+    PKT 목표수량 swap 방향을 결정한다.
+  aliases: [swap priority, GBN_PRITORITY, PARA_PRITORITY]
+  related_tables: []
+  active: true
+  status: draft
+  updated: 2026-09-23
+  source: 사용자 제공 PNS PNT-FP API 실제 스펙(2026-09-23)

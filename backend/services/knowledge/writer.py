@@ -18,12 +18,12 @@ import yaml
 from pydantic import ValidationError
 from pydantic_core import to_jsonable_python
 
-from services import knowledge_service as ks
-from services.document_store import KnowledgeError
-from services.knowledge_guides import shape_errors
-from services.knowledge_integrity import integrity_issues
-from services.knowledge_service import GLOSSARY_FILE, KIND_SPECS, KnowledgeStore
-from services.knowledge_yaml import dump_yaml, model_to_data, parse_yaml_mapping
+from services.knowledge import catalog as ks
+from services.knowledge.documents import KnowledgeError
+from services.knowledge.guides import shape_errors
+from services.knowledge.integrity import integrity_issues
+from services.knowledge.catalog import GLOSSARY_FILE, KIND_SPECS, KnowledgeStore
+from services.knowledge.yaml_codec import dump_yaml, model_to_data, parse_yaml_mapping
 from services.service_logging import logged_service_operation
 
 #: 파일명으로 쓰이는 키. 경로 구분자·점·공백을 허용하지 않아 경로 주입을 막는다.

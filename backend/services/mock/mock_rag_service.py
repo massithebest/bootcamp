@@ -1,6 +1,6 @@
 """Mock adapter uses the same approved local documents; no fabricated hits."""
 from asyncio import to_thread
-from services.document_store import get_document_store
+from services.knowledge.documents import get_document_store
 from services.service_logging import logged_service_operation
 
 

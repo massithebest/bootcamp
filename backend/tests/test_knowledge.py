@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from services.knowledge_service import KnowledgeStore
+from services.knowledge.catalog import KnowledgeStore
 
 
 def _write(path: Path, body: str) -> None:
@@ -19,7 +19,7 @@ def root(tmp_path: Path) -> Path:
         tmp_path / "catalog/tables/wip.yaml",
         """
         table: wip
-        description: SMT2020 초기 재공
+        description: 초기 재공
         grain: [dataset, lot]
         time_column: due
         tags: [WIP, 재공]
@@ -70,14 +70,14 @@ def root(tmp_path: Path) -> Path:
         """,
     )
     _write(
-        tmp_path / "simulations/SMT2020_입력검증.yaml",
+        tmp_path / "simulations/입력_정합성_검증.yaml",
         """
-        type: SMT2020_입력검증
+        type: 입력_정합성_검증
         name: 입력 검증
         aliases: [정합성 검증]
         when_to_use: simulation 입력 확인
         params:
-          dataset: {required: true, description: 데이터셋, example: LVHM}
+          dataset: {required: true, description: 데이터셋, example: SEG_B}
         output_schema:
           results: {type: array, desc: 관계 검사}
         aggregation_rules: ["dataset 하나를 기준으로 집계"]
@@ -117,21 +117,21 @@ def root(tmp_path: Path) -> Path:
         """,
     )
     _write(
-        tmp_path / "scenarios/lvhm_input_integrity.yaml",
+        tmp_path / "scenarios/seg_b_input_integrity.yaml",
         """
-        scenario_id: lvhm_input_integrity
-        name: LVHM 입력 검증
+        scenario_id: seg_b_input_integrity
+        name: SEG_B 입력 검증
         description: recipe와 simulation을 함께 확인
-        dataset: LVHM
-        question: LVHM WIP와 Route 관계를 검증해줘
+        dataset: SEG_B
+        question: SEG_B WIP와 Route 관계를 검증해줘
         steps:
           - action: recipe
             ref: wip_by_part
-            params: {dataset: LVHM}
+            params: {dataset: SEG_B}
             expectation: Part별 WIP가 조회된다
           - action: simulation
-            ref: SMT2020_입력검증
-            params: {dataset: LVHM}
+            ref: 입력_정합성_검증
+            params: {dataset: SEG_B}
             expectation: unmatched가 0이다
         expected:
           table_counts: {part: 10, wip: 2156}
@@ -184,26 +184,26 @@ def test_legacy_yaml_defaults_to_active(root: Path) -> None:
 def test_inactive_yaml_is_hidden_from_all_runtime_lookups(root: Path) -> None:
     store = KnowledgeStore.load(root)
     store.kpis["initial_wip"].active = False
-    store.simulations["SMT2020_입력검증"].active = False
+    store.simulations["입력_정합성_검증"].active = False
     store.glossary[0].active = False
     store.recipes["wip_by_part"].active = False
-    store.scenarios["lvhm_input_integrity"].active = False
+    store.scenarios["seg_b_input_integrity"].active = False
 
     assert store.list_kpis() == []
     assert store.get_kpi("initial_wip")["status"] == "error"
     assert store.list_simulations() == []
-    assert store.get_simulation("SMT2020_입력검증")["status"] == "error"
+    assert store.get_simulation("입력_정합성_검증")["status"] == "error"
     assert store.list_glossary() == []
     assert store.list_recipes() == []
     assert store.get_recipe("wip_by_part")["status"] == "error"
     assert store.list_scenarios() == []
-    assert store.get_scenario("lvhm_input_integrity")["status"] == "error"
+    assert store.get_scenario("seg_b_input_integrity")["status"] == "error"
 
 
 def test_simulation_exposes_aggregation_rules_and_visualization_hints(root: Path) -> None:
     store = KnowledgeStore.load(root)
 
-    simulation = store.get_simulation("SMT2020_입력검증")
+    simulation = store.get_simulation("입력_정합성_검증")
 
     assert simulation["aggregation_rules"] == ["dataset 하나를 기준으로 집계"]
     assert simulation["visualization_hints"] == ["관계별 건수는 표가 적합"]
@@ -226,19 +226,22 @@ def test_simulation_rule_fields_default_to_empty(root: Path) -> None:
 
 
 def test_inactive_simulation_cannot_be_validated_or_run(root: Path, monkeypatch) -> None:
-    from services import knowledge_service, simulation_registry
+    from services.knowledge import catalog as knowledge_service
+    from services.simulation import registry as simulation_registry
 
     store = KnowledgeStore.load(root)
     monkeypatch.setattr(knowledge_service, "_store", store)
     monkeypatch.setattr(simulation_registry, "get_store", lambda: store)
-    params = {"dataset": "LVHM"}
-    assert simulation_registry.validate_simulation_request("SMT2020_입력검증", params) is None
+    params = {"dataset": "SEG_B"}
+    assert simulation_registry.validate_simulation_request("입력_정합성_검증", params) is None
 
-    store.simulations["SMT2020_입력검증"].active = False
+    store.simulations["입력_정합성_검증"].active = False
 
-    assert store.is_simulation_active("SMT2020_입력검증") is False
-    error = simulation_registry.validate_simulation_request("SMT2020_입력검증", params)
-    assert error and "알 수 없는 simulation_type" in error
+    assert store.is_simulation_active("입력_정합성_검증") is False
+    error = simulation_registry.validate_simulation_request("입력_정합성_검증", params)
+    assert error is not None
+    assert error["status"] == "error"
+    assert "알 수 없는 simulation_type" in error["message"]
 
 
 def test_references_to_inactive_items_are_hidden_from_active_items(root: Path) -> None:
@@ -247,7 +250,7 @@ def test_references_to_inactive_items_are_hidden_from_active_items(root: Path) -
     store.recipes["wip_by_part"].active = False
     store.kpis["initial_wip"].recipe_refs = ["wip_by_part"]
     store.kpis["initial_wip"].diagnostics[0].ref = "part"
-    store.simulations["SMT2020_입력검증"].follows = ["SMT2020_입력검증"]
+    store.simulations["입력_정합성_검증"].follows = ["입력_정합성_검증"]
 
     assert store.describe_table("wip")["joins"] == []
     kpi = store.get_kpi("initial_wip")
@@ -255,8 +258,8 @@ def test_references_to_inactive_items_are_hidden_from_active_items(root: Path) -
     assert store.list_glossary()[0]["related_tables"] == ["wip"]
     store.kpis["initial_wip"].active = False
     assert store.list_glossary()[0]["related_kpis"] == []
-    store.simulations["SMT2020_입력검증"].active = False
-    assert store.get_simulation("SMT2020_입력검증")["status"] == "error"
+    store.simulations["입력_정합성_검증"].active = False
+    assert store.get_simulation("입력_정합성_검증")["status"] == "error"
 
 
 def test_recipe_with_inactive_source_table_is_hidden(root: Path) -> None:
@@ -372,7 +375,7 @@ def test_get_kpi_full_and_unknown(root: Path) -> None:
 def test_get_simulation_merges_params(root: Path) -> None:
     store = KnowledgeStore.load(root)
 
-    sim = store.get_simulation("SMT2020_입력검증")
+    sim = store.get_simulation("입력_정합성_검증")
     assert sim["params"]["dataset"]["required"] is True
     assert sim["verified"] is True
     assert store.get_simulation("없음")["status"] == "error"
@@ -432,12 +435,12 @@ def test_get_recipe_unknown_returns_error(root: Path) -> None:
 def test_list_and_get_scenarios(root: Path) -> None:
     store = KnowledgeStore.load(root)
 
-    assert [row["scenario_id"] for row in store.list_scenarios("LVHM")] == [
-        "lvhm_input_integrity"
+    assert [row["scenario_id"] for row in store.list_scenarios("SEG_B")] == [
+        "seg_b_input_integrity"
     ]
     assert store.list_scenarios("존재하지않는") == []
-    scenario = store.get_scenario("LVHM_INPUT_INTEGRITY")
-    assert scenario["dataset"] == "LVHM"
+    scenario = store.get_scenario("SEG_B_INPUT_INTEGRITY")
+    assert scenario["dataset"] == "SEG_B"
     assert scenario["steps"][0]["ref"] == "wip_by_part"
     assert scenario["expected"]["table_counts"]["wip"] == 2156
     assert scenario["verified"] is False
@@ -458,7 +461,7 @@ def test_scenario_accepts_arbitrary_dataset_identifier(root: Path) -> None:
             params: {dataset: plant_a_2026q3_snapshot}
             expectation: 제품별 집계가 조회된다
           - action: simulation
-            ref: SMT2020_입력검증
+            ref: 입력_정합성_검증
             params: {dataset: plant_a_2026q3_snapshot}
             expectation: 입력 관계 검사가 완료된다
         expected:

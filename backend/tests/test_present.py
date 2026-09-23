@@ -5,8 +5,8 @@ import asyncio
 import pytest
 
 from agent.sdk_tools import planning_tools, tool_catalog, tool_names
-from services import result_store
-from services.present_service import (
+from services.results import store as result_store
+from services.results.present import (
     PresentError,
     present_chart_input_schema,
     present_simulation_input_schema,
@@ -17,7 +17,7 @@ from services.present_service import (
     validate_present_sql_preview,
     validate_present_table,
 )
-from services.result_store import LocalParquetResultStore
+from services.results.store import LocalParquetResultStore
 from tools.present_tool import present_chart, present_simulation, present_sql_preview, present_table
 
 SCOPE = "scope-a"
@@ -75,7 +75,7 @@ def test_valid_sql_preview_returns_empty_object() -> None:
 
 def test_valid_simulation_returns_empty_object(result) -> None:
     args = {
-        "scenario": "HVLM 입력검증",
+        "scenario": "SEG_A 입력검증",
         "summary": "요약",
         "kpis": [{"label": "불량률", "value": 1.2, "unit": "%"}],
         "result_id": result.result_id,

@@ -1,11 +1,11 @@
 """execute_sql 가드레일. (설계 §4 "execute_sql 가드레일")
 
-서비스 계층에서 강제한다 — SDK 훅과 달리 mock/real/테스트에서 동일하게 동작한다.
+서비스 계층에서 강제한다 — SDK 훅과 달리 mock/production/테스트에서 동일하게 동작한다.
 """
 
 import pytest
 
-from services.sql_guard import MAX_ROWS, SqlGuardError, check_sql
+from services.sql.guard import MAX_ROWS, SqlGuardError, check_sql
 
 
 ALLOWED = {"wip", "part", "route_step"}

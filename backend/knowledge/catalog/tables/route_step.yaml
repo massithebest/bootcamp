@@ -1,9 +1,9 @@
 table: route_step
-description: SMT2020의 모든 route 파일을 통합한 Route별 공정 Step
+description: 모든 route 정의를 통합한 Route별 공정 Step
 grain: [dataset, route, step]
-tags: [SMT2020, Route, 공정, Step, 설비]
+tags: [Route, 공정, Step, 설비]
 columns:
-  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: dataset, type: varchar, desc: "생산 세그먼트 구분 (SEG_A 또는 SEG_B)"}
   - {name: route, type: varchar, desc: Route ID}
   - {name: step, type: int, desc: Route 내 공정 Step 번호}
   - {name: description, type: varchar, desc: 공정 설명}
@@ -40,7 +40,7 @@ caveats:
   - ptime과 관련 시간은 ptunits/ptper 및 분포 파라미터와 함께 해석한다
   - 빈 optional 필드를 0으로 간주하지 않는다
 query_rules:
-  - 특정 benchmark 질문은 dataset을 필수로 제한한다
+  - 특정 세그먼트 질문은 dataset을 필수로 제한한다
   - 특정 Route의 공정 순서는 step 오름차순으로 조회한다
   - part 또는 tool과 조인할 때 dataset과 route 또는 stnfam을 함께 조인 조건에 포함한다
 aggregation_rules:
@@ -50,7 +50,7 @@ visualization_hints:
   - Route별 Step 수나 같은 단위의 처리시간 비교에는 bar 차트가 적합하다
   - Step 순서와 공정 설명은 차트보다 step 오름차순 표가 적합하다
 sample_queries:
-  - question: benchmark별 Route Step은 총 몇 개야?
+  - question: 세그먼트별 Route Step은 총 몇 개야?
     sql: |
       SELECT dataset, COUNT(*) AS step_count
       FROM route_step
@@ -60,4 +60,4 @@ active: true
 status: verified
 owner: ""
 updated: 2026-09-15
-source: SMT2020 route_*.txt 직접 확인
+source: scripts/generate_mock_database.py 합성 생성 확인

@@ -1,7 +1,7 @@
 kpi_id: initial_wip
 name: 제품별 초기 WIP
 aliases: [초기 재공, 제품별 WIP, WIP Lot 수, WIP 수량]
-definition: SMT2020 simulation 시작 시점에 존재하는 초기 재공을 dataset과 Part별로 집계한다.
+definition: 생산계획 시작 시점에 존재하는 초기 재공을 dataset과 Part별로 집계한다.
 formula: lot_count = COUNT(*), piece_count = SUM(wip.pieces)
 sources: [wip]
 grain: [dataset, part]
@@ -16,16 +16,16 @@ sql_template: |
    GROUP BY dataset, part
    ORDER BY part
 aggregation_rules:
-  - dataset을 먼저 확정하고 HVLM/LVHM을 섞지 않는다
+  - dataset을 먼저 확정하고 SEG_A/SEG_B를 섞지 않는다
   - Lot 수는 COUNT(*), wafer/piece 수는 SUM(pieces)로 구분한다
   - route_step과 조인하기 전에 WIP를 dataset과 part grain으로 먼저 집계해 Step 수만큼 중복되지 않게 한다
 recipe_refs: [initial_wip_by_part, wip_integrity_diagnostics]
 diagnostics:
   - {hypothesis: WIP의 Part·현재 Step 및 Route의 설비 Family 연결 누락 여부, how: sql, ref: recipes/wip_integrity_diagnostics}
   - {hypothesis: dataset 키 생략에 따른 교차 연결과 Route 조인 중복 합산 위험 여부, how: sql, ref: recipes/wip_integrity_diagnostics}
-  - {hypothesis: SMT2020 입력 테이블 관계가 완전함, how: simulation, ref: SMT2020_입력검증}
+  - {hypothesis: 입력 테이블 관계가 완전함, how: simulation, ref: 입력_정합성_검증}
 active: true
 status: draft
 owner: ""
 updated: 2026-09-16
-source: SMT2020 WIP.txt 직접 확인
+source: scripts/generate_mock_database.py 합성 생성 확인

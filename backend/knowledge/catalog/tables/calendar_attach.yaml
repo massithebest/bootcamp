@@ -1,9 +1,9 @@
 table: calendar_attach
-description: SMT2020 breakdown/PM calendar와 설비 자원의 연결
+description: breakdown/PM calendar와 설비 자원의 연결
 grain: [dataset, calname, restype, resname]
-tags: [SMT2020, 설비, Calendar, Breakdown, PM]
+tags: [설비, Calendar, Breakdown, PM]
 columns:
-  - {name: dataset, type: varchar, desc: "benchmark 구분 (HVLM 또는 LVHM)"}
+  - {name: dataset, type: varchar, desc: "생산 세그먼트 구분 (SEG_A 또는 SEG_B)"}
   - {name: calname, type: varchar, desc: 연결할 calendar 이름}
   - {name: caltype, type: varchar, desc: "calendar 유형 (down/pm)"}
   - {name: restype, type: varchar, desc: 자원 유형}
@@ -15,15 +15,15 @@ joins: []
 caveats:
   - caltype에 따라 calname을 down_calendar.downcalname 또는 pm_calendar.pmcalname과 연결한다
 query_rules:
-  - 특정 benchmark 질문은 dataset을 필수로 제한하고 HVLM/LVHM 비교일 때만 두 dataset을 함께 조회한다
+  - 특정 세그먼트 질문은 dataset을 필수로 제한하고 SEG_A/SEG_B 비교일 때만 두 dataset을 함께 조회한다
   - calendar 상세와 조인할 때 caltype이 down이면 down_calendar, pm이면 pm_calendar만 사용한다
 aggregation_rules:
   - 자원 연결 수는 dataset, calname, restype, resname grain에서 센다
 visualization_hints:
-  - benchmark·caltype·restype별 연결 수 비교에는 bar 차트가 적합하다
+  - 세그먼트·caltype·restype별 연결 수 비교에는 bar 차트가 적합하다
   - calendar와 자원의 개별 연결 관계는 차트보다 표가 적합하다
 sample_queries:
-  - question: benchmark별 breakdown과 예방보전 캘린더 연결은 몇 건이야?
+  - question: 세그먼트별 breakdown과 예방보전 캘린더 연결은 몇 건이야?
     sql: |
       SELECT dataset, caltype, restype, COUNT(*) AS attachment_count
       FROM calendar_attach
@@ -33,4 +33,4 @@ active: true
 status: verified
 owner: ""
 updated: 2026-09-15
-source: SMT2020 attach.txt 직접 확인
+source: scripts/generate_mock_database.py 합성 생성 확인

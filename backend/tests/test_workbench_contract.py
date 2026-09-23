@@ -1,4 +1,4 @@
-"""F01/F02/F12: real adapter + agent + SSE, with a deterministic SDK substitute.
+"""F01/F02/F12: production adapter + agent + SSE, with a deterministic SDK substitute.
 
 Case names are also used by the frontend workbench regression fixtures.
 No new API, payload fields, provider calls, or runtime behavior are introduced.

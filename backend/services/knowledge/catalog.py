@@ -3,7 +3,7 @@
 `knowledge/` 아래의 YAML(카탈로그·KPI·시뮬레이션·용어집·시나리오·레시피)을 읽어
 pydantic 으로 검증하고, tool/서비스/API 가 함께 쓰는 조회 인터페이스를 제공한다.
 
-관리 기준: backend/docs/domain-knowledge-management.md
+관리 기준: backend/docs/DOMAIN-KNOWLEDGE-MANAGEMENT.md
 - YAML 이 카탈로그·KPI·시뮬레이션 정의의 source of truth 다.
 - 에이전트는 tools/knowledge_tool.py 를 통해서만 이 데이터에 접근한다.
 """

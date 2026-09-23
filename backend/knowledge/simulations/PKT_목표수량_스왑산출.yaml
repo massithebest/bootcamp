@@ -1,0 +1,41 @@
+type: PKT_목표수량_스왑산출
+name: PKT 목표수량 Swap 산출
+aliases: [PKT swap, 목표수량 swap, swap 결과조회, targetQty swap]
+when_to_use: >-
+  특정 제품(plan_prod_ids)의 swap 결과, swap이 실제 발생한 제품 목록, 전체 제품의
+  targetQty swap 산출 결과를 확인할 때 사용한다. PNT-FP가 적재한 스냅샷(계획·실적·
+  제품담당자배정·swap 우선순위) 기준 실시간 계산 결과이며, FP_TARGET SQL
+  카탈로그의 배치 반영 이력과는 별개 원천이므로 두 결과가 다를 수 있다. 실제
+  운영에서는 스냅샷이 아직 적재되지 않았으면 결과가 비어 있을 수 있다(오류 아님).
+  view=by_ids일 때만 plan_prod_ids가 실제로 필요하다 — 그 외 view에서는 무시한다.
+params:
+  view:
+    required: true
+    description: "all(전체) | swapped(swap이 실제 발생한 행만) | by_ids(plan_prod_ids로 지정한 제품만)"
+    example: all
+  plan_prod_ids:
+    required: false
+    description: "view=by_ids일 때만 쓰는 조회 대상 제품 ID 목록(중복 불가). 다른 view에서는 무시한다."
+    example: '["PROD_0001"]'
+output_schema:
+  metadata:
+    type: object
+    desc: itemCount·swapCount·totalTarget·totalPlanQty·targetToPlanRatio
+  items:
+    type: array
+    desc: >-
+      planProductId·site·grade·customer·planQty·poutQty·targetQty와, swap이 발생한
+      행에 한해 swapReason(direction GIVE/RECEIVE·상대 제품·swapQty 등)
+aggregation_rules:
+  - targetQty는 이미 swap이 반영된 값이므로 다시 조정하지 않는다
+  - totalTarget·totalPlanQty는 조회한 view 범위 안에서만 합산한다
+  - swapCount는 GIVE/RECEIVE 한 쌍을 각각 별도 행으로 센다
+visualization_hints:
+  - 제품·사이트별 planQty 대비 targetQty 비교에는 bar 차트가 적합하다
+  - swap 발생 건(GIVE/RECEIVE 쌍 확인)은 차트보다 표가 적합하다
+follows: []
+active: true
+status: draft
+owner: ""
+updated: 2026-09-23
+source: 사용자 제공 PNS PNT-FP API 실제 스펙(2026-09-23) — mock 데이터는 계약 형태 재현용 합성치

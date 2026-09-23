@@ -1,5 +1,5 @@
 recipe_id: initial_wip_by_part
-name: SMT2020 Part별 초기 WIP
+name: Part별 초기 WIP
 description: dataset과 part grain에서 초기 WIP Lot 수, piece 수와 최초 납기를 계산한다.
 cte_name: initial_wip_by_part
 cte_sql: |
@@ -13,36 +13,36 @@ cte_sql: |
   GROUP BY w.dataset, w.part
 sources: [wip]
 when_to_use:
-  - HVLM 또는 LVHM의 Part별 초기 재공 규모를 비교할 때
+  - SEG_A 또는 SEG_B의 Part별 초기 재공 규모를 비교할 때
   - Lot 수와 wafer/piece 수를 구분해 조회할 때
   - Part별 가장 빠른 초기 WIP 납기를 확인할 때
 output_grain: [dataset, part]
 output_columns:
-  - {name: dataset, role: category, desc: benchmark 구분}
+  - {name: dataset, role: category, desc: 세그먼트 구분}
   - {name: part, role: category, desc: Part ID}
   - {name: lot_count, role: measure, unit: lot, desc: 초기 WIP Lot 수}
   - {name: piece_count, role: measure, unit: piece, desc: 초기 WIP pieces 합계}
   - {name: earliest_due, role: time, desc: Part 내 가장 빠른 due 시각}
 query_rules:
-  - 특정 benchmark 질문은 바깥 SELECT에서 dataset을 필수로 제한한다
+  - 특정 세그먼트 질문은 바깥 SELECT에서 dataset을 필수로 제한한다
   - 상위 N개 질문은 기준 measure를 명시해 내림차순 정렬하고 LIMIT을 적용한다
   - 납기 조건은 earliest_due가 Part 내 최솟값이라는 점을 전제로 해석한다
 aggregation_rules:
   - CTE가 이미 dataset과 part grain이므로 Lot 수 재집계는 SUM(lot_count)를 사용한다
-  - HVLM/LVHM을 비교하지 않는 질문은 바깥 SELECT에서 dataset을 반드시 필터한다
+  - SEG_A/SEG_B를 비교하지 않는 질문은 바깥 SELECT에서 dataset을 반드시 필터한다
   - route_step과 조인해야 하면 이 CTE로 WIP를 먼저 집계해 Step 수만큼 중복되지 않게 한다
 visualization_hints:
   - Part별 lot_count 또는 piece_count 비교에는 bar 차트가 적합하다
   - earliest_due는 수량 축으로 사용하지 않는다
 sample_queries:
-  - question: LVHM에서 초기 WIP piece가 가장 많은 Part는 무엇이야?
+  - question: SEG_B에서 초기 WIP piece가 가장 많은 Part는 무엇이야?
     sql: |
       SELECT dataset, part, lot_count, piece_count, earliest_due
       FROM initial_wip_by_part
-      WHERE dataset = 'LVHM'
+      WHERE dataset = 'SEG_B'
       ORDER BY piece_count DESC
       LIMIT 1
-  - question: benchmark별 초기 WIP Lot과 piece 합계는 얼마야?
+  - question: 세그먼트별 초기 WIP Lot과 piece 합계는 얼마야?
     sql: |
       SELECT dataset, SUM(lot_count) AS lot_count, SUM(piece_count) AS piece_count
       FROM initial_wip_by_part
@@ -52,4 +52,4 @@ active: true
 status: draft
 owner: ""
 updated: 2026-09-15
-source: SMT2020 WIP.txt와 생성 SQLite 검증
+source: scripts/generate_mock_database.py 합성 생성 결과 검증

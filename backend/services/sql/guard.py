@@ -1,7 +1,7 @@
 """execute_sql 가드레일. (설계 §4)
 
 SDK 훅이 아니라 서비스 계층에 둔다 — 훅은 SDK 에 종속되지만, 이 검증은
-mock / real / 테스트 어디서든 같은 규칙으로 동작해야 한다.
+mock / production / 테스트 어디서든 같은 규칙으로 동작해야 한다.
 """
 
 from __future__ import annotations

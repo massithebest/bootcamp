@@ -3,7 +3,7 @@
 import asyncio
 
 from core import config
-from services import knowledge_search_service
+from services.knowledge import search as knowledge_search_service
 
 
 def test_local_backend_uses_document_store_without_calling_rag_provider(monkeypatch) -> None:
@@ -12,7 +12,7 @@ def test_local_backend_uses_document_store_without_calling_rag_provider(monkeypa
             return {"kind": "knowledge", "status": "ok", "query": query}
 
     monkeypatch.setattr(config, "KNOWLEDGE_SEARCH_BACKEND", "local")
-    monkeypatch.setattr(config, "SERVICE_MODE", "real")
+    monkeypatch.setattr(config, "SERVICE_MODE", "production")
     monkeypatch.setattr(knowledge_search_service, "get_document_store", Store)
 
     async def unexpected_provider_call(query: str) -> dict:

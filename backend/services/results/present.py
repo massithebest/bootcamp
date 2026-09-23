@@ -12,9 +12,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from services.chart_projection import AGGREGATIONS, CHART_TYPES
-from services.query_result_errors import QueryResultError
-from services.query_result_service import check_accessible, read_chart
+from services.results.chart import AGGREGATIONS, CHART_TYPES
+from services.results.errors import QueryResultError
+from services.results.query import check_accessible, read_chart
 from services.service_logging import logged_service_operation
 
 

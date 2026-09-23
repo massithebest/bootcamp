@@ -11,10 +11,10 @@ import os
 
 import pytest
 
-pytestmark = [pytest.mark.e2e, pytest.mark.smt2020, pytest.mark.mock_service]
+pytestmark = [pytest.mark.e2e, pytest.mark.mock_service]
 
 
-QUERY = "SMT2020 LVHM에서 제품별 초기 WIP를 조회하고 simulation 입력 관계도 검증해줘."
+QUERY = "SEG_B에서 제품별 초기 WIP를 조회하고 simulation 입력 관계도 검증해줘."
 
 
 def _require_api_key() -> None:
@@ -23,7 +23,7 @@ def _require_api_key() -> None:
 
 
 @pytest.fixture(scope="module")
-def agent_run(tmp_path_factory, smt2020_assets):
+def agent_run(tmp_path_factory, mock_database):
     """시드 DB 를 만들고 에이전트를 한 번 돌려 이벤트를 모은다."""
 
     _require_api_key()
@@ -32,12 +32,9 @@ def agent_run(tmp_path_factory, smt2020_assets):
 
     from core import config
 
-    db_path = smt2020_assets.main(
-        smt2020_assets.DEFAULT_SOURCE_ROOT,
-        tmp_path_factory.mktemp("e2e") / "smt2020.db",
-    )
-    original = config.SMT2020_DB_PATH
-    config.SMT2020_DB_PATH = db_path
+    db_path = mock_database.main(tmp_path_factory.mktemp("e2e") / "mock_planning.db")
+    original = config.MOCK_DB_PATH
+    config.MOCK_DB_PATH = db_path
 
     async def collect():
         from agent.agent import run_agent
@@ -47,7 +44,7 @@ def agent_run(tmp_path_factory, smt2020_assets):
     try:
         events = asyncio.run(collect())
     finally:
-        config.SMT2020_DB_PATH = original
+        config.MOCK_DB_PATH = original
 
     tool_calls = [e.tool_name for e in events if e.type == "tool_call"]
     answer = "".join(e.content or "" for e in events if e.type == "text")
@@ -77,7 +74,7 @@ def test_input_validation_is_run(agent_run) -> None:
 
 def test_answer_names_dataset_and_wip(agent_run) -> None:
     answer = agent_run["answer"]
-    assert "LVHM" in answer
+    assert "SEG_B" in answer
     assert "WIP" in answer or "재공" in answer
 
 
