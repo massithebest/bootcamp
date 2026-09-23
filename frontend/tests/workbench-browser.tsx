@@ -2,6 +2,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import App from "@/App";
+import { QueryTable } from "@/components/chat/generative/query-table";
 import type { AgentEvent } from "@/types/chat";
 import "@/app/globals.css";
 
@@ -14,8 +15,11 @@ export async function runWorkbenchRegressions() {
   const requests: ReadableStreamDefaultController<Uint8Array>[] = [];
   const encoder = new TextEncoder();
   const resultId = "a".repeat(32);
+  const alternateResultId = "b".repeat(32);
+  const expiredResultId = "c".repeat(32);
+  let resolveAlternateTable: ((response: Response) => void) | undefined;
   window.confirm = () => true;
-  window.fetch = async input => {
+  window.fetch = async (input, init) => {
     const url = String(input);
     if (url.endsWith("/api/chat")) return new Response(new ReadableStream({ start(c) { requests.push(c); } }));
     if (url.endsWith("/api/knowledge/tools")) return Response.json([{
@@ -29,10 +33,21 @@ export async function runWorkbenchRegressions() {
       name: "kpi-shortfall-analysis", description: "실적 부진 원인을 검증하는 업무 절차입니다.", status: "active",
       content: "# 실적 부진 원인 분석\n\n## 절차\n\n1. **KPI 확정**: `list_kpis`로 정의를 확인한다.\n2. **가설 검증**: 근거 수치로 검증한다.\n\n## 규칙\n\n- 기각 근거도 답변에 남긴다.",
     });
-    if (url.includes(`/api/query-results/${resultId}/table`)) return Response.json({
-      status: "ok", result_id: resultId, page: 1, page_size: 50, row_count: 1, filtered_row_count: 1, source_truncated: false,
+    const requestUrl = new URL(url, window.location.href);
+    if (requestUrl.pathname.includes("/api/query-results/") && requestUrl.pathname.endsWith("/table")) {
+      const requestedId = requestUrl.pathname.split("/").at(-2);
+      if (requestedId === alternateResultId) {
+        return new Promise<Response>((resolve, reject) => {
+          resolveAlternateTable = resolve;
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+        });
+      }
+      if (requestedId === expiredResultId) return Response.json({ detail: { code: "RESULT_NOT_FOUND", message: "결과를 찾을 수 없습니다." } }, { status: 404 });
+      return Response.json({
+      status: "ok", result_id: resultId, page: 1, page_size: 10, row_count: 1, filtered_row_count: 1, source_truncated: false,
       columns: [{ name: "제품", dtype: "str", role: "category" }, { name: "WIP", dtype: "int64", role: "measure" }], rows: [["A", 20]],
-    });
+      });
+    }
     if (url.includes(`/api/query-results/${resultId}/chart`)) return Response.json({
       status: "ok", result_id: resultId, warnings: [],
       chart: { type: "bar", x: "part", series: [{ key: "qty", label: "WIP" }], categories: ["A"], data: [{ part: "A", qty: 20 }], title: "WIP 비교", x_label: "제품", y_label: "수량", unit: "개" },
@@ -229,6 +244,31 @@ export async function runWorkbenchRegressions() {
       await click("차트 데이터 표로 보기");
       await waitFor(() => !!host.querySelector("table"));
       check(host.querySelector("table")?.textContent?.includes("A20"), `chart alternative values differ: ${host.querySelector('table')?.textContent}`);
+    });
+    await run("F18 result table never shows a different request while loading or after expiry", async () => {
+      const tableHost = document.createElement("div");
+      document.body.append(tableHost);
+      const tableRoot = createRoot(tableHost);
+      try {
+        await act(async () => tableRoot.render(<QueryTable resultId={resultId} />));
+        await waitFor(() => !!tableHost.querySelector("tbody tr"));
+        check(tableHost.textContent?.includes("A"), "initial result row missing");
+        await act(async () => tableRoot.render(<QueryTable resultId={alternateResultId} />));
+        check(!tableHost.textContent?.includes("A"), "previous result row remained visible for a different result id");
+        check(tableHost.textContent?.includes("불러오는 중"), "new result has no loading feedback");
+        resolveAlternateTable?.(Response.json({
+          status: "ok", result_id: alternateResultId, page: 1, page_size: 10, row_count: 1, filtered_row_count: 1, source_truncated: false,
+          columns: [{ name: "제품", dtype: "str", role: "category" }], rows: [["B"]],
+        }));
+        await waitFor(() => tableHost.textContent?.includes("B") ?? false);
+        await act(async () => tableRoot.render(<QueryTable resultId={expiredResultId} />));
+        check(!tableHost.textContent?.includes("B"), "previous result row remained visible after result id changed");
+        await waitFor(() => tableHost.textContent?.includes("찾을 수 없습니다") ?? false);
+        check(!tableHost.textContent?.includes("B"), "expired result kept rendering old rows");
+      } finally {
+        await act(async () => tableRoot.unmount());
+        tableHost.remove();
+      }
     });
     await run("F11/F17 reduced motion and unconnected controls are explicit", async () => {
       check(host.querySelector('[aria-label="모델 GLM-5.3-Flash, 설정 기능 미연결"]'), "model display does not disclose its unconnected control");

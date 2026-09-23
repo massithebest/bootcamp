@@ -42,6 +42,19 @@ def open_result(
     """접근 가능한 결과의 메타데이터와 DataFrame을 반환한다."""
 
     results = store or get_result_store()
+    meta = _accessible_meta(result_id, access_scope, results)
+    try:
+        return meta, results.load(result_id)
+    except Exception as exc:
+        logger.warning("결과 데이터 조회 실패: error_type=%s", type(exc).__name__)
+        raise _not_found() from None
+
+
+def _accessible_meta(
+    result_id: Any, access_scope: str | None, results: ResultStore
+) -> ResultMeta:
+    """조회 API와 Tool이 공유하는 strict scope·TTL metadata 검사."""
+
     if not isinstance(result_id, str) or not access_scope:
         raise _not_found()
     try:
@@ -56,11 +69,7 @@ def open_result(
         or meta.expires_at <= datetime.now(timezone.utc)
     ):
         raise _not_found()
-    try:
-        return meta, results.load(result_id)
-    except Exception as exc:
-        logger.warning("결과 데이터 조회 실패: error_type=%s", type(exc).__name__)
-        raise _not_found() from None
+    return meta
 
 
 def check_accessible(
@@ -69,20 +78,7 @@ def check_accessible(
     """데이터를 읽지 않고 접근 가능한 결과인지만 확인한다."""
 
     results = store or get_result_store()
-    if not isinstance(result_id, str) or not access_scope:
-        raise _not_found()
-    try:
-        meta = results.get_meta(result_id)
-    except Exception:
-        raise _not_found() from None
-    if (
-        meta is None
-        or not meta.access_scope
-        or meta.access_scope != access_scope
-        or meta.expires_at <= datetime.now(timezone.utc)
-    ):
-        raise _not_found()
-    return meta
+    return _accessible_meta(result_id, access_scope, results)
 
 
 def _column_payload(meta: ResultMeta, names: list[str] | None = None) -> list[dict[str, Any]]:

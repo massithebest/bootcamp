@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import json
 
 import pandas as pd
+import pytest
 
 from services import result_store
 from services.result_store import LocalParquetResultStore, _infer_role
@@ -48,6 +49,45 @@ def test_get_page_returns_requested_slice(tmp_path) -> None:
     assert page is not None
     assert page.rows == [["B", 20]]
     assert page.row_count == 2
+
+
+def test_sidecar_path_is_ignored_and_derived_from_result_id(tmp_path) -> None:
+    store_dir = tmp_path / "store"
+    store = LocalParquetResultStore(store_dir)
+    saved = _save(store)
+    outside_path = tmp_path / "outside.parquet"
+    pd.DataFrame([["outside", 999]], columns=["line_cd", "qty"]).to_parquet(
+        outside_path, engine="pyarrow", index=False
+    )
+    sidecar = store_dir / f"{saved.result_id}.meta.json"
+    payload = json.loads(sidecar.read_text(encoding="utf-8"))
+    payload["path"] = str(outside_path)
+    sidecar.write_text(json.dumps(payload), encoding="utf-8")
+
+    loaded = store.get_meta(saved.result_id)
+    page = store.get_page(saved.result_id, offset=0, limit=2)
+
+    assert loaded is not None and loaded.path == store_dir / f"{saved.result_id}.parquet"
+    assert page is not None and page.rows == [["A", 10], ["B", 20]]
+
+
+def test_get_meta_rejects_sidecar_with_mismatched_result_id(tmp_path) -> None:
+    store = LocalParquetResultStore(tmp_path)
+    saved = _save(store)
+    sidecar = tmp_path / f"{saved.result_id}.meta.json"
+    payload = json.loads(sidecar.read_text(encoding="utf-8"))
+    payload["result_id"] = "f" * 32
+    sidecar.write_text(json.dumps(payload), encoding="utf-8")
+
+    assert store.get_meta(saved.result_id) is None
+    assert store.get_page(saved.result_id, offset=0, limit=10) is None
+
+
+def test_load_rejects_noncanonical_result_id(tmp_path) -> None:
+    store = LocalParquetResultStore(tmp_path)
+
+    with pytest.raises(ValueError, match="Invalid result_id"):
+        store.load("../outside")
 
 
 def test_load_returns_saved_dataframe(tmp_path) -> None:

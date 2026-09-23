@@ -42,23 +42,43 @@ function useAcquired<T>(
   retryKey: number,
   acquire: () => { promise: Promise<T>; release: () => void },
 ): QueryResultState<T> & { stale?: T } {
-  const [state, setState] = useState<QueryResultState<T>>({ type: "loading" });
-  const [last, setLast] = useState<T | undefined>(undefined);
+  const [result, setResult] = useState<{
+    key: string;
+    retryKey: number;
+    state: QueryResultState<T>;
+    last?: { key: string; value: T };
+  }>(() => ({ key, retryKey, state: { type: "loading" } }));
 
   useEffect(() => {
     let active = true;
-    setState({ type: "loading" });
+    setResult((current) => ({
+      key,
+      retryKey,
+      state: { type: "loading" },
+      last: current.last?.key === key ? current.last : undefined,
+    }));
     const request = acquire();
     request.promise.then(
       (value) => {
         if (!active) return;
-        setLast(value);
-        setState({ type: "success", value });
+        setResult({
+          key,
+          retryKey,
+          state: { type: "success", value },
+          last: { key, value },
+        });
       },
       (error: unknown) => {
         if (!active) return;
         const next = fromError<T>(error);
-        if (next) setState(next);
+        if (next) {
+          setResult((current) => ({
+            key,
+            retryKey,
+            state: next,
+            last: current.last?.key === key ? current.last : undefined,
+          }));
+        }
       },
     );
     return () => {
@@ -69,7 +89,15 @@ function useAcquired<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, retryKey]);
 
-  return state.type === "loading" ? { ...state, stale: last } : state;
+  const matchesRequest = result.key === key && result.retryKey === retryKey;
+  if (!matchesRequest) {
+    const stale = result.last?.key === key ? result.last.value : undefined;
+    return stale === undefined ? { type: "loading" } : { type: "loading", stale };
+  }
+  if (result.state.type === "loading" && result.last?.key === key) {
+    return { ...result.state, stale: result.last.value };
+  }
+  return result.state;
 }
 
 export function useQueryChart(request: QueryChartRequest, retryKey: number) {
@@ -78,7 +106,7 @@ export function useQueryChart(request: QueryChartRequest, retryKey: number) {
   );
 }
 
-/** loading 중에도 직전 page를 `stale`로 돌려 표를 지우지 않는다. */
+/** 같은 요청을 재시도하는 동안에만 이전 page를 `stale`로 유지한다. */
 export function useQueryTable(request: QueryTableRequest, retryKey: number) {
   return useAcquired<QueryTablePage>(tableRequestKey(request), retryKey, () =>
     acquireQueryTable(request),

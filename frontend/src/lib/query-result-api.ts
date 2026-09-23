@@ -5,8 +5,8 @@
  *   GET /api/query-results/{resultId}/chart   — 서버가 검증·집계한 chart
  *
  * 응답은 엄격히 검증하며 실패는 `QueryResultFetchError`의 안전한 종류로만 노출한다.
- * 같은 요청은 진행 중인 fetch를 공유하고, 구독자가 모두 사라지면 abort한다.
- * 성공 응답만 작은 메모리 cache에 두며 실패는 cache하지 않는다.
+ * 같은 요청은 진행 중인 fetch만 공유하고, 구독자가 모두 사라지면 abort한다.
+ * 완료 응답은 서버의 private TTL cache 정책에 맡긴다.
  */
 
 import { API_BASE_URL } from "@/lib/chat-api";
@@ -325,7 +325,7 @@ export function fetchQueryChart(
   return fetchJson(buildChartUrl(request), parseQueryChartResponse, options.signal);
 }
 
-/* ---- 요청 공유·abort·성공 cache ---- */
+/* ---- 진행 중 요청 공유·abort ---- */
 
 interface InFlight<T> {
   controller: AbortController;
@@ -336,12 +336,8 @@ interface InFlight<T> {
 
 class RequestPool<T> {
   private readonly inFlight = new Map<string, InFlight<T>>();
-  private readonly resolved = new Map<string, T>();
-
-  constructor(private readonly limit: number) {}
 
   clear(): void {
-    this.resolved.clear();
     for (const request of this.inFlight.values()) request.controller.abort();
     this.inFlight.clear();
   }
@@ -350,12 +346,6 @@ class RequestPool<T> {
     promise: Promise<T>;
     release: () => void;
   } {
-    const cached = this.resolved.get(key);
-    if (cached !== undefined) {
-      this.resolved.delete(key); // LRU 갱신
-      this.resolved.set(key, cached);
-      return { promise: Promise.resolve(cached), release: () => {} };
-    }
     let request = this.inFlight.get(key);
     if (request?.controller.signal.aborted) {
       this.inFlight.delete(key);
@@ -372,11 +362,6 @@ class RequestPool<T> {
       next.promise = run(controller.signal).then(
         (value) => {
           if (this.inFlight.get(key) === next) this.inFlight.delete(key);
-          this.resolved.set(key, value);
-          if (this.resolved.size > this.limit) {
-            const oldest = this.resolved.keys().next().value;
-            if (oldest !== undefined) this.resolved.delete(oldest);
-          }
           return value;
         },
         (error: unknown) => {
@@ -414,8 +399,8 @@ class RequestPool<T> {
   }
 }
 
-const chartPool = new RequestPool<QueryChartResponse>(20);
-const tablePool = new RequestPool<QueryTablePage>(60);
+const chartPool = new RequestPool<QueryChartResponse>();
+const tablePool = new RequestPool<QueryTablePage>();
 
 export function chartRequestKey(request: QueryChartRequest): string {
   return JSON.stringify([
@@ -453,7 +438,7 @@ export function acquireQueryTable(request: QueryTableRequest) {
   );
 }
 
-/** 테스트와 강제 새로고침용. */
+/** 테스트와 진행 중 요청 강제 취소용. */
 export function clearQueryResultCache(): void {
   chartPool.clear();
   tablePool.clear();

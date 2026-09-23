@@ -152,7 +152,7 @@ def test_chat_endpoint_done_event_carries_turn_id(monkeypatch) -> None:
     assert done["data"]["turn_id"]
 
 
-def test_chat_endpoint_reports_error_gracefully(monkeypatch) -> None:
+def test_chat_endpoint_reports_error_gracefully(monkeypatch, caplog) -> None:
     """run_agent 내부 오류가 상세 노출 없이 error/done 으로 전달된다."""
 
     async def boom(*args, **kwargs):
@@ -168,6 +168,12 @@ def test_chat_endpoint_reports_error_gracefully(monkeypatch) -> None:
     assert events[-1]["type"] == "done"
     assert any(e["type"] == "error" for e in events)
     assert all("internal detail" not in (e.get("content") or "") for e in events)
+    assert events[-2:] == [
+        {"type": "error", "content": "Agent 실행 중 오류가 발생했습니다."},
+        {"type": "done"},
+    ]
+    assert "error_type=RuntimeError" in caplog.text
+    assert "internal detail" not in caplog.text
 
 
 def test_chat_endpoint_passes_fork_from_turn_id_through(monkeypatch) -> None:

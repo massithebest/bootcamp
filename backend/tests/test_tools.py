@@ -7,6 +7,7 @@ import pytest
 
 from agent.sdk_tools import TOOL_NAMES
 from services import result_store
+from services.document_store import KnowledgeError
 from services.result_store import LocalParquetResultStore
 from tools.knowledge_tool import (
     describe_table,
@@ -85,6 +86,23 @@ def test_execute_sql_returns_database_kind(seeded_db) -> None:
 def test_search_documents_returns_dict() -> None:
     result = asyncio.run(search_documents("리드타임 정의"))
     assert isinstance(result, dict)
+
+
+def test_search_documents_keeps_safe_knowledge_error_shape(monkeypatch) -> None:
+    async def fail(query: str) -> dict:
+        raise KnowledgeError(404, "검토 완료된 문서를 찾을 수 없습니다.")
+
+    monkeypatch.setattr("tools.rag_tool.knowledge_search_service.search", fail)
+
+    result = asyncio.run(search_documents("리드타임"))
+
+    assert result == {
+        "kind": "knowledge",
+        "status": "error",
+        "query": "리드타임",
+        "documents": [],
+        "message": "검토 완료된 문서를 찾을 수 없습니다.",
+    }
 
 
 @pytest.mark.mock_service

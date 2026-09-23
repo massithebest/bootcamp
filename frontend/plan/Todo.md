@@ -1,6 +1,6 @@
 # Production Planning Agent Frontend 계획 및 이력
 
-**상태: 진행 중. 마지막 갱신: 2026-09-22.**
+**상태: 진행 중. 마지막 갱신: 2026-09-23.**
 
 이 문서는 Frontend 작업의 목표, 기대 API 계약, 다음 작업과 완료 이력을 관리하는
 단일 기준 문서다. 폐쇄망 반입 후 Frontend workspace만 열어도 이해할 수 있도록
@@ -147,6 +147,20 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
   재연결을 관통 검증한다.
 
 ## 완료 이력 요약
+
+### 2026-09-23 — 결과 조회 수명·지식 편집 lifecycle 분리
+
+- Result API client는 동일한 진행 중 요청만 공유하고 완료 응답은 보관하지 않는다.
+  Backend의 `Cache-Control`·`Vary: Cookie`가 세션·TTL 경계를 결정한다.
+- Query 결과 표는 같은 요청의 재시도 중에만 직전 데이터를 유지하며, 결과 ID·검색·
+  페이지 등 요청 키 변경과 오류·만료 응답에서는 이전 행을 지운다.
+- `useDocumentEditor`로 텍스트 문서 로딩·폼·저장·검토 action lifecycle을 분리했다.
+  브라우저 회귀는 403·409·422 실패 시 초안 보존과 서버 상세 비노출, 사용자 전환 시
+  미저장 초안 보존을 확인한다.
+- Result API 동시 요청·완료 뒤 재요청 및 QueryTable 전환/404 회귀를 보강했다.
+- 검증: **101 passed**, build 성공(기존 대형 bundle 및 Rollup dependency 주의 포함),
+  lint 오류 0개(Fast Refresh warning 4개), 1280px browser harness chat 9·knowledge 8·
+  workbench 10 시나리오 통과.
 
 ### 2026-09-22 — legacy 결과 모드 삭제
 
@@ -306,7 +320,7 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
   세션 내 다중 thread·thread별 초안을 도입했다. `use-agent-chat`·연결 재시도 배너·재생성 확인창과 미사용 Elements
   약 3,000줄, 더미 세션을 삭제했다.
 - `present` Generative UI 결과(`SqlPreview`·`QueryChart`(area 포함)·`QueryTable`(서버 page)·`SimulationSummary`), Result API
-  client(요청 공유·abort·성공만 cache), preview·legacy 겸용 결과 renderer, 12개 도구 toolkit 등록, 후속질문 파서·UI를
+  client(진행 중 요청 공유·abort·완료 응답 미보관), preview·legacy 겸용 결과 renderer, 12개 도구 toolkit 등록, 후속질문 파서·UI를
   구현했다. 신규 의존성은 `@assistant-ui/react-generative-ui@0.0.19`·`zod@4.6.5`(assistant-stream 전이 상향).
 - `present` vocabulary는 여러 결과를 묶는 `Card`와 도메인 4종으로 축소했다. 일반 설명은 Assistant Markdown에 두고,
   로딩·경고·오류는 각 도메인 component가 검증된 상태로 직접 표시한다.

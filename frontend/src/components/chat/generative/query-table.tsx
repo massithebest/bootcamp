@@ -53,7 +53,6 @@ export function QueryTable({ resultId, columns, title }: QueryTableProps) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [retryKey, setRetryKey] = useState(0);
-  const [shown, setShown] = useState<QueryTablePage | null>(null);
   const columnKey = columns?.join("\u0000") ?? "";
 
   useEffect(() => {
@@ -69,7 +68,6 @@ export function QueryTable({ resultId, columns, title }: QueryTableProps) {
     setSorting([]);
     setGlobalFilter("");
     setDebouncedSearch("");
-    setShown(null);
   }, [resultId, columnKey]);
 
   const sort = sorting[0];
@@ -96,10 +94,11 @@ export function QueryTable({ resultId, columns, title }: QueryTableProps) {
     ],
   );
   const state = useQueryTable(request, retryKey);
-  useEffect(() => {
-    if (state.type === "success") setShown(state.value);
-  }, [state]);
-  const current = state.type === "success" ? state.value : (shown ?? state.stale ?? null);
+  const current = state.type === "success"
+    ? state.value
+    : state.type === "loading"
+      ? state.stale ?? null
+      : null;
   const loading = state.type === "loading";
 
   const data = useMemo<DataRow[]>(

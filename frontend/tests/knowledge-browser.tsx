@@ -10,12 +10,14 @@ export async function runKnowledgeWorkspaceRegressions() {
   const results: { name: string; error?: string }[] = [];
   const originalFetch = window.fetch;
   const originalConfirm = window.confirm;
+  const originalStubUser = window.localStorage.getItem("pp.knowledge.stub-user");
+  window.localStorage.setItem("pp.knowledge.stub-user", "user");
   window.confirm = () => true;
   let stream: ReadableStreamDefaultController<Uint8Array> | undefined;
   const encoder = new TextEncoder();
   let failSave = false;
   // 구조화 지식 편집 시나리오용 고정 응답. 켜기 전에는 기존 회귀와 같은 빈 응답을 돌려준다.
-  const editorFixture = { on: false, permissions: ["knowledge:write"], conflict: false };
+  const editorFixture = { on: false, permissions: ["knowledge:write"], changeStatus: 500, userId: "user" };
   const entryRow = { type: "table", id: "wip", title: "wip", summary: "재공", status: "verified", source: "", owner: "", updated: "", active: true, archived: false, pending_change: null };
   const guide = { kind: "table", key_field: "table", immutable: ["table"], template: { table: "", description: "", active: true }, fields: [
     { name: "table", path: "table", label: "테이블명", help: "", required: true, readonly: false, widget: "string", group: "기본 정보" },
@@ -24,13 +26,16 @@ export async function runKnowledgeWorkspaceRegressions() {
   const editorApi = (url: string, init?: RequestInit): Response | undefined => {
     if (!editorFixture.on) return undefined;
     const path = url.replace(/^.*\/api/, "");
-    if (path === "/me") return Response.json({ id: "user", name: "사용자", permissions: editorFixture.permissions, mode: "stub", knowledge_management: true, allow_self_approval: false, stub_users: [{ id: "user", name: "사용자" }] });
+    if (path === "/me") {
+      const id = new Headers(init?.headers).get("X-User-Id") || editorFixture.userId;
+      return Response.json({ id, name: id === "user" ? "사용자" : "검토자", permissions: editorFixture.permissions, mode: "stub", knowledge_management: true, allow_self_approval: false, stub_users: [{ id: "user", name: "사용자" }, { id: "reviewer", name: "검토자" }] });
+    }
     if (path.startsWith("/knowledge/entries/table/wip")) return Response.json({ ...entryRow, detail: { table: "wip" } });
     if (path.startsWith("/knowledge/entries")) return Response.json([entryRow]);
     if (path === "/knowledge/guides/table") return Response.json(guide);
     if (path === "/knowledge/source/table/wip") return Response.json({ kind: "table", key: "wip", yaml: "table: wip\n", data: { table: "wip", description: "기존 설명", active: true } });
     if (path === "/knowledge/validate") return Response.json({ ok: true, parsed: true, yaml: "table: wip\n", data: {}, key: "wip", errors: [] });
-    if (path === "/knowledge/changes" && init?.method === "POST") return editorFixture.conflict ? new Response("conflict", { status: 409 }) : Response.json({}, { status: 500 });
+    if (path === "/knowledge/changes" && init?.method === "POST") return new Response("secret backend detail", { status: editorFixture.changeStatus });
     if (path.startsWith("/knowledge/changes")) return Response.json([]);
     return undefined;
   };
@@ -49,7 +54,7 @@ export async function runKnowledgeWorkspaceRegressions() {
   document.body.append(host);
   const root = createRoot(host);
   const button = (name: string) => {
-    const found = Array.from(host.querySelectorAll<HTMLButtonElement>("button")).find(b => b.textContent?.trim() === name || b.getAttribute("aria-label") === name);
+    const found = Array.from(document.querySelectorAll<HTMLButtonElement>("button, [role=menuitem]")).find(b => b.textContent?.trim() === name || b.getAttribute("aria-label") === name);
     check(found, `button missing: ${name}`); return found;
   };
   const click = async (name: string) => { await act(async () => button(name).click()); };
@@ -62,6 +67,12 @@ export async function runKnowledgeWorkspaceRegressions() {
     await act(async () => {
       Object.getOwnPropertyDescriptor(element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, "value")!.set!.call(element, text);
       element.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  };
+  const selectValue = async (element: HTMLSelectElement, value: string) => {
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(element, value);
+      element.dispatchEvent(new Event("change", { bubbles: true }));
     });
   };
   const frame = async () => { await act(async () => { await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))); }); };
@@ -115,7 +126,7 @@ export async function runKnowledgeWorkspaceRegressions() {
       check(Math.abs(viewport.scrollTop - saved) < 2, `scroll changed: ${saved} -> ${viewport.scrollTop}`);
     });
     await run("structured knowledge opens an editor and a conflicting save keeps the draft", async () => {
-      Object.assign(editorFixture, { on: true, permissions: ["knowledge:write"], conflict: true });
+      Object.assign(editorFixture, { on: true, permissions: ["knowledge:write"], changeStatus: 409 });
       await act(async () => { window.dispatchEvent(new Event("knowledge-changed")); });
       await click("지식 관리");
       await waitFor(() => Array.from(host.querySelectorAll('section[aria-label="지식 목록"] li button')).some(b => b.textContent?.includes("wip")));
@@ -131,7 +142,14 @@ export async function runKnowledgeWorkspaceRegressions() {
       await click("초안 저장");
       await waitFor(() => host.textContent?.includes("최신 내용을 다시 불러오세요") === true);
       check(host.querySelector<HTMLTextAreaElement>("#field-description")!.value === "저장에 실패해도 남아야 하는 설명", "failed save erased the draft");
-      check(!host.textContent?.includes("conflict"), "server text leaked into the UI");
+      check(!host.textContent?.includes("secret backend detail"), "server text leaked into the UI");
+      for (const [status, message] of [[403, "이 작업을 할 수 없습니다"], [422, "필수 입력과 글자 수를 확인하세요"]] as const) {
+        editorFixture.changeStatus = status;
+        await click("초안 저장");
+        await waitFor(() => host.textContent?.includes(message) === true);
+        check(host.querySelector<HTMLTextAreaElement>("#field-description")!.value === "저장에 실패해도 남아야 하는 설명", `${status} erased the draft`);
+        check(!host.textContent?.includes("secret backend detail"), `${status} response leaked server text`);
+      }
       await clickCurrentChat();
       check(document.querySelector('[role="dialog"]'), "unsaved editor changes were not guarded");
       const dialogButton = (text: string) => Array.from(document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')).find(b => b.textContent === text)!;
@@ -143,7 +161,7 @@ export async function runKnowledgeWorkspaceRegressions() {
       check(!host.querySelector("#field-description"), "editor stayed open after discarding");
     });
     await run("without write permission structured knowledge stays read-only", async () => {
-      Object.assign(editorFixture, { on: true, permissions: [], conflict: false });
+      Object.assign(editorFixture, { on: true, permissions: [], changeStatus: 500 });
       await act(async () => { window.dispatchEvent(new Event("knowledge-changed")); });
       await waitFor(() => Array.from(host.querySelectorAll('section[aria-label="지식 목록"] li button')).some(b => b.textContent?.includes("wip")));
       await act(async () => Array.from(host.querySelectorAll<HTMLButtonElement>('section[aria-label="지식 목록"] li button')).find(b => b.textContent?.includes("wip"))!.click());
@@ -154,8 +172,24 @@ export async function runKnowledgeWorkspaceRegressions() {
       await act(async () => { window.dispatchEvent(new Event("knowledge-changed")); });
       await clickCurrentChat(); await frame();
     });
+    await run("switching the stub user preserves an unsaved text draft", async () => {
+      Object.assign(editorFixture, { on: true, permissions: ["knowledge:write"], userId: "user" });
+      await act(async () => { window.dispatchEvent(new Event("knowledge-changed")); });
+      await click("지식 관리"); await click("+ 새 지식 추가"); await click("텍스트 지식 등록");
+      const title = host.querySelector<HTMLInputElement>('input[name="title"]')!;
+      await fill(title, "사용자 전환 중 보존할 초안");
+      await selectValue(host.querySelector<HTMLSelectElement>('[aria-label="작업 사용자"]')!, "reviewer");
+      await waitFor(() => host.querySelector<HTMLSelectElement>('[aria-label="작업 사용자"]')?.value === "reviewer");
+      check(title.value === "사용자 전환 중 보존할 초안", "user switch erased the text draft");
+      await clickCurrentChat();
+      const dialogButton = (text: string) => Array.from(document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')).find(b => b.textContent === text)!;
+      await act(async () => dialogButton("변경 취소 후 이동").click());
+      await frame();
+      editorFixture.on = false;
+      await act(async () => { window.dispatchEvent(new Event("knowledge-changed")); });
+    });
     await run("dirty navigation supports stay and discard", async () => {
-      await click("지식 관리"); await click("텍스트 지식 등록");
+      await click("지식 관리"); await click("+ 새 지식 추가"); await click("텍스트 지식 등록");
       await fill(host.querySelector<HTMLInputElement>('input[name="title"]')!, "미저장 제목");
       await clickCurrentChat();
       check(document.querySelector('[role="dialog"]'), "dirty dialog absent");
@@ -168,7 +202,7 @@ export async function runKnowledgeWorkspaceRegressions() {
       check(host.querySelector<HTMLElement>('[aria-label="메시지 입력"]')!.getClientRects().length > 0, "did not return to chat");
     });
     await run("failed save preserves fields and management remains available", async () => {
-      await click("지식 관리"); await click("텍스트 지식 등록");
+      await click("지식 관리"); await click("+ 새 지식 추가"); await click("텍스트 지식 등록");
       for (const [name, value] of Object.entries({ title: "저장 실패 본문", content: "보존할 내용", owner: "담당자", source: "회의" })) {
         await fill(host.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${name}"]`)!, value);
       }
@@ -179,6 +213,8 @@ export async function runKnowledgeWorkspaceRegressions() {
     });
   } finally {
     await act(async () => root.unmount()); host.remove(); window.fetch = originalFetch; window.confirm = originalConfirm;
+    if (originalStubUser === null) window.localStorage.removeItem("pp.knowledge.stub-user");
+    else window.localStorage.setItem("pp.knowledge.stub-user", originalStubUser);
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: false });
   }
   return results;

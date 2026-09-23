@@ -1,8 +1,8 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { fetchChanges, fetchDocument, fetchKnowledgeEntries, fetchKnowledgeEntry, fetchMe, saveDocument, changeDocument } from "@/lib/knowledge-api";
+import { fetchChanges, fetchKnowledgeEntries, fetchKnowledgeEntry, fetchMe } from "@/lib/knowledge-api";
 import { formatTime } from "@/lib/format-time";
 import { useKnowledgeResource } from "@/hooks/use-knowledge-resource";
-import { KNOWLEDGE_LABELS, PERMISSION_WRITE, STATUS_LABELS, STRUCTURED_KINDS, type ChangeSummary, type DocumentFields, type KnowledgeDocument, type KnowledgeEntry, type KnowledgeTarget, type StructuredKind } from "@/types/knowledge";
+import { KNOWLEDGE_LABELS, PERMISSION_WRITE, STATUS_LABELS, STRUCTURED_KINDS, type ChangeSummary, type KnowledgeEntry, type KnowledgeTarget, type StructuredKind } from "@/types/knowledge";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,33 +11,29 @@ import { StructuredDetail } from "./structured-detail";
 import { ChangeStateBadge } from "./editor/change-badge";
 import { EntryEditor, type EditorTarget, type EntryEditorHandle } from "./editor/entry-editor";
 import { UserSwitcher } from "./editor/user-switcher";
+import { DOCUMENT_ACTION_LABELS, useDocumentEditor, type DocumentForm } from "./use-document-editor";
 
 export interface KnowledgeManagerHandle { requestLeave: (next: () => void) => void; open: (target?: KnowledgeTarget) => void }
-type Form = Omit<DocumentFields, "tags"> & { tagsText: string };
-const emptyForm: Form = { title: "", content: "", category: "업무 지식", tagsText: "", owner: "", source: "" };
-const formFrom = (fields: DocumentFields): Form => ({ title: fields.title, content: fields.content, category: fields.category, tagsText: fields.tags.join(", "), owner: fields.owner, source: fields.source });
 const loadMine = (signal: AbortSignal) => fetchChanges({ mine: true }, signal);
 const loadQueue = (signal: AbortSignal) => fetchChanges({ state: "submitted" }, signal);
 type Segment = "all" | "mine" | "queue";
 const SEGMENTS: { id: Segment; label: string }[] = [{ id: "all", label: "전체" }, { id: "mine", label: "내 요청" }, { id: "queue", label: "검토 대기" }];
-const ACTION_LABELS: Record<string, string> = { save: "초안 저장", review: "검토 완료", activate: "활성화", deactivate: "비활성화", archive: "보관" };
 
 export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function KnowledgeManager(_, ref) {
   const [query, setQuery] = useState("");
   const loadList = useCallback((signal: AbortSignal) => fetchKnowledgeEntries(signal, query), [query]);
   const list = useKnowledgeResource(loadList);
   const [selection, setSelection] = useState<KnowledgeTarget | "new" | null>(null);
-  const [doc, setDoc] = useState<KnowledgeDocument>();
-  const [entry, setEntry] = useState<KnowledgeEntry>();
-  const [form, setForm] = useState<Form>(emptyForm);
-  const [baseline, setBaseline] = useState<Form>(emptyForm);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>();
-  const [notice, setNotice] = useState("");
-  const [busy, setBusy] = useState(false);
   const [reload, setReload] = useState(0);
-  const [actor, setActor] = useState("");
-  const [note, setNote] = useState("");
+  const documentEditor = useDocumentEditor({ selection, reload, setSelection });
+  const {
+    doc, form, setForm, formRef, loading: documentLoading, error: documentError,
+    notice, setNotice, busy, actor, setActor, note, setNote,
+    dirty: documentDirty, historical, editable, save, act, discard,
+  } = documentEditor;
+  const [entry, setEntry] = useState<KnowledgeEntry>();
+  const [entryLoading, setEntryLoading] = useState(false);
+  const [entryError, setEntryError] = useState<string>();
   const [kind, setKind] = useState("");
   const [status, setStatus] = useState("");
   const [active, setActive] = useState("");
@@ -51,14 +47,15 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
   const [session, setSession] = useState(0);
   const editorRef = useRef<EntryEditorHandle>(null);
   const canWrite = !!me.data?.knowledge_management && me.data.permissions.includes(PERMISSION_WRITE);
-  const formRef = useRef<HTMLFormElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const dirty = JSON.stringify(form) !== JSON.stringify(baseline) || (edit !== null && editorDirty);
+  const dirty = documentDirty || (edit !== null && editorDirty);
+  const loading = documentLoading || entryLoading;
+  const error = documentError ?? entryError;
   const requestLeave = useCallback((next: () => void) => {
     if (busy) return;
     if (dirty) setPending(() => next); else next();
   }, [busy, dirty]);
-  useImperativeHandle(ref, () => ({ requestLeave, open: target => { setSelection(target ?? null); setEdit(null); setNotice(""); } }), [requestLeave]);
+  useImperativeHandle(ref, () => ({ requestLeave, open: target => { setSelection(target ?? null); setEdit(null); setNotice(""); } }), [requestLeave, setNotice]);
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => { if (dirty) { event.preventDefault(); event.returnValue = ""; } };
     window.addEventListener("beforeunload", handler);
@@ -66,51 +63,22 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
   }, [dirty]);
   useEffect(() => {
     const controller = new AbortController();
-    setError(undefined); setDoc(undefined); setEntry(undefined); setForm(emptyForm); setBaseline(emptyForm); setActor(""); setNote("");
-    if (!selection || selection === "new") { setLoading(false); return; }
-    setLoading(true);
-    const load = async () => {
-      if (selection.kind === "document") {
-        const value = await fetchDocument(selection.id, controller.signal);
-        const selected = selection.version === undefined ? value.versions[0] : value.versions.find(v => v.version === selection.version);
-        if (!selected) throw new Error("인용한 버전을 찾을 수 없습니다.");
-        if (!controller.signal.aborted) { setDoc(value); const next = formFrom(selected); setForm(next); setBaseline(next); }
-      } else {
-        const value = await fetchKnowledgeEntry(selection.kind, selection.id, controller.signal);
-        if (!controller.signal.aborted) setEntry(value);
-      }
-    };
-    load().catch((e: unknown) => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "불러오지 못했습니다."); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    setEntry(undefined);
+    setEntryError(undefined);
+    if (!selection || selection === "new" || selection.kind === "document") {
+      setEntryLoading(false);
+      return () => controller.abort();
+    }
+    setEntryLoading(true);
+    fetchKnowledgeEntry(selection.kind, selection.id, controller.signal)
+      .then(value => { if (!controller.signal.aborted) setEntry(value); })
+      .catch((e: unknown) => { if (!controller.signal.aborted) setEntryError(e instanceof Error ? e.message : "불러오지 못했습니다."); })
+      .finally(() => { if (!controller.signal.aborted) setEntryLoading(false); });
     return () => controller.abort();
   }, [selection, reload]);
   useEffect(() => { if (selection && !loading) titleRef.current?.focus(); }, [selection, loading]);
 
-  const selectedVersion = doc && (selection && selection !== "new" && selection.version !== undefined ? doc.versions.find(v => v.version === selection.version) : doc.versions[0]);
-  const historical = !!(selection && selection !== "new" && selection.version !== undefined);
-  const editable = !historical && !doc?.archived && (selection === "new" || !!doc);
-  async function save(): Promise<boolean> {
-    if (!formRef.current?.reportValidity()) return false;
-    setBusy(true); setError(undefined);
-    try {
-      const { tagsText, ...fields } = form;
-      const result = await saveDocument({ ...fields, tags: [...new Set(tagsText.split(",").map(t => t.trim()).filter(Boolean))] }, doc?.id, doc?.revision);
-      setDoc(result); const next = formFrom(result.versions[0]); setForm(next); setBaseline(next);
-      if (selection === "new") setSelection({ kind: "document", id: result.id });
-      setNotice("초안을 저장했습니다. 검토 후 활성화하면 모든 대화의 검색에 반영됩니다.");
-      return true;
-    } catch (e) { setError(e instanceof Error ? e.message : "저장하지 못했습니다."); return false; }
-    finally { setBusy(false); }
-  }
-  async function act(action: "review" | "activate" | "deactivate" | "archive") {
-    if (!doc || !selectedVersion || !actor.trim() || (action === "review" && !note.trim())) { setError("기록할 작업자와 검토 시 검토 근거를 입력하세요."); return; }
-    setBusy(true); setError(undefined);
-    try {
-      const result = await changeDocument(doc.id, action, doc.revision, actor, selectedVersion.version, note);
-      setDoc(result); setNotice(`${ACTION_LABELS[action]}했습니다.`);
-    } catch (e) { setError(e instanceof Error ? e.message : "변경하지 못했습니다."); }
-    finally { setBusy(false); }
-  }
+  const selectedVersion = documentEditor.selectedVersion;
   const rows = list.data?.filter(e => (!kind || e.type === kind) && (!status || e.status === status) && (!active || (active === "archived" ? e.archived : !e.archived && e.active === (active === "active"))));
   const navigate = (next: KnowledgeTarget | "new" | null) => requestLeave(() => { setSelection(next); setEdit(null); setEditorDirty(false); setNotice(""); });
   const openEditor = (target: EditorTarget, next: KnowledgeTarget | null) => requestLeave(() => { setSelection(next); setEdit(target); setSession(v => v + 1); setEditorDirty(false); setNotice(""); });
@@ -119,7 +87,7 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
   const changeRows = segment === "mine" ? mine : queue;
   const startNew = (kind: string) => { if (kind) openEditor({ type: "new", kind: kind as StructuredKind }, null); };
   const changeRow = (c: ChangeSummary) => <li key={c.id}><button type="button" aria-current={edit?.type === "change" && edit.id === c.id ? "true" : undefined} className={`w-full space-y-1.5 border-l-2 px-3 py-3 text-left transition-colors hover:bg-surface-2 ${edit?.type === "change" && edit.id === c.id ? "border-accent bg-accent-weak" : "border-transparent"}`} onClick={() => openEditor({ type: "change", id: c.id }, null)}><span className="flex items-start justify-between gap-2"><span className="text-2xs font-medium text-ink-2">{KNOWLEDGE_LABELS[c.kind]}{c.is_new ? " · 새 지식" : ""}</span><ChangeStateBadge state={c.state} /></span><span className="block break-words text-ui font-semibold text-ink">{c.key}</span><span className="block text-2xs text-ink-2">작성 {c.author.name} · <span className="tabular-nums">{formatTime(c.updated_at)}</span></span></button></li>;
-  const field = (name: keyof Form, label: string, max: number, multiline = false) => <label className="block space-y-1 text-ui" key={name}><span className="text-ink-2">{label}{name !== "tagsText" && " *"}</span>{multiline ? <textarea name={name} className={`${controlClass} min-h-64 resize-y`} required readOnly={!editable} maxLength={max} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })} /> : <input name={name} className={controlClass} required={name !== "tagsText"} readOnly={!editable} maxLength={max} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })} />}</label>;
+  const field = (name: keyof DocumentForm, label: string, max: number, multiline = false) => <label className="block space-y-1 text-ui" key={name}><span className="text-ink-2">{label}{name !== "tagsText" && " *"}</span>{multiline ? <textarea name={name} className={`${controlClass} min-h-64 resize-y`} required readOnly={!editable} maxLength={max} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })} /> : <input name={name} className={controlClass} required={name !== "tagsText"} readOnly={!editable} maxLength={max} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })} />}</label>;
   return <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
     <div className="shrink-0 border-b border-line px-5 py-3"><div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2"><div className="min-w-0"><p className="text-ui text-ink-2">공용 지식 · 활성화와 승인은 모든 대화의 이후 검색에 적용됩니다.</p><p className="mt-1 text-2xs text-ink-3">구조화 지식은 수정 요청을 만들고 승인 권한자가 승인하면 반영됩니다. 텍스트 지식의 작성자와 검토자 이름은 기록용입니다.</p></div>{me.data && <UserSwitcher me={me.data} />}</div></div>
     <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -168,7 +136,7 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
               {doc.active_version !== null && doc.active_version !== selectedVersion.version && <details className="border-t border-line pt-4" open><summary className="cursor-pointer text-ui font-semibold">현재 사용본과 수정본 비교</summary><div className="mt-3 grid gap-3 xl:grid-cols-2">{[doc.versions.find(v => v.version === doc.active_version), selectedVersion].map((v, index) => v && <div key={index} className="min-w-0 rounded border border-line p-3"><p className="text-ui font-semibold">{index === 0 ? "현재 사용" : "수정"} v{v.version} · {v.title}</p><p className="text-2xs text-ink-3">{v.category} · {v.tags.join(", ")} · {v.owner} · {v.source}</p><pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words font-sans text-ui">{v.content}</pre></div>)}</div></details>}
               {!historical && !doc.archived && <section className="space-y-3 border-t border-line pt-4" aria-label="검토 및 적용"><h3 className="text-ui font-semibold">검토 및 적용</h3><p className="text-2xs text-ink-2">기술 테스트 통과만으로 검토 완료하지 않습니다. 담당자가 업무 정의와 출처를 확인하세요.</p><label className="block text-ui">작업자 / 검토자<input className={`${controlClass} mt-1`} value={actor} maxLength={100} onChange={e => setActor(e.target.value)} /></label><label className="block text-ui">검토 근거<textarea className={`${controlClass} mt-1`} value={note} maxLength={2000} onChange={e => setNote(e.target.value)} /></label><div className="flex flex-wrap gap-2"><button className={buttonClass} disabled={busy || dirty || !actor.trim() || !note.trim() || selectedVersion.status !== "draft"} onClick={() => void act("review")}>검토 완료</button><button className={buttonClass} disabled={busy || dirty || !actor.trim() || selectedVersion.status !== "verified" || doc.active_version === selectedVersion.version} onClick={() => void act("activate")}>이 버전 활성화</button><button className={buttonClass} disabled={busy || dirty || !actor.trim() || doc.active_version === null} onClick={() => void act("deactivate")}>비활성화</button><button className={buttonClass} disabled={busy || dirty || !actor.trim()} onClick={() => { if (window.confirm("보관하면 이후 검색에서 제외되고 편집할 수 없습니다. 보관할까요?")) void act("archive"); }}>보관</button></div></section>}
               {selectedVersion.status === "verified" && <p className="text-2xs text-ink-2">검토: {selectedVersion.reviewer} · {selectedVersion.reviewed_at}<br />근거: {selectedVersion.review_note}</p>}
-              <details className="border-t border-line pt-4"><summary className="cursor-pointer text-ui font-semibold">버전 및 변경 이력 ({doc.versions.length}개 버전)</summary><div className="my-3 flex flex-wrap gap-2">{doc.versions.map(v => <button key={v.version} className={buttonClass} onClick={() => navigate({ kind: "document", id: doc.id, version: v.version })}>v{v.version} · {STATUS_LABELS[v.status]}</button>)}</div><ul className="space-y-2">{doc.history.map(h => <li key={h.revision} className="text-2xs text-ink-2">{h.at} · {ACTION_LABELS[h.action] ?? h.action} {h.version && `v${h.version}`} · {h.actor}<p>{h.note}</p></li>)}</ul></details>
+              <details className="border-t border-line pt-4"><summary className="cursor-pointer text-ui font-semibold">버전 및 변경 이력 ({doc.versions.length}개 버전)</summary><div className="my-3 flex flex-wrap gap-2">{doc.versions.map(v => <button key={v.version} className={buttonClass} onClick={() => navigate({ kind: "document", id: doc.id, version: v.version })}>v{v.version} · {STATUS_LABELS[v.status]}</button>)}</div><ul className="space-y-2">{doc.history.map(h => <li key={h.revision} className="text-2xs text-ink-2">{h.at} · {DOCUMENT_ACTION_LABELS[h.action] ?? h.action} {h.version && `v${h.version}`} · {h.actor}<p>{h.note}</p></li>)}</ul></details>
             </>}
           </>}
           </>}
@@ -176,6 +144,6 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
         </div>
       </section>
     </div>
-    <Dialog open={pending !== null} onOpenChange={open => { if (!open && !busy) setPending(null); }}><DialogContent showCloseButton={!busy}><DialogTitle>저장하지 않은 변경</DialogTitle><DialogDescription>이동하기 전에 초안을 저장하거나 변경을 취소하세요.</DialogDescription><div className="flex flex-wrap gap-2"><button className={buttonClass} disabled={busy} onClick={async () => { const next = pending; if (await (edit ? editorRef.current?.save() : save())) { setPending(null); next?.(); } }}>저장 후 이동</button><button className={buttonClass} disabled={busy} onClick={() => { const next = pending; setForm(baseline); setEditorDirty(false); setPending(null); next?.(); }}>변경 취소 후 이동</button><button className={buttonClass} disabled={busy} onClick={() => setPending(null)}>계속 편집</button></div></DialogContent></Dialog>
+    <Dialog open={pending !== null} onOpenChange={open => { if (!open && !busy) setPending(null); }}><DialogContent showCloseButton={!busy}><DialogTitle>저장하지 않은 변경</DialogTitle><DialogDescription>이동하기 전에 초안을 저장하거나 변경을 취소하세요.</DialogDescription><div className="flex flex-wrap gap-2"><button className={buttonClass} disabled={busy} onClick={async () => { const next = pending; if (await (edit ? editorRef.current?.save() : save())) { setPending(null); next?.(); } }}>저장 후 이동</button><button className={buttonClass} disabled={busy} onClick={() => { const next = pending; discard(); setEditorDirty(false); setPending(null); next?.(); }}>변경 취소 후 이동</button><button className={buttonClass} disabled={busy} onClick={() => setPending(null)}>계속 편집</button></div></DialogContent></Dialog>
   </div>;
 });

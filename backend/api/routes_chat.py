@@ -1,5 +1,6 @@
 """Chat API endpoint with SSE streaming."""
 
+import logging
 import re
 
 from uuid import uuid4
@@ -8,11 +9,12 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from agent.agent import run_agent
-from api.schemas import ChatRequest
+from api.schemas import AgentEvent, ChatRequest
 from core.config import SESSION_COOKIE_SECURE, SESSION_SCOPE_COOKIE_NAME
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 _SCOPE_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 
 
@@ -35,16 +37,14 @@ async def chat(request: ChatRequest, http_request: Request) -> StreamingResponse
             ):
                 yield f"data: {event.model_dump_json()}\n\n"
 
-        except Exception:
-            # TODO:
-            # 실제 환경에서는 내부 오류를 logging 한다.
-            # 상세 Exception 내용은 Frontend에 그대로 노출하지 않는다.
-            yield (
-                'data: {"type":"error",'
-                '"content":"Agent 실행 중 오류가 발생했습니다."}\n\n'
+        except Exception as exc:
+            logger.error("Agent 스트림 실패: error_type=%s", type(exc).__name__)
+            error = AgentEvent(
+                type="error", content="Agent 실행 중 오류가 발생했습니다."
             )
-
-            yield 'data: {"type":"done"}\n\n'
+            done = AgentEvent(type="done")
+            yield f"data: {error.model_dump_json(exclude_none=True)}\n\n"
+            yield f"data: {done.model_dump_json(exclude_none=True)}\n\n"
 
     response = StreamingResponse(
         event_generator(),

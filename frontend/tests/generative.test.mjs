@@ -136,7 +136,7 @@ test('URLs use snake_case API names and include server table state', () => {
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const flush = () => new Promise((resolve) => setTimeout(resolve, 5));
 
-test('identical in-flight requests share one fetch, credentials are included, and successes are cached', async () => {
+test('identical in-flight requests share one fetch, but completed results are fetched again', async () => {
   api.clearQueryResultCache();
   let calls = 0; let init;
   globalThis.fetch = async (url, options) => { calls += 1; init = options; return json(chart()); };
@@ -144,9 +144,11 @@ test('identical in-flight requests share one fetch, credentials are included, an
   const first = api.acquireQueryChart(request); const second = api.acquireQueryChart(request);
   assert.equal((await first.promise).chart.type, 'area'); await second.promise;
   assert.equal(calls, 1); assert.equal(init.credentials, 'include');
-  await api.acquireQueryChart(request).promise;
-  assert.equal(calls, 1);
   first.release(); second.release();
+  const next = api.acquireQueryChart(request);
+  await next.promise;
+  assert.equal(calls, 2);
+  next.release();
 });
 
 test('failed responses are never cached and retry fetches again', async () => {

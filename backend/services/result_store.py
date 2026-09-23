@@ -199,12 +199,14 @@ class LocalParquetResultStore(ResultStore):
 
     @logged_service_operation
     def get_meta(self, result_id: str) -> ResultMeta | None:
-        if not _RESULT_ID_PATTERN.fullmatch(result_id):
+        if not isinstance(result_id, str) or not _RESULT_ID_PATTERN.fullmatch(result_id):
             return None
         path = self._meta_path(result_id)
         if not path.exists():
             return None
         payload = json.loads(path.read_text(encoding="utf-8"))
+        if payload.get("result_id") != result_id:
+            return None
         return ResultMeta(
             result_id=payload["result_id"],
             row_count=payload["row_count"],
@@ -213,7 +215,9 @@ class LocalParquetResultStore(ResultStore):
             expires_at=datetime.fromisoformat(payload["expires_at"]),
             source=payload["source"],
             conversation_id=payload.get("conversation_id"),
-            path=Path(payload["path"]),
+            # Older sidecars store an absolute path. Derive it from the validated ID so
+            # a damaged or moved sidecar cannot redirect reads outside this store.
+            path=self._parquet_path(result_id),
             source_truncated=payload.get("source_truncated", False),
             access_scope=payload.get("access_scope"),
         )
@@ -235,6 +239,8 @@ class LocalParquetResultStore(ResultStore):
 
     @logged_service_operation
     def load(self, result_id: str) -> pd.DataFrame:
+        if not isinstance(result_id, str) or not _RESULT_ID_PATTERN.fullmatch(result_id):
+            raise ValueError("Invalid result_id")
         return pd.read_parquet(self._parquet_path(result_id), engine="pyarrow")
 
     @logged_service_operation
