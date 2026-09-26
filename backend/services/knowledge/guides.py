@@ -14,7 +14,7 @@ from typing import Any, Literal, Union, get_args, get_origin
 
 from pydantic import BaseModel
 
-from services.knowledge.catalog import KIND_SPECS
+from services.knowledge.models import KIND_SPECS
 
 # (라벨, 도움말, 예시, 그룹). 그룹은 최상위 필드에만 쓴다.
 _META = {

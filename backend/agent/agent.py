@@ -48,6 +48,10 @@ def _build_options(
         cwd=AGENT_SDK_CWD,
         setting_sources=["project"],  # CLAUDE.md / .claude/skills 로드
         mcp_servers={"planning": build_planning_mcp_server(access_scope)},
+        # 내장 도구는 Skill 만 사용 가능하게 한다. allowed_tools 는 자동 승인 목록일 뿐
+        # 사용 가능 도구를 제한하지 않으므로, bypassPermissions 와 함께 쓰려면 tools 로
+        # Bash/Write/Read 등 나머지 내장 도구를 반드시 꺼야 한다.
+        tools=["Skill"],
         # Skill: 프로젝트 Skills(.claude/skills/*)를 에이전트가 선택해 로드한다.
         # 문자열 system_prompt 로도 Claude Code preset 의 Skill 도구가 유지된다 (Task 0 확인).
         allowed_tools=tool_names() + ["Skill"],

@@ -93,6 +93,18 @@ def test_build_options_binds_scope_without_exposing_model_argument() -> None:
     assert options.mcp_servers["planning"]["type"] == "sdk"
 
 
+def test_build_options_limits_builtin_tools_to_skill() -> None:
+    """bypassPermissions 에서 Bash/Write 등 내장 도구가 열리는 회귀를 막는다."""
+
+    options = _build_options(None)
+
+    assert options.tools == ["Skill"]
+    assert all(
+        name == "Skill" or name.startswith("mcp__planning__")
+        for name in options.allowed_tools
+    )
+
+
 def test_optional_catalog_filters_are_optional_on_the_mcp_wire() -> None:
     """선택 필터 생략이 SDK 검증 오류로 기록되는 회귀를 막는다."""
 

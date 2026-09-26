@@ -24,7 +24,7 @@ from core import config
 from core.principal import Principal
 from services.knowledge import writer
 from services.knowledge.documents import KnowledgeError
-from services.knowledge.catalog import KIND_SPECS
+from services.knowledge.models import KIND_SPECS
 from services.knowledge.yaml_codec import dump_yaml, parse_yaml_mapping
 from services.service_logging import logged_service_operation
 

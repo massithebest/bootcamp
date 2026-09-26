@@ -46,7 +46,9 @@ test('present tool arg schemas match the Backend contract exactly', () => {
     const backend = Object.keys(spec.props);
     assert.deepEqual(Object.keys(frontend).sort(), backend.sort(), name);
     for (const prop of backend) {
-      if (spec.props[prop].enum) assert.deepEqual(frontend[prop].enum ?? frontend[prop].anyOf?.find(o => o.enum)?.enum, spec.props[prop].enum, `${name}.${prop} enum`);
+      for (const [constraint, expected] of Object.entries(spec.props[prop])) {
+        assert.deepEqual(frontend[prop][constraint], expected, `${name}.${prop} ${constraint}`);
+      }
     }
     assert.deepEqual([...(schema.required ?? [])].sort(), [...spec.required].sort(), `${name} required`);
   }

@@ -25,8 +25,9 @@
 
 ## UI 작업
 
-- UI 작업은 `ui-ux-pro-max` Skill과 `frontend/docs/assistant-ui-design.md`,
-  `frontend/docs/decisions.md`를 확인한다. 확정된 제품 계약과 semantic token을
+- UI 작업은 디자인 Skill과 `frontend/docs/assistant-ui-design.md`,
+  `frontend/docs/decisions.md`를 확인한다. 디자인 Skill은 Codex에서는
+  `ui-ux-pro-max`, Claude Code에서는 `frontend-design`을 사용한다. 확정된 제품 계약과 semantic token을
   일반적인 디자인 권고로 임의 교체하지 않는다.
 - Frontend는 데스크톱 전용이다. 1280px 이상에서 검증하며 모바일 viewport,
   device emulation, 터치 전용 요구사항을 추가하지 않는다.
@@ -44,6 +45,9 @@
 
 ## 기본 검증
 
+- 실행: Backend `SERVICE_MODE=mock uvicorn main:app --reload --port 8100`,
+  Frontend `npm run dev` (3100, strictPort). 합성 mock DB는 `backend/`에서
+  `python -m scripts.generate_mock_database`로 생성한다.
 - Backend: `cd backend && source .venv/bin/activate && python -m pytest -q`
 - Frontend: `cd frontend && npm test && npm run build && npm run lint`
 - 문서만 변경하면 링크·명령·파일명과 `git diff --check`를 확인한다.

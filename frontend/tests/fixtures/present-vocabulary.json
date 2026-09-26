@@ -1,5 +1,5 @@
 {
-  "$comment": "Backend services/present_service.py의 present_*_input_schema() 사본. Backend 계약을 바꾸면 함께 갱신한다.",
+  "$comment": "Backend services/results/present.py의 present_*_input_schema() 사본. Backend 계약을 바꾸면 함께 갱신한다.",
   "tools": {
     "present_sql_preview": {
       "props": {

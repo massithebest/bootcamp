@@ -22,5 +22,20 @@ export default defineConfig({
   preview: { port: 3100, strictPort: true, host: true },
   build: {
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        // 기능별 라이브러리를 분리해 앱 수정 때 변경 없는 vendor도 다시 받지 않게 한다.
+        // 공통 의존성은 Rollup의 기본 병합에 맡긴다. 외부 CDN은 사용하지 않는다.
+        manualChunks(id) {
+          if (!id.includes("/node_modules/")) return;
+          if (/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) return "vendor-react";
+          if (id.includes("/node_modules/@assistant-ui/")) return "vendor-assistant";
+          if (id.includes("/node_modules/@base-ui/")) return "vendor-ui";
+          if (/\/node_modules\/(recharts|recharts-scale|d3-[^/]+|victory-vendor)\//.test(id)) return "vendor-charts";
+          if (/\/node_modules\/(.*markdown[^/]*|remark[^/]*|rehype[^/]*|micromark[^/]*|mdast[^/]*|hast[^/]*|unist[^/]*|unified|vfile[^/]*)\//.test(id)) return "vendor-markdown";
+          if (id.includes("/node_modules/zod/")) return "vendor-schema";
+        },
+      },
+    },
   },
 });

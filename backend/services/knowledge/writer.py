@@ -22,7 +22,8 @@ from services.knowledge import catalog as ks
 from services.knowledge.documents import KnowledgeError
 from services.knowledge.guides import shape_errors
 from services.knowledge.integrity import integrity_issues
-from services.knowledge.catalog import GLOSSARY_FILE, KIND_SPECS, KnowledgeStore
+from services.knowledge.catalog import KnowledgeStore
+from services.knowledge.models import GLOSSARY_FILE, KIND_SPECS
 from services.knowledge.yaml_codec import dump_yaml, model_to_data, parse_yaml_mapping
 from services.service_logging import logged_service_operation
 

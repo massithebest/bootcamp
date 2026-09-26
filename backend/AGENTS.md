@@ -47,4 +47,8 @@ Python 3.11 FastAPI 서비스다. `/api/chat`은 Claude Agent SDK 이벤트를
   `plan/<yymmdd>-<topic>-plan.md`에 기록한다.
 - 로컬 `datasets/`, `data/`, `.env`, 변환 스크립트와 비밀값은 커밋하지 않는다.
 - 기본 검증: `source .venv/bin/activate && python -m pytest -q`
+  (`pytest.ini`가 `-m "not e2e"`를 기본 적용한다. `mock_service`는 합성 mock DB 생성기,
+  `bundled_knowledge`는 번들 YAML 고정값을 단정하는 회귀 테스트다.)
+- 지식 YAML만 바꿨다면 `python -m pytest tests/test_knowledge_integrity.py tests/test_knowledge.py -q`를
+  먼저 실행한다.
 - 실제 CLI/provider가 필요한 경우에만 `python -m pytest -m e2e`를 실행한다.

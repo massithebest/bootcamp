@@ -1,6 +1,6 @@
 # Production Planning Agent Frontend 계획 및 이력
 
-**상태: 진행 중. 마지막 갱신: 2026-09-23.**
+**상태: 진행 중. 마지막 갱신: 2026-09-26.**
 
 이 문서는 Frontend 작업의 목표, 기대 API 계약, 다음 작업과 완료 이력을 관리하는
 단일 기준 문서다. 폐쇄망 반입 후 Frontend workspace만 열어도 이해할 수 있도록
@@ -124,6 +124,7 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 
 ## 다음 작업
 
+
 ### P1
 
 - [ ] **후속질문 표시 검증**: Backend가 `done.data.suggestions`를 보내면 실제 응답에서 표시·전송·오류/취소 미표시를 확인한다.
@@ -133,8 +134,6 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 - [ ] 실제 screen reader와 긴 대화 성능을 운영 환경에서 검증한다.
 - [ ] 인증 principal이 연결되면 임시 사용자 선택기와 `lib/knowledge-user.ts`를 제거하고
   `GET /api/me`만으로 권한을 표시한다.
-- [ ] Fast Refresh lint warning과 production bundle 크기 경고를 기능 변경과
-  분리해 정리한다.
 - [ ] 실제 모델 설정 API가 제공될 때 현재 비활성 모델·추론 강도 control의 표시
   정책을 재검토한다. API가 없으면 비활성 안내를 유지한다.
 - [ ] 결과 필터·재집계 API가 제공될 때 Result Store 후속 탐색 UX를 별도 계획한다.
@@ -147,6 +146,29 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
   재연결을 관통 검증한다.
 
 ## 완료 이력 요약
+
+### 2026-09-26 — 결과 client 책임 분리와 lint·bundle 경고 정리
+
+- 결과 응답의 순수 검증은 `lib/query-result-parser.ts`, 진행 중 요청 공유·구독 해제·
+  취소는 `lib/query-result-request-pool.ts`로 분리했다. `query-result-api.ts`는 URL·
+  HTTP·안전한 오류 변환과 결과별 요청 연결을 담당하며 기존 공개 export를 유지한다.
+  cookie·TTL·완료 응답 미보관·마지막 구독자의 abort 동작은 변경하지 않았다.
+- 공개 AgentEvent와 `present_*` schema를 Backend 정의와 대조했다. fixture의 오래된
+  출처 경로를 수정하고 계약 테스트가 enum·필수 여부뿐 아니라 타입·pattern·
+  maxLength·maxItems·nullable 제약까지 비교하도록 보강했다.
+- Button·Tabs·ToolGroup의 variant 함수와 Sidebar context/hook을 컴포넌트 파일에서
+  분리했다. 공유 함수 소비자 import를 갱신해 Fast Refresh warning 4건을 제거했다.
+  semantic token·CSS·컴포넌트 동작과 assistant-ui runtime 구성은 유지한다.
+- Vite가 React·assistant-ui·Base UI·차트·Markdown·Zod를 별도 로컬 vendor chunk로
+  출력하도록 했다. 단일 JS 1,586.26kB에서 앱 259.54kB·최대 vendor 406.05kB로 분리해
+  500kB 경고를 제거했다. 총 다운로드 용량 감소나 지연 로딩을 의미하지 않는다.
+- 최종 검증: `npm test` **101 passed**, build 성공, lint **0 errors / 0 warnings**.
+  1280px 브라우저 회귀 chat 9·knowledge 8·workbench 10 모두 통과했다.
+  production preview에서도 결정적 SSE/API fixture로 채팅→표·차트와 데이터 표 대안,
+  로컬 chunk 로딩을 확인했다(JS 오류·외부 resource 요청 0). 실제 provider 검증은 아니다.
+- 남은 build 경고: Zod 의존성의 Rollup 주석 annotation 2건. 경고를 숨기거나
+  의존성 버전을 변경하지 않았다. 브라우저 검증 산출물은 Git 제외 `artifacts/`에 둔다.
+
 
 ### 2026-09-23 — accent를 signature color로 확장
 

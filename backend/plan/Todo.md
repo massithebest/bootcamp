@@ -1,6 +1,6 @@
 # Production Planning Agent Backend 계획 및 이력
 
-**상태: 진행 중. 마지막 갱신: 2026-09-23.**
+**상태: 진행 중. 마지막 갱신: 2026-09-26.**
 
 이 문서는 Backend 작업의 목표, 현재 계약, 다음 작업과 완료 이력을 관리하는 단일
 기준 문서다. 폐쇄망 반입 후 Backend workspace만 열어도 이해할 수 있도록 다른
@@ -124,7 +124,6 @@ Backend가 소유하는 범위는 다음과 같다.
 
 ## 다음 작업
 
-우선순위가 같은 항목은 업무 데이터와 폐쇄망 반입 준비 상황에 따라 조정한다.
 
 ### P1
 
@@ -162,6 +161,19 @@ Backend가 소유하는 범위는 다음과 같다.
   표시 정책을 함께 결정한다. 현재 임시 principal을 보안 경계로 사용하지 않는다.
 
 ## 완료 이력 요약
+
+### 2026-09-26 — 계약 유지 리팩토링과 지식 모델 분리
+
+- 공유 계약을 대조해 공개 AgentEvent 6종과 `present_*` 인자의 타입·필수 여부·enum·
+  길이/개수 제한이 소비자 fixture와 일치함을 확인했다. API·Tool·오류 의미는 유지한다.
+- `services/knowledge/models.py`로 Pydantic 모델과 `KindSpec`·`KIND_SPECS`를 옮겼다.
+  `catalog.py`는 YAML 로딩·조회·store cache를 담당하며 기존 모델 import를 재노출한다.
+  guides·changes는 모델 registry만, writer는 registry와 catalog 저장소를 각각 참조한다.
+  승인·reload·로그·비활성 지식 필터와 SQL 허용 테이블 계약은 유지한다.
+- 기준/최종 검증: `python -m pytest -q` **378 passed, 6 deselected**,
+  `python -m pip check` 정상. 실제 provider E2E는 실행하지 않았다.
+- 남은 경고: Starlette TestClient의 AnyIO alias deprecation 1건(upstream).
+
 
 ### 2026-09-23 — PKT 목표수량 Swap knowledge 반영과 mock 시뮬레이션
 

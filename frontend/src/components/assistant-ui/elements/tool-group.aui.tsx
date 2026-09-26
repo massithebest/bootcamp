@@ -1,4 +1,5 @@
 "use client";
+import { toolGroupVariants } from "./tool-group-variants";
 
 import {
   memo,
@@ -7,7 +8,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import { AlertCircleIcon, CheckIcon, ChevronDownIcon, LoaderIcon } from "lucide-react";
-import { cva, type VariantProps } from "class-variance-authority";
+import type { VariantProps } from "class-variance-authority";
 import {
   Collapsible,
   CollapsibleContent,
@@ -16,17 +17,6 @@ import {
 import { cn } from "@/lib/utils";
 
 const ANIMATION_DURATION = 200;
-
-const toolGroupVariants = cva("aui-tool-group-root group/tool-group w-full", {
-  variants: {
-    variant: {
-      outline: "rounded border py-3",
-      ghost: "",
-      muted: "border-muted-foreground/30 bg-muted/30 rounded border py-3",
-    },
-  },
-  defaultVariants: { variant: "outline" },
-});
 
 export type ToolGroupRootProps = Omit<
   React.ComponentProps<typeof Collapsible>,
@@ -220,5 +210,4 @@ export {
   ToolGroupRoot,
   ToolGroupTrigger,
   ToolGroupContent,
-  toolGroupVariants,
 };

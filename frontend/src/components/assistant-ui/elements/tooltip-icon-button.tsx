@@ -1,7 +1,7 @@
 /** Adapted from assistant-ui's tooltip-icon-button for the existing Base UI primitives. */
 import { forwardRef, type ComponentPropsWithoutRef } from "react";
 import type { VariantProps } from "class-variance-authority";
-import { buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { ghostButton } from "./surfaces";

@@ -8,8 +8,8 @@ Vite 7, React 18, strict TypeScript 기반의 데스크톱 SPA다. 작업 전
 - `src/App.tsx`가 앱과 `AssistantRuntimeProvider`를 조립한다. 공용 primitive는
   `components/ui`, assistant-ui 반입 소스는 `components/assistant-ui/elements`,
   기능 UI는 `components/chat`·`components/knowledge`, 통신·adapter는 `lib`에 둔다.
-- `useRemoteThreadListRuntime` + thread별 `useLocalRuntime(ChatModelAdapter)` 구성을
-  유지한다. 브라우저는 `lib/chat-api.ts`에서 Backend SSE를 직접 읽으며 외부 LLM
+- `useRemoteThreadListRuntime` + thread별 `useLocalRuntime(ChatModelAdapter)` 구성
+  (`hooks/use-agent-runtime.ts`)을 유지한다. 브라우저는 `lib/chat-api.ts`에서 Backend SSE를 직접 읽으며 외부 LLM
   provider를 호출하지 않는다.
 - thread와 메시지는 현재 메모리 adapter에만 저장된다. 영속성을 암시하지 않으며,
   영속 API가 생기면 adapter 경계에서 교체한다.
@@ -39,6 +39,8 @@ Vite 7, React 18, strict TypeScript 기반의 데스크톱 SPA다. 작업 전
   `plan/<yymmdd>-<topic>-plan.md`에 기록한다.
 - 폐쇄망 반입 원칙과 패키지 검증은 `docs/closed-network.md`를 따른다.
 - 기본 검증: `npm test && npm run build && npm run lint`.
+- dev 서버는 3100 포트 `strictPort`로 뜨고, Backend 주소는 `.env.local`의
+  `VITE_API_BASE_URL`(기본 `http://localhost:8100`)이다.
 - UI 변경은 loading·empty·error, keyboard·focus·label, 표·차트 fallback을
   데스크톱 브라우저에서 확인한다. 자동화 산출물은 `.playwright-mcp/` 또는
   `artifacts/`에 두고 커밋하지 않는다.
