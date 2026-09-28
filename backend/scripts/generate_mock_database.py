@@ -40,7 +40,7 @@ class SegmentSpec:
     """Row-count targets for one production segment.
 
     Defaults intentionally match the previous SMT2020 HVLM/LVHM volumes so
-    the bundled ``knowledge/scenarios`` expectation numbers keep working
+    the bundled ``knowledge/mock/scenarios`` expectation numbers keep working
     unchanged (only the ``dataset`` label changed, SEG_A/SEG_B).
     """
 
@@ -175,7 +175,7 @@ def _generate_fp_target_rows(rng: random.Random) -> list[tuple]:
     """``FP_TARGET``: 계획/실적/swap 수량과 제품 속성을 담는 FP 결과 IF 테이블.
 
     grain, 코드값 도메인과 정확한 row 규모는 아직 확인되지 않아 최선 추정치다
-    (``knowledge/catalog/tables/fp_target.yaml``도 ``status: draft``).
+    (``knowledge/mock/catalog/tables/fp_target.yaml``도 ``status: draft``).
     """
 
     rows = []

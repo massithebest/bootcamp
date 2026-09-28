@@ -15,18 +15,22 @@
 
 | 지식 | 저장 위치 | 용도 |
 | --- | --- | --- |
-| 용어 | `knowledge/glossary.yaml` | 동의어, 정의, 관련 KPI·테이블 연결 |
-| 테이블·컬럼·조인 | `knowledge/catalog/` | SQL 작성과 서버의 허용 목록·검증 |
-| KPI | `knowledge/kpi/` | 공식, 기준, 판정 규칙, 원인 후보 |
-| query recipe/CTE | `knowledge/recipes/` | 검증된 집계 흐름과 출력 계약 |
-| 시뮬레이션 | `knowledge/simulations/` | 종류, 입력, 출력과 실행 순서 |
-| 검증 시나리오 | `knowledge/scenarios/` | 고정 데이터셋을 관통하는 질문·실행 단계·기대값 |
+| 용어 | `KNOWLEDGE_DIR/glossary.yaml` | 동의어, 정의, 관련 KPI·테이블 연결 |
+| 테이블·컬럼·조인 | `KNOWLEDGE_DIR/catalog/` | SQL 작성과 서버의 허용 목록·검증 |
+| KPI | `KNOWLEDGE_DIR/kpi/` | 공식, 기준, 판정 규칙, 원인 후보 |
+| query recipe/CTE | `KNOWLEDGE_DIR/recipes/` | 검증된 집계 흐름과 출력 계약 |
+| 시뮬레이션 | `KNOWLEDGE_DIR/simulations/` | 종류, 입력, 출력과 실행 순서 |
+| 검증 시나리오 | `KNOWLEDGE_DIR/scenarios/` | 고정 데이터셋을 관통하는 질문·실행 단계·기대값 |
 | 분석 절차 | `agent/agent_sdk/.claude/skills/` | 어떤 지식을 어떤 순서로 조회할지 |
 | 매뉴얼·정책·보고서 | 폐쇄망 RAG | YAML로 구조화하기 어려운 산문과 출처 |
 
 같은 사실을 여러 위치에 복제하지 않는다. 구조화 가능한 정의는 YAML, 분석 순서는
 Skill, 긴 산문은 RAG가 기준이다. 실행 가능한 recipe/CTE는 RAG에 중복 색인하지
 않고 `list_recipes`와 `get_recipe`로 제공한다.
+
+개발 기본 `KNOWLEDGE_DIR`은 `backend/knowledge/mock/`이고, 폐쇄망에 반입할 실제
+YAML의 기본 위치는 `backend/knowledge/production/`이다. 두 디렉터리는 같은 내부
+구조를 쓰되 mock YAML을 production에 복사하지 않는다.
 
 ## 공통 메타데이터
 
@@ -146,7 +150,7 @@ KPI는 표시 이름과 동의어, 업무 정의, 공식, 원천 테이블, 기�
 파일명은 `<kpi_id>.yaml`로 맞춘다. 새 KPI는 구조와 SQL을 테스트했더라도 현업
 정의·단위·판정 기준을 검토하기 전까지 `draft`로 둔다. 개발용 합성 mock fixture에
 적용한 참고 예시는 [개발용 합성 mock 데이터와 검증](#개발용-합성-mock-데이터와-검증)
-절의 [initial_wip.yaml](../knowledge/kpi/initial_wip.yaml)에 있다.
+절의 [initial_wip.yaml](../knowledge/mock/kpi/initial_wip.yaml)에 있다.
 
 다음은 필수 필드와 연결 방식을 보여주는 작성 예다. 실제 KPI를 추가할 때는
 예시의 이름과 값을 복사하지 말고 대상 catalog와 업무 정의에 맞춰 작성한다.
@@ -227,11 +231,11 @@ updated: 2026-09-15
 
 ### Recipe와 diagnostics 연결
 
-- `recipe_refs`에는 `knowledge/recipes/*.yaml`의 `recipe_id`를 경로 접두사 없이
+- `recipe_refs`에는 `KNOWLEDGE_DIR/recipes/*.yaml`의 `recipe_id`를 경로 접두사 없이
   기록한다. Agent는 `get_kpi` 후 해당 ID를 `get_recipe`로 조회한다.
 - `diagnostics[].hypothesis`는 확인하려는 원인 가설, `how`는 `sql` 또는
   `simulation`, `ref`는 실행 근거다.
-- `how: simulation`의 `ref`는 `knowledge/simulations/*.yaml`의 정확한 `type`이어야
+- `how: simulation`의 `ref`는 `KNOWLEDGE_DIR/simulations/*.yaml`의 정확한 `type`이어야
   한다.
 - `how: sql`은 catalog table 이름 또는 `recipes/<recipe_id>`를 참조한다. 단순
   table 조회보다 grain·JOIN 규칙이 필요한 진단은 recipe 참조를 권장한다.
@@ -280,7 +284,7 @@ Simulation YAML은 `type`, `name`, `aliases`, `when_to_use`, `params`,
 
 table·recipe와 같이 `aggregation_rules`는 집계 의미, `visualization_hints`는
 표현 권고로 구분한다. 실행 절차와 파라미터 제약은 `when_to_use`와 `params`에 둔다.
-참고 예시는 [입력_정합성_검증.yaml](../knowledge/simulations/입력_정합성_검증.yaml)이다.
+참고 예시는 [입력_정합성_검증.yaml](../knowledge/mock/simulations/입력_정합성_검증.yaml)이다.
 
 ## Recipe와 CTE 작성
 
@@ -301,8 +305,8 @@ Recipe YAML은 다음 필드로 질문을 실행 가능한 결과 계약에 연�
 파일명은 `<recipe_id>.yaml`로 맞추고 `recipe_id`와 `cte_name`에는 SQL 식별자로
 안전한 소문자 `snake_case`를 사용한다. 새 파일은 담당자 검토 전까지 `draft`로
 시작한다. 개발용 합성 mock fixture에 적용한 참고 예시는
-[initial_wip_by_part.yaml](../knowledge/recipes/initial_wip_by_part.yaml)과
-[part_route_tool_summary.yaml](../knowledge/recipes/part_route_tool_summary.yaml)에
+[initial_wip_by_part.yaml](../knowledge/mock/recipes/initial_wip_by_part.yaml)과
+[part_route_tool_summary.yaml](../knowledge/mock/recipes/part_route_tool_summary.yaml)에
 있다.
 
 다음은 필수 계약을 보여주는 최소 작성 예다. 값과 컬럼은 복사하지 말고 대상
@@ -412,8 +416,8 @@ tool은 없다. 향후 runtime tool로 공개하려면 tool payload와 프론트
 | `expected.unmatched_rows` | 입력 관계 검사별 허용 미연결 행 수 |
 
 개발용 합성 mock fixture에 적용한 참고 샘플은
-[seg_a_input_integrity.yaml](../knowledge/scenarios/seg_a_input_integrity.yaml)과
-[seg_b_input_integrity.yaml](../knowledge/scenarios/seg_b_input_integrity.yaml)에 있다.
+[seg_a_input_integrity.yaml](../knowledge/mock/scenarios/seg_a_input_integrity.yaml)과
+[seg_b_input_integrity.yaml](../knowledge/mock/scenarios/seg_b_input_integrity.yaml)에 있다.
 최소 형태는 다음과 같다.
 
 ```yaml
@@ -445,8 +449,8 @@ Scenario를 추가할 때는 다음 순서로 작성한다.
 1. 대상 데이터셋·세그먼트를 하나로 고정하고 실제 DB에서 기준 row count와 관계
    검사를 직접 실행한다. 여러 세그먼트에서 식별자가 겹칠 수 있으므로 기대값을
    합쳐 적지 않는다.
-2. `steps[].ref`가 실제 `knowledge/recipes/*.yaml`의 `recipe_id` 또는
-   `knowledge/simulations/*.yaml`의 `type`을 가리키는지 확인한다.
+2. `steps[].ref`가 실제 `KNOWLEDGE_DIR/recipes/*.yaml`의 `recipe_id` 또는
+   `KNOWLEDGE_DIR/simulations/*.yaml`의 `type`을 가리키는지 확인한다.
 3. `params.dataset`과 최상위 `dataset`을 일치시키고 expectation에는 숫자를
    산출하는 방식과 판정 기준을 사람이 읽을 수 있게 적는다.
 4. `expected.table_counts`에는 시나리오가 실제로 의존하는 입력 테이블을 기록한다.
@@ -504,8 +508,9 @@ join 및 입력 관계 unmatched 건수를 포함한다.
 
 ## 폐쇄망 반입과 운영
 
-- 운영 YAML과 Skill은 애플리케이션 소스와 함께 검토해 반입한다. bundled mock
-  YAML은 운영 `KNOWLEDGE_DIR`로 사용하지 않는다.
+- 운영 YAML과 Skill은 애플리케이션 소스와 함께 검토해 반입한다. 실제 YAML은
+  `backend/knowledge/production/`에 추가하고 그 절대경로를 `KNOWLEDGE_DIR`로
+  지정한다. `backend/knowledge/mock/`은 운영 `KNOWLEDGE_DIR`로 사용하지 않는다.
 - 반입 후에는 합성 mock 데이터 없이 공통 계약 테스트와 production service 관통 검증을 실행한다.
 - 비정형 문서 원본은 승인된 반입 절차를 따르고 문서별 owner, source와 갱신일을
   보존한다.
@@ -568,7 +573,7 @@ table·KPI·recipe·simulation·glossary·scenario YAML은 관리 화면에서 �
 
 - 승인 즉시 reload는 uvicorn 단일 워커를 전제한다. 다중 워커면 다른 워커의 메모리
   store가 갱신되지 않으므로 파일 변경 감지 등 별도 설계 전에는 사용하지 않는다.
-- `KNOWLEDGE_DIR`는 서비스 계정이 쓸 수 있어야 한다. 개발에서 번들 `backend/knowledge/`를
+- `KNOWLEDGE_DIR`는 서비스 계정이 쓸 수 있어야 한다. 개발에서 번들 `backend/knowledge/mock/`을
   쓰면 승인이 git 변경으로 나타난다. 시험은 복사본 디렉터리를 `KNOWLEDGE_DIR`로 지정한다.
 - `KNOWLEDGE_DIR`(YAML)와 `KNOWLEDGE_DB_PATH`(요청·이력)는 함께 백업한다. 승인 이력의
   근거 메모와 최종 YAML이 서로 다른 시점이면 감사가 어긋난다.
@@ -581,7 +586,7 @@ table·KPI·recipe·simulation·glossary·scenario YAML은 관리 화면에서 �
 저장한다. 구조화 YAML과 운영 SQL DB를 수정하지 않는다. 이 파일에는 사용자 작성
 자료가 있으므로 소스와 함께 커밋하지 않는다. 배포 볼륨으로 영속 보관한다.
 
-구조화 지식은 `backend/knowledge/` YAML의 `active` 값으로 Agent 검색 반영 여부를
+구조화 지식은 실행 중인 `KNOWLEDGE_DIR` YAML의 `active` 값으로 Agent 검색 반영 여부를
 정하며, 관리 화면에서는 변경 요청과 승인으로만 수정한다(아래 절). 텍스트 지식의
 작성·검토·활성화·보관은 이 폐쇄망 앱의
 내부 공용 관리 기능으로 바로 제공한다. 작성자·검토자 이름은 기록용이며 인증된

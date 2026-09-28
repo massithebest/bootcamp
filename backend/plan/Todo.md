@@ -1,6 +1,6 @@
 # Production Planning Agent Backend 계획 및 이력
 
-**상태: 진행 중. 마지막 갱신: 2026-09-26.**
+**상태: 진행 중. 마지막 갱신: 2026-09-28.**
 
 이 문서는 Backend 작업의 목표, 현재 계약, 다음 작업과 완료 이력을 관리하는 단일
 기준 문서다. 폐쇄망 반입 후 Backend workspace만 열어도 이해할 수 있도록 다른
@@ -81,7 +81,8 @@ Backend가 소유하는 범위는 다음과 같다.
 
 ### 지식과 SQL
 
-- `knowledge/` YAML이 구조화 지식의 source of truth다.
+- 실행 중인 `KNOWLEDGE_DIR` YAML이 구조화 지식의 source of truth다. 개발 기본은
+  `knowledge/mock/`, 폐쇄망 반입 기본 위치는 `knowledge/production/`이다.
 - `query_rules`, `aggregation_rules`, `visualization_hints`의 역할을 섞지 않는다.
 - table/recipe `sample_queries`는 `question`, `sql`만 허용한다.
 - SQL은 항상 조회 전용이며 mock과 production 구현의 함수 시그니처·반환 형태를 맞춘다.
@@ -162,6 +163,14 @@ Backend가 소유하는 범위는 다음과 같다.
 
 ## 완료 이력 요약
 
+### 2026-09-28 — mock·production 구조화 지식 분리
+
+- 기존 번들 YAML을 `knowledge/mock/`으로 이전하고 개발 기본 `KNOWLEDGE_DIR`을 그
+  경로로 변경했다. 폐쇄망 실제 YAML은 `knowledge/production/`에 추가해 명시적으로
+  지정하며, prod는 mock 또는 지식 상위 디렉터리를 거부한다.
+- 폐쇄망 이식 가이드에 production YAML 디렉터리 구조, Windows 환경변수 설정과
+  mock YAML 비반입 원칙을 추가했다.
+
 ### 2026-09-26 — 계약 유지 리팩토링과 지식 모델 분리
 
 - 공유 계약을 대조해 공개 AgentEvent 6종과 `present_*` 인자의 타입·필수 여부·enum·
@@ -178,7 +187,7 @@ Backend가 소유하는 범위는 다음과 같다.
 ### 2026-09-23 — PKT 목표수량 Swap knowledge 반영과 mock 시뮬레이션
 
 - 사용자가 제공한 실제 사내 "PNS PNT-FP API"(PktTarget swap 산출) 스펙을 근거로
-  `knowledge/simulations/PKT_목표수량_스왑산출.yaml`을 새 simulation_type으로
+  `knowledge/mock/simulations/PKT_목표수량_스왑산출.yaml`을 새 simulation_type으로
   등록했다. `view`(all/swapped/by_ids)와 `plan_prod_ids`(by_ids일 때만 필요) 파라미터를
   갖는다. `glossary.yaml`에 "PKT 목표수량 Swap"·"Swap 우선순위 정책" 용어를 draft로
   추가했다 — 기존 `VUI_FP_TARGET_I`(배치 반영 이력)와는 별개 원천임을 명시했다.
@@ -277,7 +286,7 @@ Backend가 소유하는 범위는 다음과 같다.
   환경에서도 실행 가능하다.
 - 테이블·컬럼 스키마(`part`/`route_step`/`tool`/`orders`/`wip`/`setup`/
   `setup_group`/`down_calendar`/`pm_calendar`/`calendar_attach`/`transport`)는
-  그대로 유지해 `knowledge/catalog/`·`sql_guard`·mock SQL/simulation service를
+  그대로 유지해 `knowledge/mock/catalog/`·`sql_guard`·mock SQL/simulation service를
   바꾸지 않았다. `dataset` 값만 `HVLM`/`LVHM` → `SEG_A`/`SEG_B`로 중립화했고,
   `core.config.SMT2020_DB_PATH` → `MOCK_DB_PATH`(기본 경로
   `backend/data/mock_planning.db`), `Smt2020DbMissingError` →

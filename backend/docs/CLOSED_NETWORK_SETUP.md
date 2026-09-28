@@ -12,9 +12,11 @@ Part 1. 폐쇄망 인프라 구축        Part 2. pntfp 서비스 로직 이식�
                                       → 공통 테스트 → production 관통 검증
 ```
 
-합성 mock DB·문서 생성기가 만든 산출물(`backend/data/` 하위)은 개발용
-자산이며 폐쇄망에 반입하지 않는다. 폐쇄망 서버는 `ENV=prod`, `SERVICE_MODE=production`, 별도 운영
-`KNOWLEDGE_DIR`이 모두 준비된 뒤에만 기동한다. Part 2는 Claude Code에게 이 문서
+합성 mock DB·문서 생성기가 만든 산출물(`backend/data/` 하위)과
+`backend/knowledge/mock/` YAML은 개발용 자산이며 폐쇄망 운영 지식으로 반입하지 않는다.
+실제 YAML은 `backend/knowledge/production/`에 추가해 반입한다(또는 같은 내용의 별도
+영속 디렉터리를 사용한다). 폐쇄망 서버는 `ENV=prod`, `SERVICE_MODE=production`, 명시적인
+운영 `KNOWLEDGE_DIR`이 모두 준비된 뒤에만 기동한다. Part 2는 Claude Code에게 이 문서
 경로를 알려주고 "이 가이드를 보고 이식해줘"라고 지시하는 방식으로 실행하면 된다.
 
 ---
@@ -257,8 +259,11 @@ import 관계와 사용처를 확인한 뒤 대상과 필요성을 먼저 결정
    병합한다.
 5. `system_prompt.py`와 `CLAUDE.md`의 production service 지침을 현재 Agent Tool 계약에
    맞춰 병합한다.
-6. 서비스와 기존 SQL 프롬프트에서 확인한 도메인 정보를 별도 운영
-   `KNOWLEDGE_DIR`의 YAML에 반영한다.
+6. 서비스와 기존 SQL 프롬프트에서 확인한 도메인 정보를
+   `backend/knowledge/production/` YAML에 반영한다. 디렉터리 구조는 mock과 같게
+   `catalog/`, `kpi/`, `recipes/`, `simulations/`, `scenarios/`, `glossary.yaml`로
+   만들고, 실제 운영 환경변수 `KNOWLEDGE_DIR`는 이 디렉터리의 절대경로로 지정한다.
+   운영 YAML을 별도 영속 볼륨에 둘 때도 동일한 구조를 복사하고 그 경로를 지정한다.
 7. 신규 import에 필요한 패키지만 `backend/requirements.txt`에 추가하고 사내
    Nexus에 해당 버전과 전이 의존성이 있는지 확인한다.
 8. 계약 테스트와 전체 백엔드 테스트를 실행한 뒤 `SERVICE_MODE=production` 관통 검증을
@@ -434,7 +439,10 @@ Agent가 SQL을 올바르게 생성하려면 실제 DB와 서비스에 맞는 �
    확인한다.
 2. `backend/.env`에 `LLM_PROVIDER=local`, private LLM 및 production service에 필요한
    환경변수가 모두 채워졌는지 확인한다.
-3. `ENV=prod`, `SERVICE_MODE=production`, 별도 운영 `KNOWLEDGE_DIR`을 설정한다.
+3. `ENV=prod`, `SERVICE_MODE=production`, `KNOWLEDGE_DIR`을 설정한다. 기본 반입
+   위치를 쓸 경우 Windows에서는
+   `KNOWLEDGE_DIR=<backend 절대경로>\\knowledge\\production`으로 지정한다.
+   `knowledge/mock`과 `knowledge/` 상위 폴더는 운영 경로로 지정하지 않는다.
    합성 mock DB 관련 변수는 설정하지 않는다.
 4. 테스트를 실행할 폐쇄망 이식 환경에는 `requirements-dev.txt`를 설치하고,
    mock service·외부 provider E2E를 제외한 공통 계약 테스트를 실행한다.
@@ -486,7 +494,7 @@ python -m uvicorn main:app --port 8100
     `services/production/simulation_service.py`가 반환하는 payload(특히
     `status`, `kind`, `simulation_type`, `dataset`/`scenario`, `kpis`, Result
     Store 저장 필드)를 하나씩 대조한다. 응답 필드명이 다르면 이식 코드에서
-    매핑하고, `knowledge/simulations/*.yaml`의 `output_schema`를 실제 응답에
+    매핑하고, `KNOWLEDGE_DIR/simulations/*.yaml`의 `output_schema`를 실제 응답에
     맞게 갱신한다.
 12. 폐쇄망 프록시 구현을 반입한 뒤 `LLM_PROVIDER=local`을 쓴다면 `/anthropic`
     경로를 별도로 검증한다: 서버를 이 설정으로 재기동한 뒤 실제 채팅 1건을 보내

@@ -29,7 +29,8 @@ Windows PowerShell에서는 `py -3.11 -m venv .venv`와
 - 결과 표시는 bounded preview와 flat `present_sql_preview`·`present_chart`·
   `present_table`·`present_simulation` Tool, `/api/query-results/*`만 사용한다
 - `LLM_PROVIDER`, `AGENT_MODEL`, provider key: 실제 Agent SDK 설정
-- `KNOWLEDGE_DIR`, `KNOWLEDGE_DB_PATH`: 구조화 YAML과 텍스트 지식 SQLite 위치
+- `KNOWLEDGE_DIR`, `KNOWLEDGE_DB_PATH`: 구조화 YAML과 텍스트 지식 SQLite 위치. 개발 기본값은
+  `knowledge/mock`, 폐쇄망 반입 YAML 기본 위치는 `knowledge/production`
 - `KNOWLEDGE_SEARCH_BACKEND=local|service`: `search_documents`가 로컬 SQLite 또는 사내 RAG 어댑터를 쓸지 선택
 - `KNOWLEDGE_MANAGEMENT_ENABLED`, `KNOWLEDGE_ALLOW_SELF_APPROVAL`, `KNOWLEDGE_PRINCIPALS`,
   `KNOWLEDGE_DEFAULT_PRINCIPAL`: 구조화 지식 변경 요청·승인의 스텁 권한 설정(값은 `.env.example` 참고)
@@ -82,8 +83,10 @@ SDK `query`를 대체해 Agent 이벤트 흐름을 검증한다. `services/produ
 사내 DB·RAG·simulation 구현으로 교체하는 경계이며 mock과 함수 시그니처·반환 형태를
 유지해야 한다.
 
-폐쇄망 운영은 `ENV=prod`, `SERVICE_MODE=production`과 별도 `KNOWLEDGE_DIR`을 모두
-요구한다. 조건을 충족하지 않으면 서버는 시작 단계에서 실패한다.
+폐쇄망 운영은 `ENV=prod`, `SERVICE_MODE=production`과 명시적인 `KNOWLEDGE_DIR`을 모두
+요구한다. 운영 YAML은 `knowledge/production`에 반입해 지정하거나 별도 영속 경로에
+두며, `knowledge/mock`은 지정할 수 없다. 조건을 충족하지 않으면 서버는 시작 단계에서
+실패한다.
 
 ## API 진입점
 
@@ -105,7 +108,9 @@ Result Store와 `/api/query-results/*`는 세션 범위 쿠키 `pp_session_scope
 
 ## 지식 계약
 
-`knowledge/` YAML이 table·KPI·recipe·scenario·simulation·glossary의 기준이다.
+`knowledge/mock/`은 개발·회귀용 YAML이고, `knowledge/production/`은 폐쇄망 이식용
+운영 YAML 위치다. 실행 중인 `KNOWLEDGE_DIR`의 YAML이 table·KPI·recipe·scenario·
+simulation·glossary의 단일 기준이다.
 
 - `query_rules`: 기본 날짜·필터·정렬·조인 전제
 - `aggregation_rules`: 결과 grain·집계 함수·중복·재집계 규칙

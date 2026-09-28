@@ -1,6 +1,6 @@
 """Simulation type / parameter schema shared by mock and production services.
 
-정의의 source of truth 는 `knowledge/simulations/*.yaml` 이다 (설계 §3).
+정의의 source of truth 는 `KNOWLEDGE_DIR/simulations/*.yaml` 이다 (설계 §3).
 이 모듈은 그것을 로드해 서비스·tool 이 쓰는 형태로 돌려주는 얇은 계층이다.
 새 시뮬레이션 종류는 YAML 파일을 추가하면 된다.
 """

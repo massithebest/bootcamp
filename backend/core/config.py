@@ -28,8 +28,14 @@ if SERVICE_MODE == "real":
 #: backend/ 디렉터리. 아래 경로 상수의 기준점.
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
-#: 도메인 지식 YAML(카탈로그·KPI·시뮬레이션·용어집·시나리오) 루트.
-DEFAULT_KNOWLEDGE_DIR = BACKEND_DIR / "knowledge"
+#: 도메인 지식 YAML의 구분 루트와 번들 개발용 mock·폐쇄망 production 위치.
+KNOWLEDGE_ROOT_DIR = BACKEND_DIR / "knowledge"
+MOCK_KNOWLEDGE_DIR = KNOWLEDGE_ROOT_DIR / "mock"
+PRODUCTION_KNOWLEDGE_DIR = KNOWLEDGE_ROOT_DIR / "production"
+
+#: 개발 환경 기본 YAML 루트. 실제 운영 YAML은 명시적으로 production 위치(또는
+#: 별도 영속 경로)를 지정해야 한다.
+DEFAULT_KNOWLEDGE_DIR = MOCK_KNOWLEDGE_DIR
 _CONFIGURED_KNOWLEDGE_DIR = os.getenv("KNOWLEDGE_DIR", "").strip()
 KNOWLEDGE_DIR = Path(_CONFIGURED_KNOWLEDGE_DIR or DEFAULT_KNOWLEDGE_DIR)
 
@@ -61,7 +67,10 @@ def validate_runtime_configuration() -> None:
         raise RuntimeError("ENV=prod requires an explicit KNOWLEDGE_DIR.")
     if not KNOWLEDGE_DIR.is_dir():
         raise RuntimeError("ENV=prod requires KNOWLEDGE_DIR to be an existing directory.")
-    if KNOWLEDGE_DIR.resolve() == DEFAULT_KNOWLEDGE_DIR.resolve():
+    if KNOWLEDGE_DIR.resolve() in {
+        KNOWLEDGE_ROOT_DIR.resolve(),
+        MOCK_KNOWLEDGE_DIR.resolve(),
+    }:
         raise RuntimeError(
             "ENV=prod cannot use the bundled mock development knowledge directory."
         )

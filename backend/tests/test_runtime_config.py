@@ -58,7 +58,10 @@ def test_production_rejects_mock_service_mode(tmp_path: Path) -> None:
     assert "SERVICE_MODE" in result.stderr
 
 
-@pytest.mark.parametrize("knowledge_dir", ["", str(BACKEND_DIR / "knowledge")])
+@pytest.mark.parametrize(
+    "knowledge_dir",
+    ["", str(BACKEND_DIR / "knowledge"), str(BACKEND_DIR / "knowledge" / "mock")],
+)
 def test_production_rejects_missing_or_bundled_knowledge(
     knowledge_dir: str,
 ) -> None:
@@ -72,6 +75,18 @@ def test_production_rejects_missing_or_bundled_knowledge(
 
     assert result.returncode != 0
     assert "KNOWLEDGE_DIR" in result.stderr or "mock" in result.stderr
+
+
+def test_production_accepts_bundled_production_knowledge_directory() -> None:
+    result = run_import(
+        {
+            "ENV": "prod",
+            "SERVICE_MODE": "production",
+            "KNOWLEDGE_DIR": str(BACKEND_DIR / "knowledge" / "production"),
+        }
+    )
+
+    assert result.returncode == 0
 
 
 def test_production_rejects_nonexistent_knowledge_directory(tmp_path: Path) -> None:
