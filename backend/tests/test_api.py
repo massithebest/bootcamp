@@ -37,15 +37,17 @@ def clear_agent_sessions():
     session_store.clear()
 
 
-def _install_sdk_stream(monkeypatch, messages: list[object], session_id: str) -> None:
+def _install_sdk_stream(
+    monkeypatch, messages: list[object], session_id: str, *, failed: bool = False
+) -> None:
     async def fake_query(**_):
         for message in messages:
             yield message
         yield ResultMessage(
-            subtype="success",
+            subtype="error" if failed else "success",
             duration_ms=1,
             duration_api_ms=1,
-            is_error=False,
+            is_error=failed,
             num_turns=1,
             session_id=session_id,
         )
@@ -130,26 +132,74 @@ def test_chat_endpoint_streams_sdk_agent_events(monkeypatch) -> None:
     assert answer == "조회 결과를 확인합니다.조회 결과는 1건입니다."
 
 
-def test_chat_endpoint_done_event_carries_turn_id(monkeypatch) -> None:
-    """편집/재생성이 다음 요청의 `fork_from_turn_id` 로 돌려보낼 값."""
+# ---- workbench 종료 상태: case 이름은 frontend/tests/workbench.test.mjs와 대응한다 ----
 
-    _install_sdk_stream(
-        monkeypatch,
-        [AssistantMessage(content=[TextBlock(text="완료")], model="fixture")],
-        session_id="api-done-session",
-    )
 
-    response = client.post(
-        "/api/chat",
-        json={"message": "hi", "conversation_id": "api-done-conversation"},
-    )
+def _tool_call(call_id):
+    return AssistantMessage(content=[ToolUseBlock(
+        id=call_id, name="mcp__planning__execute_sql", input={"sql": "SELECT 1"},
+    )], model="fixture")
 
+
+def _tool_result(call_id, data):
+    return UserMessage(content=[ToolResultBlock(tool_use_id=call_id, content=json.dumps(data))])
+
+
+ZERO = {"status": "ok", "kind": "database", "row_count": 0, "table": {"columns": ["qty"], "rows": []}}
+ERROR = {"status": "error", "message": "조회 조건을 확인하세요."}
+
+
+@pytest.mark.parametrize("case", ["tool-error-done", "missing-result", "empty-done", "zero-rows", "error-done", "parallel-reversed", "recovered-tool-error"])
+def test_workbench_terminal_states_on_sse_wire(monkeypatch, case):
+    messages = []
+    if case not in ("empty-done", "error-done"):
+        messages.append(_tool_call("sql-1"))
+    if case == "tool-error-done":
+        messages.extend([_tool_result("sql-1", ERROR), AssistantMessage(content=[TextBlock(text="조건 확인이 필요합니다.")], model="fixture")])
+    elif case == "zero-rows":
+        messages.append(_tool_result("sql-1", ZERO))
+    elif case == "parallel-reversed":
+        messages.extend([_tool_call("sql-2"), _tool_result("sql-2", ZERO), _tool_result("sql-1", ERROR)])
+    elif case == "recovered-tool-error":
+        messages.extend([_tool_result("sql-1", ERROR), _tool_call("sql-2"), _tool_result("sql-2", ZERO),
+            AssistantMessage(content=[TextBlock(text="조건을 수정해 조회했습니다. 결과는 0건입니다.")], model="fixture")])
+    _install_sdk_stream(monkeypatch, messages, session_id="ux-fixture", failed=case == "error-done")
+    response = client.post("/api/chat", json={"message": "조회 결과를 알려줘"})
+    assert response.status_code == 200
     events = _parse_sse(response.text)
-    done = events[-1]
-
-    assert done["type"] == "done"
-    assert isinstance(done["data"]["turn_id"], str)
-    assert done["data"]["turn_id"]
+    assert events[-1]["type"] == "done"
+    assert sum(e["type"] == "done" for e in events) == 1
+    results = [e for e in events if e["type"] == "tool_result"]
+    calls = {e["tool_call_id"]: e for e in events if e["type"] == "tool_call"}
+    for event in results:
+        assert event["tool_call_id"] in calls
+        assert event["tool_name"] == calls[event["tool_call_id"]]["tool_name"]
+        result_index = events.index(event)
+        assert events.index(calls[event["tool_call_id"]]) < result_index
+        status = events[result_index + 1]
+        assert status["type"] == "status"
+        assert status["tool_call_id"] == event["tool_call_id"]
+        assert status["data"]["status"] == ("error" if event["data"]["status"] == "error" else "completed")
+    if case in ("empty-done", "missing-result"):
+        assert results == []  # Never synthesize a successful tool result.
+        assert len(calls) == (case == "missing-result")
+    if case == "empty-done":
+        assert [e["type"] for e in events] == ["done"]
+    if case == "error-done":
+        assert [e["type"] for e in events] == ["error", "done"]
+        assert events[-1]["data"] is None
+    elif case == "tool-error-done":
+        assert results[0]["data"] == ERROR
+        assert events[-2]["type"] == "text"
+        assert events[-1]["data"]["turn_id"]
+    elif case == "zero-rows":
+        assert results[0]["data"] == ZERO
+    elif case == "parallel-reversed":
+        assert [e["tool_call_id"] for e in results] == ["sql-2", "sql-1"]
+    elif case == "recovered-tool-error":
+        assert [e["data"]["status"] for e in results] == ["error", "ok"]
+        assert events[-2]["type"] == "text"
+    assert all("access_scope" not in e.get("data", {}).get("args", {}) for e in calls.values())
 
 
 def test_chat_endpoint_reports_error_gracefully(monkeypatch, caplog) -> None:

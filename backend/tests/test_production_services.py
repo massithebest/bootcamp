@@ -1,8 +1,8 @@
 """client mock 기반 production 경계 회귀 테스트.
 
 폐쇄망 인프라(사내 SQL API·Milvus·Simulation API·LLM 게이트웨이) 없이도
-검증 가능한 것만 담는다: production 어댑터의 설정 가드레일, `/anthropic`
-프록시 미구현 상태, `missing_params` 구조화 상태.
+검증 가능한 것만 담는다: production 어댑터의 설정 가드레일, mock과 같은 공개
+시그니처, `/anthropic` 프록시 미구현 상태, `missing_params` 구조화 상태.
 
 TODO: 폐쇄망에서 `services/production/{sql,rag,simulation}_service.py`에 실제
 HTTP 로직이 이식된 뒤에는, 이 파일에 성공 경로(Result Store 저장 포함) 테스트를
@@ -10,12 +10,14 @@ HTTP 로직이 이식된 뒤에는, 이 파일에 성공 경로(Result Store 저
 """
 
 import asyncio
+import inspect
 
 import pytest
 from fastapi.testclient import TestClient
 
 from main import app
-from services.mock import mock_simulation_service
+from services.mock import mock_rag_service, mock_simulation_service, mock_sql_service
+from services.production import rag_service, simulation_service, sql_service
 from services.production.common_sql_client import CommonSqlClient
 from services.production.milvus_client import get_embedding_function, get_milvus_client
 from services.production.rag_service import ProductionRAGService
@@ -61,6 +63,21 @@ def test_production_services_are_not_implemented_yet() -> None:
                 "입력_정합성_검증", {"dataset": "SEG_A"}
             )
         )
+
+
+# ---- mock·production 공개 시그니처 일치 ----
+
+
+def test_mock_production_function_signatures_match() -> None:
+    for mock, production, names in [
+        (mock_sql_service, sql_service, ["execute_sql"]),
+        (mock_rag_service, rag_service, ["search"]),
+        (mock_simulation_service, simulation_service, ["list_simulation", "run_simulation"]),
+    ]:
+        for name in names:
+            assert inspect.signature(getattr(mock, name), eval_str=True) == inspect.signature(
+                getattr(production, name), eval_str=True
+            )
 
 
 # ---- missing_params 구조화 상태 ----

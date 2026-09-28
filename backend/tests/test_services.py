@@ -89,13 +89,6 @@ def test_mock_execute_sql_distinguishes_exact_limit_from_overflow(mock_db, monke
     assert store.get_meta(overflow["result_id"]).source_truncated is True
 
 
-def test_mock_execute_sql_result_retrievable_via_store(mock_db) -> None:
-    result = asyncio.run(
-        mock_sql_service.execute_sql("SELECT part FROM part", purpose="Part 확인")
-    )
-    assert result_store.get_result_store().get_meta(result["result_id"]) is not None
-
-
 def test_mock_execute_sql_rejects_write(mock_db) -> None:
     result = asyncio.run(
         mock_sql_service.execute_sql("DELETE FROM wip", purpose="지우기")
@@ -176,16 +169,6 @@ def test_mock_input_validation_rejects_invalid_dataset(mock_db) -> None:
     )
     assert result["status"] == "error"
     assert "SEG_A" in result["message"] and "SEG_B" in result["message"]
-
-
-def test_mock_input_validation_requires_dataset(mock_db) -> None:
-    result = asyncio.run(
-        mock_simulation_service.run_simulation(
-            simulation_type="입력_정합성_검증", params={}
-        )
-    )
-    assert result["status"] == "missing_params"
-    assert result["missing"][0]["name"] == "dataset"
 
 
 def test_mock_input_validation_missing_db(tmp_path, monkeypatch) -> None:
@@ -304,13 +287,6 @@ def test_mock_pkt_swap_deterministic(mock_db) -> None:
     assert first["kpis"] == second["kpis"]
 
 
-def test_mock_run_simulation_unknown_type() -> None:
-    result = asyncio.run(
-        mock_simulation_service.run_simulation("존재하지_않는_타입", {})
-    )
-    assert result["status"] == "error"
-
-
 @pytest.mark.parametrize("source", ['"private_table"', '[private_table]', '`private_table`', '/* gap */ private_table'])
 def test_sql_catalog_cannot_be_bypassed_with_quoted_or_commented_table(mock_db, source):
     import sqlite3
@@ -328,16 +304,3 @@ def test_sql_catalog_allows_quoted_table_and_cte(mock_db):
         'WITH source AS (SELECT part FROM "part") SELECT COUNT(*) AS n FROM source', purpose="CTE test"))
     assert result["status"] == "ok"
     assert result["sample_rows"] == [{"n": 12}]
-
-
-def test_mock_production_function_signatures_match():
-    import inspect
-    from services.production import sql_service, rag_service, simulation_service
-
-    for mock, production, names in [
-        (mock_sql_service, sql_service, ["execute_sql"]),
-        (mock_rag_service, rag_service, ["search"]),
-        (mock_simulation_service, simulation_service, ["list_simulation", "run_simulation"]),
-    ]:
-        for name in names:
-            assert inspect.signature(getattr(mock, name), eval_str=True) == inspect.signature(getattr(production, name), eval_str=True)

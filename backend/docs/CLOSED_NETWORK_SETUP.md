@@ -466,10 +466,10 @@ python -m pytest -q `
 
 6. mock/production 서비스가 같은 공개 함수를 제공하는지 확인하고, production service에는
    실제 인프라를 호출하지 않는 단위 테스트 또는 client mock 테스트를 추가한다.
-   `tests/test_real_services.py`에 이미 설정 가드레일·`/anthropic` 미구현 상태·
-   `missing_params` 테스트가 있다. 이식 후에는 미구현을 단정하는 테스트를
-   실제 성공 경로(SQL/RAG/simulation, Result Store 저장 포함) 테스트로 교체하고,
-   프록시 501 테스트도 구현 결과에 맞게 교체한다.
+   `tests/test_production_services.py`에 이미 설정 가드레일·mock/production 공개
+   시그니처 일치·`/anthropic` 미구현 상태·`missing_params` 테스트가 있다. 이식
+   후에는 미구현을 단정하는 테스트를 실제 성공 경로(SQL/RAG/simulation, Result
+   Store 저장 포함) 테스트로 교체하고, 프록시 501 테스트도 구현 결과에 맞게 교체한다.
 7. 백엔드를 기동한다.
 
 ```powershell

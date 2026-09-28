@@ -163,6 +163,18 @@ Backend가 소유하는 범위는 다음과 같다.
 
 ## 완료 이력 요약
 
+### 2026-09-28 — backend 테스트 중복 제거와 파일 통합
+
+- 같은 계층에서 같은 계약을 단정하던 테스트 15개를 삭제했다(동일 본문의 prompt 검사,
+  `isinstance(dict)`만 보던 Tool wrapper 검사, 다른 테스트가 이미 덮는 session_store·
+  present 등록·mock service 검사). 계층이 다른 store·service·tool·API 테스트는 유지했다.
+- 작은 파일을 책임별로 합쳤다: `test_workbench_contract` → `test_api`(case 이름은
+  frontend workbench fixture와 대응 유지), `test_session_store` → `test_agent`,
+  `test_aggregation_guidance`·`test_knowledge_diagnostics` → `test_bundled_knowledge`,
+  e2e 2개 → `test_e2e`, `test_knowledge_search_service` → `test_document_management`.
+  `test_real_services`는 내용에 맞게 `test_production_services`로 바꾸고 mock/production
+  시그니처 일치 테스트를 옮겼다. 테스트 파일 25개 → 20개, 제품 코드 변경 없음.
+
 ### 2026-09-28 — mock·production 구조화 지식 분리
 
 - 기존 번들 YAML을 `knowledge/mock/`으로 이전하고 개발 기본 `KNOWLEDGE_DIR`을 그

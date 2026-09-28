@@ -70,22 +70,6 @@ def test_tool_names_cover_every_tool() -> None:
     assert short_names == {tool.__name__ for tool in ALL_TOOLS}
 
 
-def test_execute_sql_returns_database_kind(seeded_db) -> None:
-    result = asyncio.run(
-        execute_sql("SELECT part FROM part WHERE dataset='SEG_A'", purpose="Part 확인")
-    )
-
-    assert result["status"] == "ok"
-    assert result["kind"] == "database"
-    assert [column["name"] for column in result["columns"]] == ["part"]
-
-
-@pytest.mark.mock_service
-def test_search_documents_returns_dict() -> None:
-    result = asyncio.run(search_documents("리드타임 정의"))
-    assert isinstance(result, dict)
-
-
 def test_search_documents_keeps_safe_knowledge_error_shape(monkeypatch) -> None:
     async def fail(query: str) -> dict:
         raise KnowledgeError(404, "검토 완료된 문서를 찾을 수 없습니다.")
@@ -101,24 +85,6 @@ def test_search_documents_keeps_safe_knowledge_error_shape(monkeypatch) -> None:
         "documents": [],
         "message": "검토 완료된 문서를 찾을 수 없습니다.",
     }
-
-
-@pytest.mark.mock_service
-def test_list_simulation_returns_dict() -> None:
-    result = asyncio.run(list_simulation())
-    assert isinstance(result, dict)
-    assert isinstance(result["simulations"], list)
-
-
-def test_run_simulation_returns_dict(seeded_db) -> None:
-    result = asyncio.run(
-        run_simulation(
-            simulation_type="입력_정합성_검증",
-            params={"dataset": "SEG_A"},
-        )
-    )
-    assert isinstance(result, dict)
-    assert result["status"] == "ok"
 
 
 @pytest.mark.usefixtures("bundled_knowledge")
@@ -161,14 +127,6 @@ def test_get_kpi_unknown_is_error() -> None:
 
     assert result["status"] == "error"
     assert "list_kpis" in result["message"]
-
-
-@pytest.mark.usefixtures("bundled_knowledge")
-def test_get_kpi_exposes_diagnostics() -> None:
-    result = asyncio.run(get_kpi("initial_wip"))
-
-    assert result["verified"] is False  # expanded diagnostics await domain review
-    assert {d["how"] for d in result["data"]["diagnostics"]} == {"sql", "simulation"}
 
 
 def test_get_result_summary_unknown_id_is_error() -> None:

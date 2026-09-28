@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from agent.sdk_tools import planning_tools, tool_catalog, tool_names
+from agent.sdk_tools import tool_catalog
 from services.results import store as result_store
 from services.results.present import (
     PresentError,
@@ -231,20 +231,6 @@ def test_present_simulation_schema_requires_scenario_summary_kpis() -> None:
 
 
 # ---- 등록 ----
-
-
-def test_present_tools_are_always_registered() -> None:
-    names = {t.name for t in planning_tools()}
-
-    assert {"present_sql_preview", "present_chart", "present_table", "present_simulation"} <= names
-    assert not {"prepare_table", "prepare_visualization"} & names
-
-
-def test_tool_names_prefixes_present_tools() -> None:
-    names = tool_names()
-
-    for short in ("present_sql_preview", "present_chart", "present_table", "present_simulation"):
-        assert f"mcp__planning__{short}" in names
 
 
 def test_tool_catalog_advertises_present_schema() -> None:

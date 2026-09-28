@@ -165,8 +165,3 @@ def test_data_tool_descriptions_distinguish_sql_simulation_and_documents() -> No
     assert "임의의 종류" in tools["run_simulation"].description
     assert "화면 버튼·변경 위치·조회 방법" in tools["search_documents"].description
     assert "실제 저장 수치 조회나 simulation 실행을 대신하지 않는다" in tools["search_documents"].description
-
-
-def test_system_prompt_still_lists_no_present_mode_tools() -> None:
-    for name in SHORT_TOOL_NAMES:
-        assert name not in SYSTEM_PROMPT

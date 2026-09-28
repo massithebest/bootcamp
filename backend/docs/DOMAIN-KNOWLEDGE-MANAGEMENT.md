@@ -264,7 +264,7 @@ cd backend
 python -m pytest -q \
   tests/test_knowledge.py \
   tests/test_knowledge_integrity.py \
-  tests/test_aggregation_guidance.py
+  tests/test_bundled_knowledge.py
 ```
 
 정합성 테스트는 KPI source, SQL이 참조하는 table, `recipe_refs`, diagnostics와
