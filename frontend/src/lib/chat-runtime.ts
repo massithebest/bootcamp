@@ -21,6 +21,7 @@ import type {
 } from "@/types/chat";
 import { isStandaloneTool } from "./standalone-tools";
 import { toolResultError } from "./tool-result";
+import { tableArgs } from "@/components/chat/generative/vocabulary";
 
 export interface AgentMessageMetadata {
   /** Tool 호출과 별개로 Backend가 공개한 사용자용 업무 진행 단계. */
@@ -86,6 +87,12 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
   );
   const standaloneParts = allStandaloneParts.filter((part, index) =>
     shouldShowStandalonePart(part, index, allStandaloneParts),
+  );
+  const hideMarkdownTables = standaloneParts.some((part) =>
+    part.toolName === "present_table" &&
+    isSuccessfulStandalonePart(part) &&
+    part.result?.data !== null &&
+    tableArgs.safeParse(part.args).success,
   );
   // 일반 Tool 사이의 준비 문구는 최종 답변에서 숨기되, 실행 중인 최신 Tool을
   // 설명하는 공개 문구는 progressText로 유지한다. 이미 제시한 표·차트가 있는
@@ -177,6 +184,7 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
     metadata: {
       custom: {
         statuses: independentStatuses,
+        hideMarkdownTables,
         ...(message.observedTiming ? { observedTiming: message.observedTiming } : {}),
         toolTimings: Object.fromEntries(message.parts.flatMap((part) =>
           part.kind === "tool" && part.observedTiming ? [[part.toolCallId, part.observedTiming]] : [],

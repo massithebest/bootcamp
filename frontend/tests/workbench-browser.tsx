@@ -224,17 +224,30 @@ export async function runWorkbenchRegressions() {
     await run("F01/F05/F06/F15 separate table, long tokens, headings and readable metadata", async () => {
       await newChat(); await send();
       const long = "LOT_".repeat(120);
-      await emit({ type: "text", content: `# 분석\n\n### 세부\n\n${long}\n\n| 지표 | 비율 |\n| --- | --- |\n| 불량률 | 2% |` },
-        { type: "tool_call", tool_name: "present_table", tool_call_id: "table", data: { args: { result_id: resultId } } },
+      await emit({ type: "text", content: `# 분석\n\n### 세부\n\n${long}\n\n| 지표 | 비율 |\n| --- | --- |\n| 불량률 | 2% |\n\n\`\`\`markdown\n| 코드 예시 | 값 |\n| --- | --- |\n| 코드 행 | 1 |\n\`\`\`` });
+      await waitFor(() => !!host.querySelector("tbody")?.textContent?.includes("불량률"));
+      check(host.textContent?.includes("불량률"), "Markdown-only streaming table disappeared");
+      await emit({ type: "tool_call", tool_name: "present_table", tool_call_id: "table", data: { args: { result_id: resultId } } },
         { type: "tool_result", tool_name: "present_table", tool_call_id: "table", data: { status: "ok", result_id: resultId } }, { type: "done" });
-      await waitFor(() => !!host.textContent?.includes(long));
-      check(host.textContent?.includes("불량률"), "separate Markdown table disappeared");
+      await waitFor(() => !!host.querySelector("tbody tr") && !host.textContent?.includes("불량률"));
+      check(!host.textContent?.includes("불량률"), "Markdown table duplicated a successful present_table");
+      check(host.querySelectorAll("table").length === 1, "expected only the present_table result");
+      await waitFor(() => [...host.querySelectorAll("pre")].some(pre => pre.textContent?.includes("코드 행")));
       const paragraph = [...host.querySelectorAll("p")].find(p => p.textContent === long)!;
       check(paragraph.scrollWidth <= paragraph.clientWidth + 1, "long token clipped");
       check(host.querySelectorAll("main").length === 1 && host.querySelector("h2"), "missing landmark/message heading");
       check(host.querySelector("h3")?.textContent === "분석" && host.querySelector("h4")?.textContent === "세부", `heading level skipped: ${[...host.querySelectorAll('h3,h4')].map(e => `${e.tagName}:${e.textContent}`).join(',')}`);
       const th = host.querySelector("th")!;
       check(getComputedStyle(th).color === "rgb(85, 96, 109)", "table header still low contrast");
+    });
+    await run("Markdown table remains when present_table fails", async () => {
+      await newChat(); await send();
+      await emit({ type: "tool_call", tool_name: "present_table", tool_call_id: "failed-table", data: { args: { result_id: resultId } } },
+        { type: "tool_result", tool_name: "present_table", tool_call_id: "failed-table", data: { status: "error", message: "표 설정 실패" } },
+        { type: "text", content: "결론과 근거는 유지합니다.\n\n| 지표 | 값 |\n| --- | --- |\n| 대안 표 | 20 |" }, { type: "done" });
+      await waitFor(() => !!host.querySelector("tbody tr"));
+      check(host.textContent?.includes("대안 표"), "failed present_table hid the Markdown fallback");
+      check(host.textContent?.includes("결론과 근거는 유지합니다."), "surrounding prose disappeared");
     });
     await run("F13 chart data alternative uses real values", async () => {
       await newChat(); await send();

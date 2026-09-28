@@ -14,6 +14,7 @@
 import { Children, Fragment, type ComponentPropsWithoutRef } from "react";
 import remarkGfm from "remark-gfm";
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
+import { useAuiState } from "@assistant-ui/react";
 import { TABLE_DISPLAY_ROW_LIMIT } from "@/components/chat/primitives";
 import { remarkChatHeadings } from "@/lib/markdown-headings";
 
@@ -100,6 +101,11 @@ function Anchor(props: ComponentPropsWithoutRef<"a">) {
 
 /** 표 컨테이너 — `primitives.tsx` `DataTable` 과 동일한 스크롤·높이 제한 래퍼. */
 function Table(props: ComponentPropsWithoutRef<"table">) {
+  const hidden = useAuiState((s) =>
+    s.message.role === "assistant" && s.message.metadata.custom.hideMarkdownTables === true,
+  );
+  // GFM에서 표로 파싱된 노드만 생략한다. 본문과 fenced code는 그대로 유지한다.
+  if (hidden) return null;
   return (
     <div className="thin-scroll max-h-96 overflow-x-auto overflow-y-auto">
       <table className="w-full border-collapse font-mono text-data tabular-nums">

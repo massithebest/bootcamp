@@ -88,6 +88,10 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 
 ### 표·차트·지식
 
+- 같은 assistant 답변에 인자가 유효하고 성공 결과가 확인된 `present_table`이 있으면
+  Markdown 표는 renderer에서 숨긴다. 설명·결론·코드 블록과 원문은 보존한다.
+  미호출·미완료·실패·잘못된 인자는 Markdown 표를 숨기지 않는다.
+
 - 지식 API는 Tool·Skill·구조화 entry와 버전형 text document, 구조화 지식 변경 요청을 제공한다.
 - 문서 검색 Tool 이름은 `search_documents`이며 결과 `kind`는 `knowledge`다.
 - 브라우저는 credential cookie를 포함하고 내부 path·scope를 표시하지 않는다.
@@ -146,6 +150,18 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
   재연결을 관통 검증한다.
 
 ## 완료 이력 요약
+
+### 2026-09-26 — present_table과 Markdown 표 중복 표시 제거
+
+- runtime이 같은 답변의 유효한 `present_table` 성공 결과를 판정해 로컬 metadata에
+  `hideMarkdownTables`를 기록한다. Markdown renderer의 table 슬롯이 이를 구독해
+  GFM 표 노드만 숨긴다. 이미 streaming 중 표시된 표도 Tool 성공 시 숨긴다.
+- Markdown 원문은 수정하지 않아 설명·결론·근거·코드 펜스와 복사 원문을 유지한다.
+  다른 답변, 사용자 메시지, Markdown 단독 답변과 Tool 실패 시 표는 보존한다.
+  Backend API·AgentEvent·Tool payload 계약은 변경하지 않았다.
+- 검증: `npm test` **102 passed**, build 성공, lint 오류·경고 0개.
+  1280px Workbench browser 회귀 **11개 통과**: streaming 전환·코드 펜스 보존·실패 대안 표 확인.
+
 
 ### 2026-09-26 — 결과 client 책임 분리와 lint·bundle 경고 정리
 

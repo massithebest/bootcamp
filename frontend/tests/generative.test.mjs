@@ -236,3 +236,18 @@ test('area charts are supported with an accessible textual summary', () => {
   const out = renderToStaticMarkup(createElement(ChartBlock, { chart: spec, warnings: chart().warnings, alwaysLegend: true }));
   assert.match(out, /영역 차트/); assert.match(out, /차트 데이터 표로 보기/); assert.match(out, /저장된 조회 결과 범위 안내/);
 });
+
+test('only a valid successful present_table suppresses Markdown tables in its own answer', () => {
+  const prose = '결론입니다.\n\n| 지표 | 값 |\n| --- | --- |\n| 수량 | 20 |\n\n근거입니다.';
+  const success = tool('p', 'present_table', { result_id: ID }, {});
+  const pending = tool('p', 'present_table', { result_id: ID });
+  const failed = tool('p', 'present_table', { result_id: ID }, { status: 'error', message: '실패' });
+  const malformed = tool('p', 'present_table', { result_id: 'invalid' }, {});
+  for (const [part, hidden] of [[success, true], [pending, false], [failed, false], [malformed, false], [tool('c', 'present_chart', { result_id: ID }, {}), false]]) {
+    const converted = convertMessage(assistant([text('before', prose), part, text('after', prose)]));
+    assert.equal(converted.metadata.custom.hideMarkdownTables, hidden);
+    assert.deepEqual(converted.content.filter(p => p.type === 'text').map(p => p.text), [prose, prose]);
+  }
+  assert.equal(convertMessage(assistant([text('only', prose)])).metadata.custom.hideMarkdownTables, false);
+  assert.equal(convertMessage({ id: 'u', role: 'user', content: prose }).content[0].text, prose);
+});
