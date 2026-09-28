@@ -1,4 +1,4 @@
-"""Real production planning knowledge search service."""
+"""Production planning knowledge search service."""
 
 from services.service_logging import logged_service_operation
 
@@ -15,7 +15,7 @@ class ProductionRAGService:
         # BM25 > RRF > rerank) 로직을 이식한다. docs/CLOSED_NETWORK_SETUP.md §2-4 참고.
 
         raise NotImplementedError(
-            "Real RAG service must be implemented in the closed network."
+            "Production RAG service must be implemented in the closed network."
         )
 
 

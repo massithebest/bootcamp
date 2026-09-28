@@ -1,4 +1,4 @@
-"""Real production planning simulation service."""
+"""Production planning simulation service."""
 
 from services.simulation.registry import (
     list_simulation_types,
