@@ -40,8 +40,7 @@ Python 3.11의 표준 `venv` 환경을 기준으로 한다.
 cd backend
 python3.11 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements-dev.txt
-cp .env.example .env
+python -m pip install -r requirements.txt
 ```
 
 `scripts/generate_mock_database.py`는 외부 원본 없이 합성 mock SQLite DB를
