@@ -2,7 +2,7 @@
 출처: https://www.assistant-ui.com/design.md (원문 그대로 미러링, 수집일 2026-09-22)
 폐쇄망에서 assistant-ui 공식 디자인 규칙을 읽을 수 있도록 저장한 사본이다.
 이 파일 자체는 원문을 바꾸지 않는다. 이 프로젝트가 위 규칙과 의도적으로
-다르게 유지하는 제품 결정은 `frontend/docs/decisions.md`에 별도로 남긴다.
+다르게 유지하는 제품 결정은 `frontend/plan/InProgress.md`에 별도로 남긴다.
 새 버전이 필요하면 위 URL을 다시 받아 이 헤더만 유지하고 본문을 교체한다.
 -->
 

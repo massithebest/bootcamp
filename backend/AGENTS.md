@@ -1,7 +1,7 @@
 # Backend 작업 지침
 
 Python 3.11 FastAPI 서비스다. `/api/chat`은 Claude Agent SDK 이벤트를
-`AgentEvent` SSE로 변환한다. 작업 전 `plan/Todo.md`와 대상 폴더의 더 가까운
+`AgentEvent` SSE로 변환한다. 작업 전 `plan/Todo.md`, `plan/InProgress.md`와 대상 폴더의 더 가까운
 `AGENTS.md`를 확인한다.
 
 ## 경계
@@ -43,8 +43,9 @@ Python 3.11 FastAPI 서비스다. `/api/chat`은 Claude Agent SDK 이벤트를
 
 ## 작업과 검증
 
-- 기존 변경을 보존하고 작은 작업은 `plan/Todo.md`, 큰 작업만
-  `plan/<yymmdd>-<topic>-plan.md`에 기록한다.
+- 기존 변경을 보존한다. 새 일·아이디어는 `plan/Todo.md`, 진행·현재 계약은
+  `plan/InProgress.md`, 완료 결과는 `plan/History.md`에 기록한다. 큰 작업의
+  세부 실행 계획만 `plan/<yymmdd>-<topic>-plan.md`에 둔다.
 - 로컬 `datasets/`, `data/`, `.env`, 변환 스크립트와 비밀값은 커밋하지 않는다.
 - 기본 검증: `source .venv/bin/activate && python -m pytest -q`
   (`pytest.ini`가 `-m "not e2e"`를 기본 적용한다. `mock_service`는 합성 mock DB 생성기,

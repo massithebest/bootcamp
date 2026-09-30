@@ -1,7 +1,8 @@
 # Frontend 작업 지침
 
 Vite 7, React 18, strict TypeScript 기반의 데스크톱 SPA다. 작업 전
-`plan/Todo.md`, `docs/decisions.md`와 대상 폴더의 더 가까운 `AGENTS.md`를 확인한다.
+`plan/Todo.md`, `plan/InProgress.md`와 대상 폴더의 더 가까운
+`AGENTS.md`를 확인한다.
 
 ## 구조와 계약
 
@@ -25,8 +26,9 @@ Vite 7, React 18, strict TypeScript 기반의 데스크톱 SPA다. 작업 전
 - assistant-ui 변경 전 관련 Skill, 공식 문서와 설치된 타입 선언을 함께 확인한다.
   현재 주요 버전은 `@assistant-ui/react` 0.15.19와
   `@assistant-ui/react-markdown` 0.14.15다.
-- 시각·상호작용 기준은 `docs/assistant-ui-design.md`, 제품별 결정과 예외는
-  `docs/decisions.md`, 현재 계약과 검증 이력은 `plan/Todo.md`를 따른다.
+- 시각·상호작용 기준은 `docs/assistant-ui-design.md`, 제품별 결정·현재 계약은
+  `plan/InProgress.md`, 완료 검증 이력은
+  `plan/History.md`를 따른다.
 - `globals.css`의 semantic token과 기존 컴포넌트를 우선 사용한다. 외부 font·CDN·
   remote asset, dark theme, 근거 없는 새 UI 라이브러리를 추가하지 않는다.
 - 모델 thinking은 표시하지 않는다. 공개 `status`는 업무 진행 단계로만 표현한다.
@@ -35,8 +37,9 @@ Vite 7, React 18, strict TypeScript 기반의 데스크톱 SPA다. 작업 전
 
 ## 작업과 검증
 
-- 기존 변경을 보존하고 작은 작업은 `plan/Todo.md`, 큰 작업만
-  `plan/<yymmdd>-<topic>-plan.md`에 기록한다.
+- 기존 변경을 보존한다. 새 일·아이디어는 `plan/Todo.md`, 진행·현재 계약은
+  `plan/InProgress.md`, 완료 결과는 `plan/History.md`에 기록한다. 큰 작업의
+  세부 실행 계획만 `plan/<yymmdd>-<topic>-plan.md`에 둔다.
 - 폐쇄망 반입 원칙과 패키지 검증은 `docs/CLOSED_NETWORK_SETUP.md`를 따른다.
 - 기본 검증: `npm test && npm run build && npm run lint`.
 - dev 서버는 3100 포트 `strictPort`로 뜨고, Backend 주소는 `.env.local`의

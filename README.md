@@ -93,8 +93,8 @@ Backend 테스트는 합성 mock DB 생성기를 항상 사용할 수 있어 별
 
 ## 문서
 
-- [Backend 계획과 이력](backend/plan/Todo.md)
-- [Frontend 계획과 이력](frontend/plan/Todo.md)
+- Backend: [할 일·아이디어](backend/plan/Todo.md) · [진행 중·현재 계약](backend/plan/InProgress.md) · [완료 이력](backend/plan/History.md)
+- Frontend: [할 일·아이디어](frontend/plan/Todo.md) · [진행 중·현재 계약](frontend/plan/InProgress.md) · [완료 이력](frontend/plan/History.md)
 - [Backend 실행·운영](backend/README.md)
 - [Frontend 실행·검증](frontend/README.md)
 - [Frontend UI 디자인 기준](frontend/docs/assistant-ui-design.md)
@@ -102,4 +102,4 @@ Backend 테스트는 합성 mock DB 생성기를 항상 사용할 수 있어 별
 - [개발 Agent 작업 지침](AGENTS.md)
 
 현재 실제 사내 DB·RAG·simulation 연결, 대화 영속 저장과 동적 후속질문은 후속
-범위다. 세부 상태는 각 workspace의 `plan/Todo.md`를 기준으로 한다.
+범위다. 세부 상태와 현재 계약은 각 workspace의 `plan/InProgress.md`를 기준으로 한다.

@@ -13,7 +13,7 @@ export function EmptyState() {
         무엇을 도와드릴까요?
       </h2>
       <p className="mt-2 text-ui leading-relaxed text-ink-2">
-        P&T FP의 Part, Route, Tool, WIP를 조회하고 입력 관계를 검증합니다.
+        생산계획 데이터 조회부터 계획 수립 과정과 운영 기준까지 확인해 보세요.
       </p>
     </div>
   );

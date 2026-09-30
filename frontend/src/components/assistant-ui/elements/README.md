@@ -15,5 +15,5 @@
 
 현재 실행 방법은 [Frontend README](../../../../README.md), 디자인 기준은
 [assistant-ui 디자인 문서](../../../../docs/assistant-ui-design.md), 적용 결정은
-[기술 결정 기록](../../../../docs/decisions.md)을 따른다. MIT 고지는
+[현재 계약과 UI 결정](../../../../plan/InProgress.md)을 따른다. MIT 고지는
 [LICENSE](../LICENSE)에 있다.

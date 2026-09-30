@@ -5,7 +5,8 @@
 
 ## 작업 원칙
 
-- 작업 전 해당 workspace의 `plan/Todo.md`와 더 가까운 `AGENTS.md`를 읽는다.
+- 작업 전 해당 workspace의 `plan/Todo.md`, `plan/InProgress.md`와 더 가까운
+  `AGENTS.md`를 읽는다. 관련 완료 근거가 필요하면 `plan/History.md`를 확인한다.
 - 기존 staged·unstaged·untracked 변경은 사용자 작업으로 보고 요청 범위 밖의
   변경을 되돌리거나 덮어쓰지 않는다.
 - Backend와 Frontend 계획은 각자의 `plan/`에서 독립적으로 관리한다. 공유 계약을
@@ -26,7 +27,7 @@
 ## UI 작업
 
 - UI 작업은 디자인 Skill과 `frontend/docs/assistant-ui-design.md`,
-  `frontend/docs/decisions.md`를 확인한다. 디자인 Skill은 Codex에서는
+  `frontend/plan/InProgress.md`를 확인한다. 디자인 Skill은 Codex에서는
   `ui-ux-pro-max`, Claude Code에서는 `frontend-design`을 사용한다. 확정된 제품 계약과 semantic token을
   일반적인 디자인 권고로 임의 교체하지 않는다.
 - Frontend는 데스크톱 전용이다. 1280px 이상에서 검증하며 모바일 viewport,
@@ -38,8 +39,11 @@
 - `CLAUDE.md`: 같은 위치의 `AGENTS.md`를 재사용하는 Claude Code 진입점.
 - `backend/agent/agent_sdk*/CLAUDE.md`: 개발 지침이 아니라 런타임 Agent 지침.
 - `README.md`: 사용자의 설치·실행·검증 진입점.
-- `*/plan/Todo.md`: 현재 계약·다음 작업·완료 이력의 기준.
-- `*/docs/`: 반복해서 참고하는 운영·설계 문서. 일정과 체크리스트는 두지 않는다.
+- `*/plan/Todo.md`: 해야 할 일과 검토 전 아이디어.
+- `*/plan/InProgress.md`: 착수한 작업의 진행 상황과 현재 유효한 계약.
+- `*/plan/History.md`: 완료된 업무·검증·대체된 결정의 이력.
+- `*/docs/`: 반복해서 참고하는 운영·설계 가이드. 개발 작업 상태와 완료 이력은
+  plan에 둔다. 운영자가 실행할 때 쓰는 절차·점검 목록은 가이드에 남긴다.
 - `*/docs/`에 새로 작성하는 문서의 파일명은 대문자로 쓴다. 기존 문서를 이동하거나
   이름을 바꾸면 README·계획·코드 주석의 링크도 함께 갱신한다.
 

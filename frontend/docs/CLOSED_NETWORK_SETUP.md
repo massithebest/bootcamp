@@ -79,18 +79,10 @@ npm run preview
 
 - `dist/`가 3100 포트에서 열리고 외부 font·asset 요청이 없어야 한다.
 - `.env.local`의 `VITE_API_BASE_URL`이 폐쇄망 Backend를 가리켜야 한다.
-- chat SSE, 취소, retry, 편집·재생성, tool card와 standalone 차트 Tool UI 및
-  과거 chart marker 조회를 확인한다.
+- chat SSE, 취소, retry, 편집·재생성, tool card와 flat `present_*` 결과 UI 조회를 확인한다.
 - Backend의 CORS origin과 credential 설정이 Frontend 주소와 일치해야 한다.
 - browser Network 탭이나 사내 proxy 로그에서 허용된 Backend 외 outbound 요청이
   없어야 한다.
-
-## 2026-09-22 반입 항목: 결과 Tool UI
-
-- `zod@4.6.5`를 결과 Tool 인자 검증용 직접 의존성으로 고정한다.
-- `@assistant-ui/react-generative-ui`는 flat `present_*` Tool 전환 후 제거했다.
-- 사내 registry에는 현재 `package-lock.json`의 정확한 버전과 전이 의존성만 반입한다.
-  `npm view <package>@<version> dependencies peerDependencies`와 `dist` URL grep 절차를 따른다.
 
 ## 현재 확인된 주의점
 
@@ -103,80 +95,18 @@ npm run preview
 - native package가 준비 환경과 폐쇄망의 OS·CPU에 맞지 않으면 설치 또는 build가
   실패하므로 `node_modules` 복사보다 사내 registry를 통한 재설치를 우선한다.
 
-관련 아키텍처 결정은 [Frontend 기술 결정 기록](decisions.md)을 따른다.
+## 현재 패키지 반입 기준
+
+- 정확한 직접·전이 의존성 버전은 `package-lock.json`을 기준으로 미러링한다.
+  결과 인자 검증에는 `zod`, 표와 차트에는 `@tanstack/react-table`·`recharts`를 쓴다.
+- `@assistant-ui/react-generative-ui`와 legacy chart marker용 코드는 현재 반입 대상이
+  아니다. 결과 표시에는 flat `present_*` Tool UI를 쓴다.
+- `@tanstack/react-table`·`recharts`의 MIT 고지는
+  `public/table-chart-license-notices.txt`에 유지한다. 배포 시 이 파일을 포함한다.
+- 사내 registry가 패키지를 실제 보관하는지 확인한 뒤, 비어 있는 npm cache로
+  `npm ci`와 `npm run build`를 수행한다. 외부 proxy 조회 성공만으로 반입 완료를
+  판단하지 않는다.
+
+현재 아키텍처·UI 결정은 [Frontend 진행 중·현재 계약](../plan/InProgress.md)을 따른다.
 API 서버와 Agent SDK의 반입·운영은 Frontend workspace 범위가 아니며,
 운영자가 제공한 배포 절차와 확정된 API 주소만 사용한다.
-
-## 2026-09-16 Elements 반입
-
-공식 registry의 Thread, ThreadList, ToolCall, AgentPlan, TooltipIconButton을
-준비 환경에서 검토해 `src/components/assistant-ui/elements`에 조정 소스로
-포함했다. 출처·수정 범위는 같은 폴더의 `README.md`, MIT 고지는 상위
-`LICENSE`에 있다. 기존 MarkdownText도 이 디렉터리로 이동했다.
-package.json과 lockfile은 변경하지 않았고 신규 npm 의존성은 없다.
-`components.json`의 registry URL은 개발 시 소스 생성용이며 앱이 호출하지 않는다.
-
-
-### 공식 CLI 설치 후속
-
-사용자 요청으로 tw-shimmer 0.4.13과 zustand 5.0.15를 직접 의존성에 고정했다.
-신규 tarball은 tw-shimmer 하나이며 zustand는 이미 잠긴 전이 의존성과 동일하다.
-두 패키지에 설치 스크립트·런타임 외부 fetch는 없고 tw-shimmer는 로컬 CSS다.
-사내 registry 확보 여부는 이 환경에서 확인할 수 없으므로 반입 시 위 준비 절차에
-따라 정확한 버전을 미러링해야 한다. 기존 package 버전은 변경하지 않았다.
-
-## 2026-09-16 TanStack Table·Recharts 점검
-
-대화형 표는 `@tanstack/react-table` 9.2.4, 차트는 `recharts` 3.8.0을 사용한다.
-두 직접 의존성은 `package.json`과 lockfile에 정확한 버전으로 고정했다. TanStack
-Table의 잠긴 전이 의존성은 `@tanstack/table-core` 9.2.4,
-`@tanstack/react-store` 0.11.1, `@tanstack/store` 0.11.1이다.
-
-두 프로젝트는 MIT 라이선스다. 사내 업무, 상업적 사용, 수정과 재배포가 가능하며,
-복사본 또는 중요한 부분에 저작권 및 허가 고지를 보존해야 한다. 무보증 조건도
-함께 적용된다. 앱은 두 라이브러리를 번들에 포함하며 CDN이나 외부 runtime API를
-호출하지 않는다. 배포물에 포함되는 전문은
-`public/table-chart-license-notices.txt`에서 관리한다. 회사의 별도 오픈소스 승인
-절차가 있으면 이 기술·라이선스 점검과 별도로 따른다.
-
-현재 개발 환경의 npm registry는 공개 npm을 가리키므로 사내 Nexus에 패키지가
-있는지는 여기서 확인하지 못했다. Nexus에 접근할 수 있는 준비 환경에서 실제 주소를
-환경 변수로만 주입한 뒤 정확한 버전을 조회한다.
-
-```bash
-cd frontend
-export INTERNAL_NPM_REGISTRY='<NEXUS_NPM_REGISTRY>'
-
-npm view @tanstack/react-table@9.2.4 version license dependencies \
-  --registry="$INTERNAL_NPM_REGISTRY"
-npm view @tanstack/table-core@9.2.4 version license dependencies \
-  --registry="$INTERNAL_NPM_REGISTRY"
-npm view @tanstack/react-store@0.11.1 version license dependencies \
-  --registry="$INTERNAL_NPM_REGISTRY"
-npm view @tanstack/store@0.11.1 version license dependencies \
-  --registry="$INTERNAL_NPM_REGISTRY"
-npm view recharts@3.8.0 version license dependencies optionalDependencies \
-  --registry="$INTERNAL_NPM_REGISTRY"
-```
-
-각 명령이 요청한 버전을 출력하면 직접 패키지는 조회 가능한 상태다. Nexus의 group
-repository가 외부 proxy를 허용하는 환경이라면 조회 성공만으로 사전 반입 완료를
-뜻하지 않을 수 있다. Nexus UI에서 artifact가 hosted 또는 cache에 실제 저장됐는지
-함께 확인한다.
-
-모든 전이 의존성과 OS별 optional package까지 확인하려면 깨끗한 checkout에서 빈
-cache로 lockfile 설치를 실행한다. 이 검증이 성공해야 폐쇄망 설치 가능 판정을 내린다.
-
-```bash
-cd frontend
-NPM_AUDIT_CACHE="$(mktemp -d)"
-npm ci --registry="$INTERNAL_NPM_REGISTRY" --cache="$NPM_AUDIT_CACHE" --prefer-online
-npm ls @tanstack/react-table @tanstack/table-core @tanstack/react-store \
-  @tanstack/store recharts
-npm run build
-rm -rf "$NPM_AUDIT_CACHE"
-```
-
-인증 token과 실제 Nexus URL은 `.npmrc`, shell history, 빌드 로그와 저장소에 남기지
-않는다. `npm ci`가 404로 실패하면 오류에 나온 정확한 package와 버전을 Nexus에
-미러링한 뒤 빈 cache 검증을 다시 수행한다.

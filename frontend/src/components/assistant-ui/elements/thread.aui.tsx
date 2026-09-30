@@ -92,7 +92,7 @@ function Composer({ autoFocus }: { autoFocus: boolean }) {
         submitMode="enter"
         autoFocus={autoFocus}
         aria-label="메시지 입력"
-        placeholder="P&T FP 데이터에 대해 질문하세요. 예: 제품별 WIP를 보여줘"
+        placeholder="생산계획 데이터에 대해 질문하세요. 예 : 차월 계획 제품을 DB에서 조회해주세요.,"
         className="max-h-44 min-h-6 w-full resize-none bg-transparent text-ui text-ink outline-none placeholder:text-ink-3 focus-visible:outline-none disabled:opacity-60"
       />
       <div className="flex min-w-0 items-center justify-between gap-2">

@@ -145,4 +145,4 @@ E2E가 아닌 공통 테스트가 외부 provider나 인터넷에 의존하도�
 - [Backend 작업 지침](AGENTS.md)
 - [폐쇄망 배포 및 실서비스 이식](docs/CLOSED_NETWORK_SETUP.md)
 - [도메인 지식·테이블·CTE 관리](docs/DOMAIN-KNOWLEDGE-MANAGEMENT.md)
-- [Backend 계획과 완료 이력](plan/Todo.md)
+- Backend 계획: [할 일·아이디어](plan/Todo.md) · [진행 중·현재 계약](plan/InProgress.md) · [완료 이력](plan/History.md)
