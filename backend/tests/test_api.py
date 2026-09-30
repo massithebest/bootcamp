@@ -282,11 +282,7 @@ def test_knowledge_skills_endpoint() -> None:
 
     assert response.status_code == 200
     skills = response.json()
-    assert {skill["name"] for skill in skills} == {
-        "kpi-shortfall-analysis",
-        "sql-analysis",
-        "simulation",
-    }
+    assert {skill["name"] for skill in skills} == {"sql-analysis", "simulation"}
     assert all(set(skill) == {"name", "description", "status"} for skill in skills)
     assert all(skill["description"] for skill in skills)
 

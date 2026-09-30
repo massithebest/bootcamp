@@ -39,9 +39,8 @@ BASE_START = datetime(2026, 1, 1)
 class SegmentSpec:
     """Row-count targets for one production segment.
 
-    Defaults intentionally match the previous SMT2020 HVLM/LVHM volumes so
-    the bundled ``knowledge/mock/scenarios`` expectation numbers keep working
-    unchanged (only the ``dataset`` label changed, SEG_A/SEG_B).
+    Defaults intentionally keep the bundled ``knowledge/mock/scenarios``
+    expectation numbers working unchanged (dataset labels SEG_A/SEG_B).
     """
 
     dataset: str
@@ -141,7 +140,7 @@ TABLE_COLUMNS: dict[str, list[tuple[str, str]]] = {
 
 #: Tables mirrored from real closed-network schema info the user supplied
 #: directly (table/column names, business rules) rather than invented to
-#: match the SMT2020-shaped placeholder above. These have no ``dataset``
+#: match the placeholder segments above. These have no ``dataset``
 #: segmentation column since the real table doesn't have one.
 STANDALONE_TABLE_COLUMNS: dict[str, list[tuple[str, str]]] = {
     "FP_TARGET": [

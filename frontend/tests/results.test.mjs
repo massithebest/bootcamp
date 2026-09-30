@@ -20,9 +20,8 @@ test('preview summary displays row count and column statistics', () => {
   assert.match(html, /250/); assert.match(html, /40/); assert.match(html, /qty/);
 });
 test('simulation discovery renders available type', () => {
-  const html = render('simulation', { simulations: [{ type: 'SMT2020_입력검증', name: '입력검증', when_to_use: '관계 검증' }] });
-  assert.match(html, /생산계획_입력검증/);
-  assert.doesNotMatch(html, /SMT2020/);
+  const html = render('simulation', { simulations: [{ type: '입력검증', name: '입력검증', when_to_use: '관계 검증' }] });
+  assert.match(html, /입력검증/);
 });
 test('mock and existing RAG document formats are both visible', () => {
   const html = render('knowledge', { documents: [{ title: 'mock', content: '문서 본문', score: 0.82 }, { title: 'existing', snippet: '발췌', relevance: 0.9 }] });

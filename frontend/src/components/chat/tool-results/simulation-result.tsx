@@ -7,11 +7,6 @@ function columnsOfRecords(records: Record<string, unknown>[]): string[] {
   return records.length > 0 ? Object.keys(records[0]) : [];
 }
 
-/** Backend 계약 식별자는 유지하되 화면에서는 제품 용어로 표시한다. */
-function displayProductName(value: string | null): string {
-  return (value ?? "").replaceAll("SMT2020", "생산계획");
-}
-
 /** 시뮬레이션 결과 → 핵심 수치 + 병목/제약 요약이 즉시 읽히도록. 표는 접어서. */
 export function SimulationResult({ data }: { data: Record<string, unknown> }) {
   const scenario = str(data.scenario);
@@ -33,14 +28,14 @@ export function SimulationResult({ data }: { data: Record<string, unknown> }) {
         <DataTable
           columns={["종류", "이름", "사용 시점"]}
           rows={simulations.map((s) => [
-            displayProductName(str(s.type)),
-            displayProductName(str(s.name)),
-            displayProductName(str(s.when_to_use)),
+            str(s.type) ?? "",
+            str(s.name) ?? "",
+            str(s.when_to_use) ?? "",
           ])}
         />
       )}
       {scenario && (
-        <p className="font-mono text-2xs text-ink-3">{displayProductName(scenario)}</p>
+        <p className="font-mono text-2xs text-ink-3">{scenario}</p>
       )}
 
       {kpis.length > 0 && (
@@ -68,7 +63,7 @@ export function SimulationResult({ data }: { data: Record<string, unknown> }) {
       )}
 
       {summary && (
-        <p className="text-ui leading-relaxed text-ink-2">{displayProductName(summary)}</p>
+        <p className="text-ui leading-relaxed text-ink-2">{summary}</p>
       )}
 
       {/* 배열형 simulation 결과가 대용량(100행 초과)이면

@@ -37,7 +37,7 @@ Vite 7, React 18, strict TypeScript 기반의 데스크톱 SPA다. 작업 전
 
 - 기존 변경을 보존하고 작은 작업은 `plan/Todo.md`, 큰 작업만
   `plan/<yymmdd>-<topic>-plan.md`에 기록한다.
-- 폐쇄망 반입 원칙과 패키지 검증은 `docs/closed-network.md`를 따른다.
+- 폐쇄망 반입 원칙과 패키지 검증은 `docs/CLOSED_NETWORK_SETUP.md`를 따른다.
 - 기본 검증: `npm test && npm run build && npm run lint`.
 - dev 서버는 3100 포트 `strictPort`로 뜨고, Backend 주소는 `.env.local`의
   `VITE_API_BASE_URL`(기본 `http://localhost:8100`)이다.

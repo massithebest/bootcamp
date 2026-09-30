@@ -13,7 +13,7 @@ export function EmptyState() {
         무엇을 도와드릴까요?
       </h2>
       <p className="mt-2 text-ui leading-relaxed text-ink-2">
-        생산계획의 Part, Route, Tool, WIP를 조회하고 입력 관계를 검증합니다.
+        P&T FP의 Part, Route, Tool, WIP를 조회하고 입력 관계를 검증합니다.
       </p>
     </div>
   );

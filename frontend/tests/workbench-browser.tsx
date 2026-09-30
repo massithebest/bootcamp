@@ -27,11 +27,11 @@ export async function runWorkbenchRegressions() {
       input_schema: { type: "object", properties: { secret_schema_marker: { type: "string" } } },
     }]);
     if (url.endsWith("/api/knowledge/skills")) return Response.json([{
-      name: "kpi-shortfall-analysis", description: "실적 부진 원인을 검증하는 업무 절차입니다.", status: "active",
+      name: "sql-analysis", description: "SQL 조회 및 결과 검증 절차입니다.", status: "active",
     }]);
-    if (url.endsWith("/api/knowledge/skills/kpi-shortfall-analysis")) return Response.json({
-      name: "kpi-shortfall-analysis", description: "실적 부진 원인을 검증하는 업무 절차입니다.", status: "active",
-      content: "# 실적 부진 원인 분석\n\n## 절차\n\n1. **KPI 확정**: `list_kpis`로 정의를 확인한다.\n2. **가설 검증**: 근거 수치로 검증한다.\n\n## 규칙\n\n- 기각 근거도 답변에 남긴다.",
+    if (url.endsWith("/api/knowledge/skills/sql-analysis")) return Response.json({
+      name: "sql-analysis", description: "SQL 조회 및 결과 검증 절차입니다.", status: "active",
+      content: "# SQL 조회 절차\n\n## 절차\n\n1. **테이블 찾기**: 카탈로그에서 테이블을 확인한다.\n2. **실행**: 읽기 전용 SQL을 실행한다.\n\n## 규칙\n\n- 카탈로그에 없는 컬럼을 추측하지 않는다.",
     });
     const requestUrl = new URL(url, window.location.href);
     if (requestUrl.pathname.includes("/api/query-results/") && requestUrl.pathname.endsWith("/table")) {
@@ -118,9 +118,9 @@ export async function runWorkbenchRegressions() {
       check(!toolsPanel.textContent?.includes("입력 명세") && !toolsPanel.textContent?.includes("secret_schema_marker"), "tool input schema remains visible");
       await click("스킬");
       const skillsPanel = host.querySelector<HTMLElement>("#inspector-panel-skills")!;
-      await waitFor(() => [...skillsPanel.querySelectorAll("button")].some(item => item.textContent?.includes("kpi-shortfall-analysis")));
+      await waitFor(() => [...skillsPanel.querySelectorAll("button")].some(item => item.textContent?.includes("sql-analysis")));
       check(getComputedStyle(skillsPanel).scrollbarGutter === "stable", "Inspector does not reserve scrollbar space");
-      const skillTrigger = [...skillsPanel.querySelectorAll<HTMLButtonElement>("button")].find(item => item.textContent?.includes("kpi-shortfall-analysis"))!;
+      const skillTrigger = [...skillsPanel.querySelectorAll<HTMLButtonElement>("button")].find(item => item.textContent?.includes("sql-analysis"))!;
       const skillDescription = skillsPanel.querySelector<HTMLElement>("article header p")!;
       const descriptionWidth = skillDescription.getBoundingClientRect().width;
       check(skillTrigger.getAttribute("aria-expanded") === "false" && !skillsPanel.querySelector("ol"), "skill detail is not collapsed initially");
@@ -128,8 +128,8 @@ export async function runWorkbenchRegressions() {
       await waitFor(() => !!skillsPanel.querySelector("ol"));
       check(skillDescription.getBoundingClientRect().width === descriptionWidth, "Inspector scrollbar changed text width");
       check(skillTrigger.getAttribute("aria-expanded") === "true", "skill dropdown did not expand");
-      check(skillsPanel.querySelector("h3")?.textContent === "kpi-shortfall-analysis", "skill name hierarchy missing");
-      check(skillsPanel.querySelector("h4")?.textContent === "실적 부진 원인 분석", "skill markdown title is not rendered");
+      check(skillsPanel.querySelector("h3")?.textContent === "sql-analysis", "skill name hierarchy missing");
+      check(skillsPanel.querySelector("h4")?.textContent === "SQL 조회 절차", "skill markdown title is not rendered");
       check(!!skillsPanel.querySelector("ol strong") && !skillsPanel.textContent?.includes("## 절차"), "skill markdown remains raw");
       await click("지식");
       const search = host.querySelector<HTMLInputElement>('[aria-label="우측 지식 검색"]')!;

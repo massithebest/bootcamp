@@ -40,6 +40,13 @@ test('backend error then done preserved once', async () => {
   const expected = [{ type: 'error', content: '안전한 오류' }, { type: 'done' }];
   assert.deepEqual(await collect(expected.map(frame).join('')), expected);
 });
+test('LLM response timeout message is preserved for the error surface', async () => {
+  const expected = [
+    { type: 'error', content: 'LLM API 서버 응답이 지연되고 있습니다. 잠시 후에 다시 시도해 주세요.' },
+    { type: 'done' },
+  ];
+  assert.deepEqual(await collect(expected.map(frame).join('')), expected);
+});
 test('EOF without done is incomplete, preserves partial output', async () => {
   const events = await collect(frame({ type: 'text', content: 'partial' }));
   assert.deepEqual(events.map(e => e.type), ['text', 'error', 'done']);

@@ -67,7 +67,7 @@ def test_kpi_definition_is_read_before_querying(agent_run) -> None:
     assert "get_kpi" in tool_calls, "KPI 정의를 읽지 않았다"
     assert "execute_sql" in tool_calls, "데이터를 조회하지 않았다"
     assert tool_calls.index("get_kpi") < tool_calls.index("execute_sql"), (
-        "KPI 정의보다 SQL 조회가 먼저다 — kpi-shortfall-analysis Skill 절차를 따르지 않았다"
+        "KPI 정의보다 SQL 조회가 먼저다"
     )
 
 

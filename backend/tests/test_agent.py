@@ -338,6 +338,24 @@ def test_failed_or_cancelled_run_does_not_publish_success_anchor(monkeypatch, en
     assert not session_store._turn_anchors
 
 
+def test_run_agent_reports_a_safe_message_when_llm_response_times_out(monkeypatch):
+    async def slow_query(**kwargs):
+        await asyncio.Event().wait()
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(agent_module, "query", slow_query)
+    monkeypatch.setattr(agent_module, "LLM_RESPONSE_TIMEOUT_SECONDS", 0.01)
+
+    events = asyncio.run(_collect(run_agent("응답 대기", conversation_id="conv-1")))
+
+    assert [(event.type, event.content) for event in events] == [
+        ("error", agent_module.LLM_RESPONSE_TIMEOUT_MESSAGE),
+        ("done", None),
+    ]
+    assert session_store.get_session_id("conv-1") is None
+    assert not session_store._turn_anchors
+
+
 def test_old_cancel_cleanup_does_not_overwrite_new_session(monkeypatch):
     import asyncio
 

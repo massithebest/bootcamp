@@ -133,7 +133,7 @@ SSE envelope 검증은 `lib/chat-sse.ts`, 순수 메시지 전이는 `lib/chat-s
 
 외부 font, CDN, script, telemetry와 브라우저의 외부 LLM 호출을 금지한다. 패키지
 버전과 전이 의존성을 사내 registry에서 확인하고 오프라인 build를 검증한다.
-세부 절차는 [폐쇄망 운영 원칙](closed-network.md)을 따른다.
+세부 절차는 [폐쇄망 운영 원칙](CLOSED_NETWORK_SETUP.md)을 따른다.
 
 
 ### 공식 registry CLI 설치 후속 (2026-09-16, 활성)
@@ -328,7 +328,7 @@ Composer는 `ViewportFooter`, 이동 버튼은 `ScrollToBottom`에 연결한다.
 스크롤한 경우에는 위치를 보존하면서 새 실행과 스트리밍의 하단 추적을 유지한다.
 
 시작 화면 예시는 런타임이 생성한 suggestion 목록이 아니라 제품에 고정된
-SMT2020 질문이다. 정적 `Suggestions` scope와 `ThreadPrimitive.Suggestions`
+예시 질문이다. 정적 `Suggestions` scope와 `ThreadPrimitive.Suggestions`
 iterator, `SuggestionPrimitive`를 사용한다. `ViewportProvider`,
 `MessageByIndex`와 experimental `Unstable_MessageById`는 현재 표준 목록 렌더링에
 필요하지 않다.

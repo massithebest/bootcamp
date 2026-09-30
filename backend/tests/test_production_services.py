@@ -1,8 +1,8 @@
 """client mock 기반 production 경계 회귀 테스트.
 
 폐쇄망 인프라(사내 SQL API·Milvus·Simulation API·LLM 게이트웨이) 없이도
-검증 가능한 것만 담는다: production 어댑터의 설정 가드레일, mock과 같은 공개
-시그니처, `/anthropic` 프록시 미구현 상태, `missing_params` 구조화 상태.
+검증 가능한 것만 담는다: production 어댑터의 설정 가드레일, SQL 조회 API 행 제한,
+mock과 같은 공개 시그니처, `/anthropic` 프록시 미구현 상태와 `missing_params` 구조.
 
 TODO: 폐쇄망에서 `services/production/{sql,rag,simulation}_service.py`에 실제
 HTTP 로직이 이식된 뒤에는, 이 파일에 성공 경로(Result Store 저장 포함) 테스트를
@@ -23,7 +23,7 @@ from services.production.milvus_client import get_embedding_function, get_milvus
 from services.production.rag_service import ProductionRAGService
 from services.production.simulation_api_client import SimulationApiClient
 from services.production.simulation_service import ProductionSimulationService
-from services.production.sql_service import ProductionSQLService
+from services.sql.guard import MAX_ROWS
 from services.simulation.registry import validate_simulation_request
 
 
@@ -32,7 +32,7 @@ from services.simulation.registry import validate_simulation_request
 
 def test_common_sql_client_requires_endpoint_config() -> None:
     with pytest.raises(RuntimeError, match="COMMON_SQL_API_URL"):
-        asyncio.run(CommonSqlClient().execute("SELECT 1"))
+        asyncio.run(CommonSqlClient().execute("SELECT 1", row_limit=MAX_ROWS))
 
 
 def test_simulation_api_client_requires_endpoint_config() -> None:
@@ -50,11 +50,9 @@ def test_milvus_client_requires_connection_config() -> None:
         get_milvus_client()
 
 
-def test_production_services_are_not_implemented_yet() -> None:
+def test_production_rag_and_simulation_services_are_not_implemented_yet() -> None:
     """이식 전에는 mock으로 우회하지 않고 명확히 NotImplementedError를 낸다."""
 
-    with pytest.raises(NotImplementedError):
-        asyncio.run(ProductionSQLService().execute_sql("SELECT 1", purpose="p"))
     with pytest.raises(NotImplementedError):
         asyncio.run(ProductionRAGService().search("query"))
     with pytest.raises(NotImplementedError):

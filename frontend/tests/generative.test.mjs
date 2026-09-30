@@ -83,7 +83,7 @@ test('present_chart/present_table show stable loading states before data arrives
   assert.match(surface(PresentTableToolUI, { result_id: ID }), /표를 불러오는 중/);
   assert.match(surface(PresentTableToolUI, { result_id: 'not-an-id' }), /표시 설정이 올바르지 않아/);
   assert.match(surface(PresentChartToolUI, { result_id: ID, chart_type: 'pie', x_column: 'm', y_column: 'q' }), /표시 설정이 올바르지 않아/);
-  assert.match(surface(PresentSimulationToolUI, { scenario: 'SMT2020 HVLM', summary: '요약', kpis: [{ label: 'Part', value: 0, unit: '개' }] }), />0</);
+  assert.match(surface(PresentSimulationToolUI, { scenario: 'HVLM', summary: '요약', kpis: [{ label: 'Part', value: 0, unit: '개' }] }), />0</);
 });
 
 test('present_sql_preview is collapsed by default and never emits SQL as markup', () => {
@@ -226,8 +226,8 @@ test('DatabaseResult renders present preview without full rows', () => {
 });
 
 test('SimulationResult shows KPIs, summary and preview for present payloads', () => {
-  const out = html(SimulationResult, { status: 'ok', kind: 'simulation', result_id: ID, scenario: 'SMT2020 HVLM', summary: '요약 문장', kpis: [{ label: 'Part', value: 0, unit: '개' }], row_count: 11, columns: [{ name: 'table', dtype: 'str', role: 'category' }], sample_rows: [{ table: 'part' }], statistics: {}, distinct_counts: {}, date_ranges: {}, top_groups: {} });
-  assert.match(out, />0</); assert.match(out, /요약 문장/); assert.match(out, /생산계획 HVLM/); assert.match(out, /전체/);
+  const out = html(SimulationResult, { status: 'ok', kind: 'simulation', result_id: ID, scenario: 'HVLM', summary: '요약 문장', kpis: [{ label: 'Part', value: 0, unit: '개' }], row_count: 11, columns: [{ name: 'table', dtype: 'str', role: 'category' }], sample_rows: [{ table: 'part' }], statistics: {}, distinct_counts: {}, date_ranges: {}, top_groups: {} });
+  assert.match(out, />0</); assert.match(out, /요약 문장/); assert.match(out, /HVLM/); assert.match(out, /전체/);
 });
 
 test('area charts are supported with an accessible textual summary', () => {

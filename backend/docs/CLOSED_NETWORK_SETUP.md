@@ -337,6 +337,9 @@ class ProductionSQLService:
   LLM prompt 조합과 `generate_and_query(question)` 경로는 이식하지 않는다.
 - DB 연결과 실제 조회는 `common_sql_client.py`를 사용하되, 실행 전 반드시
   `services/sql/guard.py::check_sql`과 catalog 허용 테이블 검사를 통과시킨다.
+  SQL에는 guard가 `LIMIT`을 덧붙이지 않는다. `CommonSqlClient.execute` 요청 본문에
+  검증된 `sql`과 `rowLimit=MAX_ROWS`(현재 1000)를 함께 보내고, API가 그 행 상한을
+  적용하도록 구현한다. 사용자가 SQL에 명시한 `LIMIT`은 그대로 전달한다.
   현재 정규식 가드는 인용된 식별자의 미등록 테이블 참조를 놓칠 수 있다.
   이식 시 SQL 파서 또는 DB의 실제 참조 테이블 검증을 추가하고, DB 계정도
   허용 테이블만 읽을 수 있게 제한한다.

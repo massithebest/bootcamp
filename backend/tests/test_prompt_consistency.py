@@ -19,7 +19,7 @@ from services.knowledge.catalog import get_store
 CLAUDE_MD = Path(AGENT_SDK_CWD) / "CLAUDE.md"
 SKILLS = sorted((Path(AGENT_SDK_CWD) / ".claude" / "skills").glob("*/SKILL.md"))
 
-EXPECTED_SKILLS = {"kpi-shortfall-analysis", "sql-analysis", "simulation"}
+EXPECTED_SKILLS = {"sql-analysis", "simulation"}
 
 SHORT_TOOL_NAMES = {name.rsplit("__", 1)[-1] for name in TOOL_NAMES}
 
@@ -41,6 +41,12 @@ def _frontmatter(text: str) -> dict[str, str]:
 
 def test_system_prompt_is_short() -> None:
     assert SYSTEM_PROMPT.strip().count("\n") < 30
+
+
+def test_system_prompt_defines_pt_factory_planning_scope() -> None:
+    assert "P&T(Package & Test) Factory Planning" in SYSTEM_PROMPT
+    assert "가용 용량 및 공정 제약" in SYSTEM_PROMPT
+    assert "실현 가능한 생산계획" in SYSTEM_PROMPT
 
 
 def test_system_prompt_does_not_list_tools() -> None:
@@ -112,7 +118,7 @@ def test_no_legacy_only_instructions_remain(path: Path) -> None:
 
 
 def test_present_procedure_is_documented_in_every_presenting_file() -> None:
-    for path in (CLAUDE_MD, *(p for p in SKILLS if p.parent.name != "kpi-shortfall-analysis")):
+    for path in (CLAUDE_MD, *SKILLS):
         text = path.read_text(encoding="utf-8")
         assert "present_" in text and "result_id" in text, path
         assert "행·차트 data 배열" in text, path
@@ -165,3 +171,11 @@ def test_data_tool_descriptions_distinguish_sql_simulation_and_documents() -> No
     assert "임의의 종류" in tools["run_simulation"].description
     assert "화면 버튼·변경 위치·조회 방법" in tools["search_documents"].description
     assert "실제 저장 수치 조회나 simulation 실행을 대신하지 않는다" in tools["search_documents"].description
+
+
+def test_rag_final_answers_require_a_source_or_url() -> None:
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+
+    assert "최종 응답" in claude
+    assert "`source` 또는 검색 결과가 제공한 URL을 반드시 포함" in claude
+    assert "출처와 URL이 모두 없는 검색 결과는 최종 답변의 근거로 사용하지 않는다" in claude

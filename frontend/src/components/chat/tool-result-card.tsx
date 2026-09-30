@@ -150,7 +150,7 @@ function JsonDetail({ value, empty }: { value: Record<string, unknown>; empty: s
   if (Object.keys(value).length === 0) return <p className="text-ui text-ink-3">{empty}</p>;
   return (
     <pre className="thin-scroll max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-surface-2 p-3 font-mono text-data leading-relaxed text-ink-2">
-      {JSON.stringify(value, null, 2).replaceAll("SMT2020", "생산계획")}
+      {JSON.stringify(value, null, 2)}
     </pre>
   );
 }
@@ -159,14 +159,14 @@ function GenericResult({ result }: { result: ToolResult }) {
   if (result.data && Object.keys(result.data).length > 0) {
     return (
       <pre className="thin-scroll max-h-80 overflow-auto whitespace-pre-wrap break-words rounded bg-[#1c2530] p-3 font-mono text-data leading-relaxed text-[#d7dce4]">
-        {JSON.stringify(result.data, null, 2).replaceAll("SMT2020", "생산계획")}
+        {JSON.stringify(result.data, null, 2)}
       </pre>
     );
   }
   if (result.content) {
     return (
       <p className="whitespace-pre-wrap break-words text-ui text-ink-2">
-        {result.content.replaceAll("SMT2020", "생산계획")}
+        {result.content}
       </p>
     );
   }

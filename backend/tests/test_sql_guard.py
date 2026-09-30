@@ -15,13 +15,13 @@ def test_max_rows_contract_is_one_thousand() -> None:
     assert MAX_ROWS == 1000
 
 
-def test_select_passes_and_gets_limit() -> None:
-    guarded = check_sql("SELECT * FROM wip", ALLOWED)
+def test_select_passes_without_adding_limit() -> None:
+    sql = "SELECT * FROM wip"
 
-    assert guarded.rstrip().endswith(f"LIMIT {MAX_ROWS + 1}")
+    assert check_sql(sql, ALLOWED) == sql
 
 
-def test_existing_limit_is_kept() -> None:
+def test_existing_limit_is_preserved() -> None:
     guarded = check_sql("SELECT * FROM wip LIMIT 10", ALLOWED)
 
     assert guarded.count("LIMIT") == 1

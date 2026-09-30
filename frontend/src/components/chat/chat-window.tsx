@@ -261,7 +261,7 @@ export function ChatWindow() {
             <p className="text-2xs text-ink-2">
               {streaming
                 ? "에이전트 실행 중…"
-                : "생산계획 질의 · 시뮬레이션"}
+                : "P&T FP 질의 · 시뮬레이션"}
             </p>
           </div>
           {view === "chat" && !inspectorOpen && (

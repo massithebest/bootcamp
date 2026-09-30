@@ -78,5 +78,5 @@ bundle에는 포함되지 않는다.
 - [Frontend 작업 지침](AGENTS.md)
 - [assistant-ui 디자인 기준](docs/assistant-ui-design.md)
 - [기술 결정 기록](docs/decisions.md)
-- [폐쇄망 운영 원칙](docs/closed-network.md)
+- [폐쇄망 운영 원칙](docs/CLOSED_NETWORK_SETUP.md)
 - [Frontend 계획과 완료 이력](plan/Todo.md)

@@ -13,10 +13,10 @@ export function SimulationSummary({ scenario, summary, kpis, children }: Simulat
   return (
     <section
       data-slot="simulation-summary"
-      aria-label={scenario.replaceAll("SMT2020", "생산계획")}
+      aria-label={scenario}
       className="flex min-w-0 flex-col gap-3"
     >
-      <p className="font-mono text-2xs text-ink-3">{scenario.replaceAll("SMT2020", "생산계획")}</p>
+      <p className="font-mono text-2xs text-ink-3">{scenario}</p>
       {kpis.length > 0 && (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
           {kpis.map((kpi, index) => (
@@ -30,7 +30,7 @@ export function SimulationSummary({ scenario, summary, kpis, children }: Simulat
           ))}
         </dl>
       )}
-      <p className="text-ui leading-relaxed text-ink-2">{summary.replaceAll("SMT2020", "생산계획")}</p>
+      <p className="text-ui leading-relaxed text-ink-2">{summary}</p>
       {children && <div className="flex flex-col gap-3">{children}</div>}
     </section>
   );

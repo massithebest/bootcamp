@@ -163,6 +163,32 @@ Backend가 소유하는 범위는 다음과 같다.
 
 ## 완료 이력 요약
 
+### 2026-09-28 — LLM 응답 지연 timeout 안내
+
+- Agent SDK가 다음 LLM 이벤트를 30초 동안 내지 않으면 호출을 취소하고, SSE
+  `error` 뒤 `done`으로 종료한다. 공개 오류 문구는 "LLM API 서버 응답이 지연되고
+  있습니다. 잠시 후에 다시 시도해 주세요."이며 내부 예외·provider 정보는 노출하지
+  않는다. `LLM_RESPONSE_TIMEOUT_SECONDS` 환경변수(기본 30초)로 조정할 수 있다.
+
+### 2026-09-28 — P&T Factory Planning Agent 역할 명시
+
+- 시스템 프롬프트의 역할을 반도체 후공정 P&T(Package & Test) Factory Planning의
+  생산계획 분석으로 구체화했다. 제품 수요·주문, 설비·인력·자재의 가용 용량과 공정
+  제약을 고려해 실현 가능한 계획을 분석한다는 범위를 명시했다.
+
+### 2026-09-28 — RAG 최종 응답 인용 필수화
+
+- 런타임 Agent 지침에서 `search_documents`를 근거로 한 최종 응답은 문서 제목과
+  `source` 또는 검색 결과 URL을 반드시 포함하도록 했다. URL이 있으면 우선 표기하고,
+  version도 제공될 때 밝힌다. 출처·URL 모두 없는 결과는 답변 근거로 쓰지 않으며
+  임의 인용을 만들지 않는다.
+
+### 2026-09-28 — production SQL API 행 상한 전달
+
+- SQL guard에서 자동 `LIMIT MAX_ROWS + 1` 추가를 제거했다. Production SQL service는
+  guard 검증 후 조회 API에 SQL과 `rowLimit=MAX_ROWS`를 전달하며, API 클라이언트
+  요청 계약과 폐쇄망 이식 가이드에 이를 명시했다.
+
 ### 2026-09-28 — backend 테스트 중복 제거와 파일 통합
 
 - 같은 계층에서 같은 계약을 단정하던 테스트 15개를 삭제했다(동일 본문의 prompt 검사,

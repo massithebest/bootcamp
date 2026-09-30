@@ -1,5 +1,6 @@
 """Claude Agent SDK initialization and execution."""
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -19,12 +20,16 @@ from api.schemas import AgentEvent
 from core.config import (
     AGENT_MODEL,
     CLAUDE_CLI_PATH,
+    LLM_RESPONSE_TIMEOUT_SECONDS,
     agent_provider_env,
 )
 
 
 #: `agent/agent_sdk/` — CLAUDE.md 와 .claude/skills 가 위치한 Agent 작업 디렉터리.
 AGENT_SDK_CWD = str((Path(__file__).parent / "agent_sdk").resolve())
+LLM_RESPONSE_TIMEOUT_MESSAGE = (
+    "LLM API 서버 응답이 지연되고 있습니다. 잠시 후에 다시 시도해 주세요."
+)
 
 
 def _build_options(
@@ -149,7 +154,19 @@ async def run_agent(
     adapter = AgentEventAdapter()
     options = _build_options(resume_session_id, resume_session_at, access_scope)
 
-    async for raw_event in query(prompt=message, options=options):
+    raw_events = query(prompt=message, options=options)
+    while True:
+        try:
+            raw_event = await asyncio.wait_for(
+                anext(raw_events), timeout=LLM_RESPONSE_TIMEOUT_SECONDS
+            )
+        except StopAsyncIteration:
+            break
+        except asyncio.TimeoutError:
+            yield AgentEvent(type="error", content=LLM_RESPONSE_TIMEOUT_MESSAGE)
+            yield AgentEvent(type="done")
+            return
+
         for event in adapter.convert(raw_event):
             yield event
 

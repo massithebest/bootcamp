@@ -151,6 +151,26 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 
 ## 완료 이력 요약
 
+### 2026-09-28 — LLM 응답 지연 안내 표시
+
+- Backend가 LLM 응답 지연 시 보내는 기존 `error`·`done` AgentEvent를 현재
+  `MessageError` 오류 상태와 다시 실행 동작으로 그대로 표시한다. 별도 wire 타입이나
+  UI 경로를 만들지 않는다.
+
+### 2026-09-28 — 폐쇄망 설정 문서명과 Vite 서버 옵션 정리
+
+- 폐쇄망 운영 문서를 `docs/CLOSED_NETWORK_SETUP.md`로 대문자화하고,
+  Frontend README·작업 지침의 링크를 갱신했다. 로컬 `.env.local`에
+  `VITE_API_BASE_URL=http://localhost:8100`을 명시했다(파일은 Git 제외).
+- Vite dev·preview 서버를 포트 3100, `strictPort: true`, `host: true`,
+  `allowedHosts: []`로 고정하고 build source map은 생성하지 않는다.
+
+### 2026-09-28 — 화면 제품명 P&T FP 통일
+
+- Composer placeholder, 빈 대화 안내, 대화 헤더, simulation·Tool 결과의 화면 표기와
+  HTML 설명 metadata에서 `생산계획`/`SMT2020` 대신 `P&T FP`를 사용하도록 통일했다.
+  Backend 식별자와 payload 원문은 변경하지 않는다.
+
 ### 2026-09-26 — present_table과 Markdown 표 중복 표시 제거
 
 - runtime이 같은 답변의 유효한 `present_table` 성공 결과를 판정해 로컬 metadata에

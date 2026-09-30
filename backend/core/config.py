@@ -149,6 +149,10 @@ def require_production_env(name: str, value: str) -> str:
 # ---- LLM Provider ----
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic").lower()
 
+#: Agent SDK가 다음 LLM 응답 이벤트를 기다리는 최대 시간(초). 초과 시 공개 SSE
+#: error/done으로 종료해 브라우저가 무한 대기하지 않게 한다.
+LLM_RESPONSE_TIMEOUT_SECONDS = int(os.getenv("LLM_RESPONSE_TIMEOUT_SECONDS", "30"))
+
 #: LLM_PROVIDER=local(사내 LLM 게이트웨이) 전용 설정. 값은 `backend/.env`에만
 #: 두고 코드·문서에 실제 모델명·endpoint·key를 남기지 않는다.
 PRIVATE_LLM_MODEL_NAME = os.getenv("PRIVATE_LLM_MODEL_NAME", "")

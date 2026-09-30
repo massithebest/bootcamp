@@ -11,7 +11,7 @@ import re
 from services.service_logging import logged_service_operation
 
 
-#: 한 번에 저장할 최대 행 수. 서비스는 MAX_ROWS + 1행으로 source_truncated를 판정한다.
+#: SQL 조회 API 및 mock 저장소에 전달하는 최대 행 수.
 MAX_ROWS = 1000
 
 _FORBIDDEN = re.compile(
@@ -29,7 +29,7 @@ class SqlGuardError(ValueError):
 
 @logged_service_operation
 def check_sql(sql: str, allowed_tables: set[str]) -> str:
-    """검사를 통과하면 LIMIT 가 보장된 SQL 을 돌려준다.
+    """검사를 통과하면 정리된 읽기 전용 SQL 을 돌려준다.
 
     Raises:
         SqlGuardError: 조회 전용 규칙을 어겼거나 미등록 테이블을 참조할 때.
@@ -37,7 +37,7 @@ def check_sql(sql: str, allowed_tables: set[str]) -> str:
 
     stripped = sql.strip().rstrip(";").strip()
     if not stripped:
-        return _with_limit(stripped)
+        return stripped
 
     if ";" in stripped:
         raise SqlGuardError("한 번에 하나의 SQL 문만 실행할 수 있습니다.")
@@ -67,10 +67,4 @@ def check_sql(sql: str, allowed_tables: set[str]) -> str:
                 f"등록되지 않은 테이블입니다: {table}. list_tables 로 확인하세요."
             )
 
-    return _with_limit(stripped)
-
-
-def _with_limit(sql: str) -> str:
-    if re.search(r"\bLIMIT\b", sql, re.I):
-        return sql
-    return f"{sql} LIMIT {MAX_ROWS + 1}"
+    return stripped
