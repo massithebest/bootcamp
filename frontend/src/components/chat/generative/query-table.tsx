@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   columnFilteringFeature,
   globalFilteringFeature,
@@ -31,6 +31,10 @@ export interface QueryTableProps {
 }
 
 type DataRow = { cells: QueryTablePage["rows"][number] };
+type LastPage = {
+  requestBaseKey: string;
+  value: QueryTablePage;
+};
 
 const PAGE_SIZES = [10, 25, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 10;
@@ -53,6 +57,7 @@ export function QueryTable({ resultId, columns, title }: QueryTableProps) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [retryKey, setRetryKey] = useState(0);
+  const lastPage = useRef<LastPage | null>(null);
   const columnKey = columns?.join("\u0000") ?? "";
 
   useEffect(() => {
@@ -94,11 +99,27 @@ export function QueryTable({ resultId, columns, title }: QueryTableProps) {
     ],
   );
   const state = useQueryTable(request, retryKey);
+  const requestBaseKey = JSON.stringify([
+    resultId,
+    pagination.pageSize,
+    columnKey,
+    debouncedSearch,
+    sort?.id ?? "",
+    sort?.desc ?? false,
+  ]);
+  useEffect(() => {
+    if (state.type === "success") {
+      lastPage.current = { requestBaseKey, value: state.value };
+    }
+  }, [request.page, requestBaseKey, state]);
+  const retainedPage = lastPage.current?.requestBaseKey === requestBaseKey
+    ? lastPage.current.value
+    : null;
   const current = state.type === "success"
     ? state.value
     : state.type === "loading"
-      ? state.stale ?? null
-      : null;
+      ? state.stale ?? retainedPage
+      : retainedPage;
   const loading = state.type === "loading";
 
   const data = useMemo<DataRow[]>(
@@ -143,7 +164,7 @@ export function QueryTable({ resultId, columns, title }: QueryTableProps) {
   }
 
   const pageCount = Math.max(1, dataTable.getPageCount());
-  const currentPage = Math.min(current.page - 1, pageCount - 1);
+  const requestedPage = Math.min(pagination.pageIndex + 1, pageCount);
   const first = current.rows.length ? (current.page - 1) * current.page_size + 1 : 0;
   const last = first ? first + current.rows.length - 1 : 0;
   const visibleRows = dataTable.getRowModel().rows;
@@ -165,7 +186,12 @@ export function QueryTable({ resultId, columns, title }: QueryTableProps) {
             {hasSearch && ` · 검색 결과 ${current.filtered_row_count.toLocaleString("ko-KR")}건`}
             {" · "}
             {first ? `${first.toLocaleString("ko-KR")}–${last.toLocaleString("ko-KR")}행` : "표시할 행 없음"}
-            {loading ? " · 불러오는 중…" : ""}
+            {loading && (current.page !== requestedPage
+              ? ` · ${requestedPage}페이지 불러오는 중…`
+              : " · 불러오는 중…")}
+            {state.type !== "loading" && state.type !== "success" && current.page !== requestedPage
+              ? ` · ${requestedPage}페이지를 불러오지 못해 ${current.page}페이지를 유지 중`
+              : ""}
           </p>
         </div>
         <label className="relative min-w-52 flex-1 sm:max-w-72">
@@ -269,19 +295,23 @@ export function QueryTable({ resultId, columns, title }: QueryTableProps) {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => dataTable.previousPage()}
-            disabled={!dataTable.getCanPreviousPage() || loading}
-            className="inline-flex size-7 items-center justify-center rounded border border-line-strong text-ink-2 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={() => {
+              if (!loading && dataTable.getCanPreviousPage()) dataTable.previousPage();
+            }}
+            aria-disabled={!dataTable.getCanPreviousPage() || loading}
+            className="inline-flex size-7 items-center justify-center rounded border border-line-strong text-ink-2 hover:bg-surface-2 aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
             aria-label="이전 페이지"
           >
             <ChevronLeftIcon aria-hidden className="size-3.5" />
           </button>
-          <span className="min-w-20 text-center" aria-live="polite">{currentPage + 1} / {pageCount} 페이지</span>
+          <span className="min-w-20 text-center" aria-live="polite">{requestedPage} / {pageCount} 페이지</span>
           <button
             type="button"
-            onClick={() => dataTable.nextPage()}
-            disabled={!dataTable.getCanNextPage() || loading}
-            className="inline-flex size-7 items-center justify-center rounded border border-line-strong text-ink-2 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={() => {
+              if (!loading && dataTable.getCanNextPage()) dataTable.nextPage();
+            }}
+            aria-disabled={!dataTable.getCanNextPage() || loading}
+            className="inline-flex size-7 items-center justify-center rounded border border-line-strong text-ink-2 hover:bg-surface-2 aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
             aria-label="다음 페이지"
           >
             <ChevronRightIcon aria-hidden className="size-3.5" />

@@ -18,7 +18,9 @@ export async function runWorkbenchRegressions() {
   const resultId = "a".repeat(32);
   const alternateResultId = "b".repeat(32);
   const expiredResultId = "c".repeat(32);
+  const pagedResultId = "d".repeat(32);
   let resolveAlternateTable: ((response: Response) => void) | undefined;
+  let resolvePagedTable: ((response: Response) => void) | undefined;
   window.confirm = () => true;
   window.fetch = async (input, init) => {
     const url = String(input);
@@ -37,6 +39,20 @@ export async function runWorkbenchRegressions() {
     const requestUrl = new URL(url, window.location.href);
     if (requestUrl.pathname.includes("/api/query-results/") && requestUrl.pathname.endsWith("/table")) {
       const requestedId = requestUrl.pathname.split("/").at(-2);
+      if (requestedId === pagedResultId) {
+        const page = Number(requestUrl.searchParams.get("page"));
+        if (page === 2) {
+          return new Promise<Response>((resolve, reject) => {
+            resolvePagedTable = resolve;
+            init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+          });
+        }
+        if (page === 3) return new Response("unavailable", { status: 500 });
+        return Response.json({
+          status: "ok", result_id: pagedResultId, page: 1, page_size: 10, row_count: 30, filtered_row_count: 30, source_truncated: false,
+          columns: [{ name: "제품", dtype: "str", role: "category" }], rows: Array.from({ length: 10 }, (_, i) => [`제품-${i + 1}`]),
+        });
+      }
       if (requestedId === alternateResultId) {
         return new Promise<Response>((resolve, reject) => {
           resolveAlternateTable = resolve;
@@ -309,6 +325,36 @@ export async function runWorkbenchRegressions() {
         check(!tableHost.textContent?.includes("B"), "previous result row remained visible after result id changed");
         await waitFor(() => tableHost.textContent?.includes("찾을 수 없습니다") ?? false);
         check(!tableHost.textContent?.includes("B"), "expired result kept rendering old rows");
+      } finally {
+        await act(async () => tableRoot.unmount());
+        tableHost.remove();
+      }
+    });
+    await run("F18 paging retains table, focus and previous rows during slow and failed requests", async () => {
+      const tableHost = document.createElement("div");
+      document.body.append(tableHost);
+      const tableRoot = createRoot(tableHost);
+      try {
+        await act(async () => tableRoot.render(<QueryTable resultId={pagedResultId} />));
+        await waitFor(() => !!tableHost.querySelector("tbody tr"));
+        const section = tableHost.querySelector('[data-slot="query-table"]');
+        const next = tableHost.querySelector<HTMLButtonElement>('button[aria-label="다음 페이지"]')!;
+        await act(async () => { next.focus(); next.click(); });
+        check(document.activeElement === next, "pagination focus was lost while the request was pending");
+        check(section === tableHost.querySelector('[data-slot="query-table"]'), "table section remounted during pagination");
+        check(tableHost.textContent?.includes("제품-1") && tableHost.textContent?.includes("2페이지 불러오는 중"), "previous page was not kept with pending status");
+        resolvePagedTable?.(Response.json({
+          status: "ok", result_id: pagedResultId, page: 2, page_size: 10, row_count: 30, filtered_row_count: 30, source_truncated: false,
+          columns: [{ name: "제품", dtype: "str", role: "category" }], rows: Array.from({ length: 10 }, (_, i) => [`제품-${i + 11}`]),
+        }));
+        await waitFor(() => tableHost.textContent?.includes("제품-11") ?? false);
+        check(document.activeElement === next, "pagination focus moved after page content updated");
+
+        const nextAgain = tableHost.querySelector<HTMLButtonElement>('button[aria-label="다음 페이지"]')!;
+        await act(async () => { nextAgain.focus(); nextAgain.click(); });
+        check(document.activeElement === nextAgain, "pagination focus was lost on a failed request");
+        await waitFor(() => !!tableHost.querySelector('[role="alert"]'));
+        check(tableHost.textContent?.includes("제품-11") && tableHost.textContent?.includes("3페이지를 불러오지 못해 2페이지를 유지 중"), "failed page did not preserve the last successful rows");
       } finally {
         await act(async () => tableRoot.unmount());
         tableHost.remove();

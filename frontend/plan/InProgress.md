@@ -82,6 +82,8 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
   → `{status, result_id, page, page_size, row_count, filtered_row_count, source_truncated,
   columns[{name,dtype,role}], rows[[…]]}`. `QueryTable`은 TanStack Table 수동 모드로 저장된
   최대 1,000건 전체에 서버 검색·정렬을 적용하고 기본 10행씩 page를 받는다.
+  동일 결과·열·검색·정렬·페이지 크기의 페이지 전환 중에는 마지막 성공 행과
+  버튼 포커스를 유지하며, 지연·실패 시 요청 페이지와 유지 중인 페이지를 안내한다.
   `GET /api/query-results/{resultId}/chart?chart_type&x_column&y_column&group_by_column&aggregation&title` →
   `{status, result_id, chart{type(bar|line|area), x, series[], categories[], data[], title, x_label, y_label, unit}, warnings[]}`,
   `…/preview`. 없음·만료·타 세션은 동일한 404 `RESULT_NOT_FOUND`, 요청 오류는 422
