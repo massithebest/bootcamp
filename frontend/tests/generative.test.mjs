@@ -9,7 +9,7 @@ import { z } from 'zod';
 const contract = JSON.parse(readFileSync(new URL('./fixtures/present-vocabulary.json', import.meta.url), 'utf8')).tools;
 const ID = 'a'.repeat(32);
 const originalFetch = globalThis.fetch;
-let server, PresentSqlPreviewToolUI, PresentChartToolUI, PresentTableToolUI, PresentSimulationToolUI, vocab, api, convertMessage, standalone, DatabaseResult, SimulationResult, ChartBlock, chartSummary;
+let server, PresentSqlPreviewToolUI, PresentChartToolUI, PresentTableToolUI, PresentSimulationToolUI, vocab, api, convertMessage, standalone, DatabaseResult, SimulationResult, ChartBlock, chartSummary, formatYAxisTick;
 before(async () => {
   server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom' });
   ({ PresentSqlPreviewToolUI, PresentChartToolUI, PresentTableToolUI, PresentSimulationToolUI } =
@@ -22,6 +22,7 @@ before(async () => {
   ({ SimulationResult } = await server.ssrLoadModule('/src/components/chat/tool-results/simulation-result.tsx'));
   ({ ChartBlock } = await server.ssrLoadModule('/src/components/chat/tool-results/chart-block.tsx'));
   ({ chartSummary } = await server.ssrLoadModule('/src/lib/chart-summary.ts'));
+  ({ formatYAxisTick } = await server.ssrLoadModule('/src/components/chat/tool-results/charts/axis-format.ts'));
 });
 after(async () => { globalThis.fetch = originalFetch; await server.close(); });
 
@@ -245,6 +246,18 @@ test('stacked bar charts identify the cumulative display in their accessible sum
   const out = renderToStaticMarkup(createElement(ChartBlock, { chart: spec, stacked: true, alwaysLegend: true }));
   assert.match(out, /aria-label="누적 막대 차트"/);
   assert.match(out, /누적 막대 차트/);
+});
+
+test('Y-axis tick labels use compact K/M/B notation while preserving small values and signs', () => {
+  assert.equal(formatYAxisTick(10), '10');
+  assert.equal(formatYAxisTick(1_000), '1K');
+  assert.equal(formatYAxisTick(10_000), '10K');
+  assert.equal(formatYAxisTick(1_000_000), '1M');
+  assert.equal(formatYAxisTick(25_000_000), '25M');
+  assert.equal(formatYAxisTick(1_200_000_000), '1.2B');
+  assert.equal(formatYAxisTick(-1_250_000), '-1.3M');
+  assert.equal(formatYAxisTick(1.234), '1.234');
+  assert.equal(formatYAxisTick('not-a-number'), 'not-a-number');
 });
 
 test('only a valid successful present_table suppresses Markdown tables in its own answer', () => {
