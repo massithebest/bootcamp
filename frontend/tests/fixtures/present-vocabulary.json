@@ -28,6 +28,13 @@
           ],
           "type": "string"
         },
+        "bar_mode": {
+          "enum": [
+            "grouped",
+            "stacked"
+          ],
+          "type": "string"
+        },
         "chart_type": {
           "enum": [
             "bar",

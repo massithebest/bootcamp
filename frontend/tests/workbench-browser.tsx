@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import App from "@/App";
 import { QueryTable } from "@/components/chat/generative/query-table";
+import { ChartBlock } from "@/components/chat/tool-results/chart-block";
 import type { AgentEvent } from "@/types/chat";
 import "@/app/globals.css";
 
@@ -257,6 +258,36 @@ export async function runWorkbenchRegressions() {
       await click("차트 데이터 표로 보기");
       await waitFor(() => !!host.querySelector("table"));
       check(host.querySelector("table")?.textContent?.includes("A20"), `chart alternative values differ: ${host.querySelector('table')?.textContent}`);
+    });
+    await run("F13 stacked bars share a category position while grouped bars remain side by side", async () => {
+      const chartHost = document.createElement("div");
+      document.body.append(chartHost);
+      const chartRoot = createRoot(chartHost);
+      const spec = {
+        type: "bar" as const, x: "product", series: [{ key: "a", label: "A" }, { key: "b", label: "B" }],
+        categories: ["P1"], data: [{ product: "P1", a: 10, b: 20 }], title: null,
+        x_label: "제품", y_label: "수량", unit: "개",
+      };
+      const barPositions = async (stacked: boolean) => {
+        await act(async () => chartRoot.render(<ChartBlock chart={spec} alwaysLegend stacked={stacked} />));
+        await waitFor(() => {
+          const bars = [...chartHost.querySelectorAll<SVGElement>(".recharts-bar-rectangle .recharts-rectangle")];
+          if (bars.length < 2) return false;
+          const samePosition = bars[0].getAttribute("x") === bars[1].getAttribute("x");
+          return stacked ? samePosition : !samePosition;
+        });
+        return [...chartHost.querySelectorAll<SVGElement>(".recharts-bar-rectangle .recharts-rectangle")]
+          .slice(0, 2).map((rect) => Number(rect.getAttribute("x")));
+      };
+      try {
+        const stackedX = await barPositions(true);
+        check(stackedX[0] === stackedX[1], `stacked series have separate x positions: ${stackedX}`);
+        const groupedX = await barPositions(false);
+        check(groupedX[0] !== groupedX[1], `grouped series unexpectedly share x position: ${groupedX}`);
+      } finally {
+        await act(async () => chartRoot.unmount());
+        chartHost.remove();
+      }
     });
     await run("F18 result table never shows a different request while loading or after expiry", async () => {
       const tableHost = document.createElement("div");

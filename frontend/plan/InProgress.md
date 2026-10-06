@@ -32,7 +32,7 @@ Backend에 없는 기능을 동작하는 것처럼 표시하는 것은 범위 �
 | 메시지 lifecycle | 완료 | complete/cancelled/error, 부분 응답과 terminal event 구분 |
 | 실행 과정 | 완료 | 공개 status, ToolGroup, 호출 ID별 args/result와 2단계 disclosure |
 | 표 | 완료 | `QueryTable` 최대 1,000건 서버 검색·정렬·10/25/50/100 pagination |
-| 차트 | 완료 | `QueryChart`(bar/line/area, 서버 집계), loading/error와 데이터 표 대안 |
+| 차트 | 완료 | `QueryChart`(bar/line/area, 서버 집계), grouped/stacked 막대 표시, loading/error와 데이터 표 대안 |
 | 조합형 결과 | 완료 | flat `present_sql_preview`·`present_chart`·`present_table`·`present_simulation` Tool renderer(`SqlPreview`·`QueryChart`·`QueryTable`·`SimulationSummary`) |
 | 후속질문 | 파서·UI 완료 | `done.data.suggestions`를 Backend가 보내면 표시(현재 미전송) |
 | 지식 관리 | 완료 | 구조화 지식 조회·수정 요청·검토·승인(가이드 폼·원문 YAML·diff), 텍스트 등록·검토·활성화, 정확한 버전 인용 |
@@ -58,7 +58,7 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 
 - Backend는 `present` Tool 하나 대신 flat(스칼라 인자) Tool 4개를 보낸다:
   `present_sql_preview(sql, title?)`,
-  `present_chart(result_id, chart_type, x_column, y_column, group_by_column?, aggregation?, title?)`,
+  `present_chart(result_id, chart_type, x_column, y_column, group_by_column?, aggregation?, title?, bar_mode?: grouped|stacked)`,
   `present_table(result_id, columns?, title?)`,
   `present_simulation(scenario, summary, kpis, result_id?)`. 각 Tool 이름이 곧 렌더링할 컴포넌트를
   정하므로 `$type` 트리 파싱이 없다. 인자는 snake_case로 wire와 그대로 일치한다.
@@ -74,6 +74,8 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
   호출과 같은 방식). (과거에는 Tool 하나가 UI 트리 전체를 `tree` JSON-문자열로 받았으나,
   실제 provider가 그 문자열 타입을 지키지 못해 반복 실패하는 문제가 있어 2026-09-22
   이중 인코딩을 없애는 재설계로 바꿨다. 상세 근거는 [완료 이력](History.md) 참고.)
+- `bar_mode`는 막대 렌더링 전용이며 생략하면 grouped다. stacked는 `chart_type=bar`와
+  `group_by_column`을 요구한다. 누적 막대의 접근성 요약도 누적 표시를 알린다.
 - 이 모드의 `execute_sql`·`run_simulation` 결과는 전체 행 없이 preview(`result_id`, `row_count`, `columns`, `sample_rows`(객체,
   최대 5), `date_ranges`, `distinct_counts`, `statistics`, `top_groups`; simulation은 `simulation_type`·`scenario`·`summary`·`kpis`)다.
 - `GET /api/query-results/{resultId}/table?page&page_size(≤100)&columns=…&search=&sort_column=&sort_direction=asc|desc`

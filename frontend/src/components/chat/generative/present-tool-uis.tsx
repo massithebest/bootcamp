@@ -63,6 +63,7 @@ export const PresentChartToolUI: ToolCallMessagePartComponent<Record<string, unk
       <QueryChart
         resultId={parsed.data.result_id}
         chartType={parsed.data.chart_type}
+        barMode={parsed.data.bar_mode}
         xColumn={parsed.data.x_column}
         yColumn={parsed.data.y_column}
         groupByColumn={parsed.data.group_by_column}

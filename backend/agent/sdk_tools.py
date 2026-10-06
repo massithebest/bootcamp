@@ -245,7 +245,9 @@ def _present_chart_tool(access_scope: str | None):
         "present_chart",
         "execute_sql·run_simulation이 반환한 result_id를 서버가 집계한 bar/line/area 차트로 "
         "보여준다. 행·차트 데이터는 넣지 않고 result_id와 표시 설정만 넣는다. "
-        "추이·비교를 보여줄 때 쓴다. 필요하면 한 응답에서 여러 번 호출할 수 있다(예: 지표별로 "
+        "추이·비교를 보여줄 때 쓴다. 막대 차트는 기본 grouped이며, 같은 단위의 합산 가능한 "
+        "값을 group_by_column별 구성으로 비교할 때만 bar_mode=stacked를 지정한다. "
+        "stacked는 chart_type=bar와 group_by_column이 필요하다. 필요하면 한 응답에서 여러 번 호출할 수 있다(예: 지표별로 "
         "따로 보여줄 때). 성공한 호출을 Markdown 표나 코드 펜스로 반복하지 않는다. "
         "호출 뒤에는 '위/아래' 같은 위치 표현 대신 '차트에서는'처럼 결과를 해석한다.",
         present_chart_input_schema(),

@@ -35,7 +35,7 @@ Backend가 소유하는 범위는 다음과 같다.
 | SQL | Mock 완료 / Production stub | 등록 table만 허용하는 SELECT/WITH, 1,000행 저장 상한 |
 | Simulation | Mock 완료 / Production stub | 합성 mock SEG_A/SEG_B 입력 관계·정합성 검증 |
 | Result Store | 1차 완료 | parquet+metadata, TTL·용량 정리, browser access scope |
-| 결과 API·표·시각화 | 완료 | `/api/query-results/{id}/preview|table|chart`, `present_sql_preview`·`present_chart`·`present_table`·`present_simulation` flat Tool·검증(유일한 결과 표시 경로, 최대 500 points·8 series) |
+| 결과 API·표·시각화 | 완료 | `/api/query-results/{id}/preview|table|chart`, `present_sql_preview`·`present_chart`·`present_table`·`present_simulation` flat Tool·검증(유일한 결과 표시 경로, 최대 500 points·8 series), `present_chart.bar_mode=grouped|stacked` |
 | RAG | Local 완료 / Vector 미구현 | 활성 검토 문서 local 검색; Milvus·문서 색인 후속 |
 | 실행 환경 | 완료 | Python 3.11 `.venv`, Backend 기본 포트 8100 |
 | Service logging | 완료 | 공개 작업 시작·완료·실패, 소요 시간, 중첩 DEBUG와 민감정보 비노출 |
@@ -61,7 +61,7 @@ Backend가 소유하는 범위는 다음과 같다.
   `source_truncated`, `columns`, `sample_rows`(≤5, 객체), `date_ranges`, `distinct_counts`, `statistics`,
   `top_groups`(컬럼당 ≤10); simulation은 `simulation_type`·`scenario`·`summary`·`kpis`; SQL은 `purpose`만)만 반환하고,
   flat(스칼라 인자) Tool 4개를 등록한다: `present_sql_preview(sql, title?)`,
-  `present_chart(result_id, chart_type, x_column, y_column, group_by_column?, aggregation?, title?)`,
+  `present_chart(result_id, chart_type, x_column, y_column, group_by_column?, aggregation?, title?, bar_mode?)`,
   `present_table(result_id, columns?, title?)`, `present_simulation(scenario, summary, kpis, result_id?)`.
   (과거에는 `present` tool 하나가 UI 트리 전체를 `tree` JSON-문자열 하나로 받았으나, 실제
   tool-calling 모델이 문자열 타입을 지키지 못해 Claude Agent SDK의 강제 `jsonschema.validate`에
@@ -71,6 +71,9 @@ Backend가 소유하는 범위는 다음과 같다.
   한 화면에 시각적으로 묶는 기능(과거 `Card`)은 없다 — 같은 `result_id`로 여러 `present_*`를
   호출해도 화면에는 순차적으로 나열되며 연결은 모델이 텍스트로 설명한다. 자동 표 보완은
   하지 않는다.
+- `present_chart.bar_mode`는 선택 enum `grouped|stacked`이며 기본은 `grouped`다.
+  `stacked`는 막대 차트에서만 허용하고 `group_by_column`이 필요하다. 표시 모드만
+  바꾸므로 `/api/query-results/{id}/chart` 응답 payload는 바뀌지 않는다.
 - `GET /api/query-results/{result_id}/preview|table|chart`(같은 `pp_session_scope`): table `page`·`page_size`(기본 10, ≤100)·
   `columns`·`search`(≤200)·`sort_column`·`sort_direction(asc|desc)`를 저장된 최대 1,000건 전체에 적용하고
   `row_count`·`filtered_row_count`와 현재 page를 반환한다. chart는 `chart_type(bar|line|area)`·`x_column`·`y_column`·

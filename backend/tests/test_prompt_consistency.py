@@ -139,6 +139,7 @@ def test_present_tool_descriptions_forbid_position_words_and_raw_tree() -> None:
         assert "tree" not in description and "$type" not in description and "children" not in description
 
     assert "위/아래" in chart and "차트에서는" in chart and "result_id" in chart
+    assert "bar_mode=stacked" in chart and "group_by_column" in chart
     assert "위/아래" in table and "표에는" in table and "result_id" in table
 
 

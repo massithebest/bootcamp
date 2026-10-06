@@ -10,6 +10,14 @@
 
 ## 완료 기록
 
+### 2026-10-01 — `present_chart` 누적 막대 모드
+
+- `present_chart`에 선택 입력 `bar_mode: grouped|stacked`를 추가했다. 생략 시
+  grouped를 유지하며 stacked는 `chart_type=bar`와 `group_by_column`을 요구한다.
+- 같은 단위의 합산 가능한 그룹 구성에만 stacked를 권하도록 Tool 설명과 Agent
+  지침을 갱신했다. 집계 chart API 응답 계약은 바꾸지 않았다.
+- Backend 전체 검증: 365 passed, 6 deselected.
+
 ### 2026-09-28 — LLM 응답 지연 timeout 안내
 
 - Agent SDK가 다음 LLM 이벤트를 30초 동안 내지 않으면 호출을 취소하고, SSE

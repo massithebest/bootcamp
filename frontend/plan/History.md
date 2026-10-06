@@ -2,6 +2,14 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-10-01 — grouped/stacked 막대 차트
+
+- `present_chart.bar_mode`의 선택값 `grouped|stacked`를 Tool fixture·Zod schema와
+  renderer에 연결했다. 기본 grouped는 유지하고 stacked bar는 모든 그룹 시리즈에
+  공통 `stackId`를 적용한다.
+- 스크린 리더 요약도 누적 막대 표시를 알린다. Backend 전체 365 passed, Frontend
+  105 tests passed, build·lint 성공.
+
 ## 2026-09-30 — 시작 화면 문구 교체
 
 - Composer 입력 안내와 시작 화면의 기본 질의 5개를 요청 문구로 교체했다.

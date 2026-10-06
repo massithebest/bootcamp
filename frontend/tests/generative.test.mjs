@@ -80,6 +80,8 @@ test('malformed present tool args render an inline notice and never throw', () =
 
 test('present_chart/present_table show stable loading states before data arrives and reject bad props', () => {
   assert.match(surface(PresentChartToolUI, { result_id: ID, chart_type: 'line', x_column: 'm', y_column: 'q' }), /차트를 불러오는 중/);
+  assert.match(surface(PresentChartToolUI, { result_id: ID, chart_type: 'bar', bar_mode: 'stacked', x_column: 'm', y_column: 'q', group_by_column: 'line' }), /차트를 불러오는 중/);
+  assert.match(surface(PresentChartToolUI, { result_id: ID, chart_type: 'bar', bar_mode: 'percent', x_column: 'm', y_column: 'q' }), /표시 설정이 올바르지 않아/);
   assert.match(surface(PresentTableToolUI, { result_id: ID }), /표를 불러오는 중/);
   assert.match(surface(PresentTableToolUI, { result_id: 'not-an-id' }), /표시 설정이 올바르지 않아/);
   assert.match(surface(PresentChartToolUI, { result_id: ID, chart_type: 'pie', x_column: 'm', y_column: 'q' }), /표시 설정이 올바르지 않아/);
@@ -235,6 +237,14 @@ test('area charts are supported with an accessible textual summary', () => {
   assert.match(chartSummary(spec), /영역 차트/);
   const out = renderToStaticMarkup(createElement(ChartBlock, { chart: spec, warnings: chart().warnings, alwaysLegend: true }));
   assert.match(out, /영역 차트/); assert.match(out, /차트 데이터 표로 보기/); assert.match(out, /저장된 조회 결과 범위 안내/);
+});
+
+test('stacked bar charts identify the cumulative display in their accessible summary', () => {
+  const spec = { ...chart().chart, type: 'bar', title: null };
+  assert.match(chartSummary(spec, true), /누적 막대 차트/);
+  const out = renderToStaticMarkup(createElement(ChartBlock, { chart: spec, stacked: true, alwaysLegend: true }));
+  assert.match(out, /aria-label="누적 막대 차트"/);
+  assert.match(out, /누적 막대 차트/);
 });
 
 test('only a valid successful present_table suppresses Markdown tables in its own answer', () => {

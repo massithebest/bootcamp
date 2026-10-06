@@ -21,9 +21,11 @@ const PALETTE = [
 export function BarChartView({
   chart,
   alwaysLegend = false,
+  stacked = false,
 }: {
   chart: ChartSpec;
   alwaysLegend?: boolean;
+  stacked?: boolean;
 }) {
   const reduced = useReducedMotion();
   const config: ChartConfig = Object.fromEntries(
@@ -65,6 +67,7 @@ export function BarChartView({
           <Bar
             key={s.key}
             dataKey={s.key}
+            stackId={stacked ? "bar-stack" : undefined}
             fill={PALETTE[i % PALETTE.length]}
             radius={2}
             isAnimationActive={!reduced}

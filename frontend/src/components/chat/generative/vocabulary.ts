@@ -17,6 +17,7 @@ export const sqlPreviewArgs = z.object({
 export const chartArgs = z.object({
   result_id: resultIdSchema,
   chart_type: z.enum(["bar", "line", "area"]),
+  bar_mode: z.enum(["grouped", "stacked"]).optional(),
   x_column: z.string().max(200),
   y_column: z.string().max(200),
   group_by_column: z.string().max(200).nullable().optional(),

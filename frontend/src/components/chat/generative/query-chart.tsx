@@ -8,6 +8,7 @@ import { ResultNotice, RetryButton } from "./message";
 export interface QueryChartProps {
   resultId: string;
   chartType: ChartType;
+  barMode?: "grouped" | "stacked";
   xColumn: string;
   yColumn: string;
   groupByColumn?: string | null;
@@ -17,7 +18,7 @@ export interface QueryChartProps {
 
 /** resultId와 표시 설정으로 서버가 집계한 chart를 조회해 그린다. 원본 데이터는 받지 않는다. */
 export function QueryChart(props: QueryChartProps) {
-  const { resultId, chartType, xColumn, yColumn, groupByColumn, aggregation, title } = props;
+  const { resultId, chartType, barMode, xColumn, yColumn, groupByColumn, aggregation, title } = props;
   const [retryKey, setRetryKey] = useState(0);
   const request = useMemo(
     () => ({ resultId, chartType, xColumn, yColumn, groupByColumn, aggregation, title }),
@@ -37,7 +38,7 @@ export function QueryChart(props: QueryChartProps) {
     if (chart.data.length === 0) {
       return <ResultNotice>차트로 표시할 데이터가 없습니다. 조회 조건을 넓혀 다시 요청해 주세요.</ResultNotice>;
     }
-    return <ChartBlock chart={chart} warnings={warnings} alwaysLegend />;
+    return <ChartBlock chart={chart} warnings={warnings} alwaysLegend stacked={barMode === "stacked"} />;
   }
   if (state.type === "not-found") {
     return <ResultNotice tone="alert">{state.message}</ResultNotice>;

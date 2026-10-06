@@ -59,6 +59,20 @@ def test_valid_chart_returns_empty_object(result) -> None:
     assert asyncio.run(present_chart(args, access_scope=SCOPE)) == {}
 
 
+def test_valid_stacked_bar_requires_group_and_returns_empty_object(result) -> None:
+    args = {
+        "result_id": result.result_id,
+        "chart_type": "bar",
+        "x_column": "work_month",
+        "y_column": "qty",
+        "group_by_column": "line",
+        "bar_mode": "stacked",
+    }
+
+    assert validate_present_chart(args, access_scope=SCOPE) == {}
+    assert asyncio.run(present_chart(args, access_scope=SCOPE)) == {}
+
+
 def test_valid_table_returns_empty_object(result) -> None:
     args = {"result_id": result.result_id, "columns": ["work_month", "qty"]}
 
@@ -152,6 +166,25 @@ def test_chart_aggregation_required_when_grain_duplicates(result) -> None:
     assert error.code == "AGGREGATION_REQUIRED"
 
 
+def test_stacked_bar_requires_bar_chart_and_group_by_column(result) -> None:
+    base = {
+        "result_id": result.result_id,
+        "chart_type": "bar",
+        "x_column": "work_month",
+        "y_column": "qty",
+        "group_by_column": "line",
+        "bar_mode": "stacked",
+    }
+
+    no_group = _error(validate_present_chart, {**base, "group_by_column": None})
+    assert no_group.code == "INVALID_REQUEST"
+    assert no_group.details["path"] == "$.group_by_column"
+
+    wrong_chart = _error(validate_present_chart, {**base, "chart_type": "line"})
+    assert wrong_chart.code == "INVALID_REQUEST"
+    assert wrong_chart.details["path"] == "$.bar_mode"
+
+
 def test_chart_non_numeric_y_column_reports_invalid_column_role(result) -> None:
     args = {
         "result_id": result.result_id,
@@ -221,6 +254,8 @@ def test_present_chart_schema_requires_core_fields() -> None:
 
     assert set(schema["required"]) == {"result_id", "chart_type", "x_column", "y_column"}
     assert schema["properties"]["chart_type"]["enum"] == ["bar", "line", "area"]
+    assert schema["properties"]["bar_mode"]["enum"] == ["grouped", "stacked"]
+    assert "bar_mode" not in schema["required"]
 
 
 def test_present_simulation_schema_requires_scenario_summary_kpis() -> None:

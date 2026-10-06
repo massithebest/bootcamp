@@ -31,7 +31,7 @@ Skills, 입력·출력 schema는 각 Tool 설명을 따른다.
 | `get_result_summary` | 저장 결과의 메타데이터·요약 확인 |
 | `get_result_page` | 저장 결과의 필요한 구간 확인 |
 | `present_sql_preview` | 실행 SQL 표시 |
-| `present_chart` | `result_id`의 bar/line/area 차트 표시 |
+| `present_chart` | `result_id`의 bar/line/area 차트 표시. 막대는 기본 grouped, 필요하면 stacked |
 | `present_table` | `result_id`의 서버 페이지 표 표시 |
 | `present_simulation` | 시나리오·요약·KPI 표시 |
 
@@ -57,6 +57,9 @@ Skills, 입력·출력 schema는 각 Tool 설명을 따른다.
 - 2행 이상을 나열하거나 표를 요청하면 `present_table`을 사용한다. 비교·추이는
   `present_chart`, SQL 원문은 `present_sql_preview`, 시뮬레이션 요약은
   `present_simulation`으로 표시한다.
+- `present_chart`의 막대는 기본 `bar_mode=grouped`다. 같은 단위의 합산 가능한
+  값을 `group_by_column`별 구성으로 비교할 때 `bar_mode=stacked`를 쓴다. 이 모드는
+  `chart_type=bar`와 `group_by_column`이 모두 필요하며 선·영역 차트에는 지정하지 않는다.
 - 오류는 `code`와 `details.path`에 따라 입력 또는 집계를 최대 2회 보정한다.
   차트를 확정할 수 없으면 `present_table`과 텍스트 설명으로 답한다.
 - 여러 결과는 필요한 `present_*` Tool을 각각 호출하고 연결 관계를 텍스트로

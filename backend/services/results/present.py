@@ -23,6 +23,7 @@ TITLE_MAX_STRING = 120
 DEFAULT_MAX_STRING = 2000
 KPI_MAX_ITEMS = 12
 COLUMNS_MAX_ITEMS = 50
+BAR_MODES = ("grouped", "stacked")
 
 
 def _string(max_length: int = DEFAULT_MAX_STRING) -> dict[str, Any]:
@@ -73,6 +74,7 @@ def present_chart_input_schema() -> dict[str, Any]:
             "y_column": _string(200),
             "group_by_column": {"anyOf": [_string(200), {"type": "null"}]},
             "aggregation": _enum(list(AGGREGATIONS)),
+            "bar_mode": _enum(list(BAR_MODES)),
             "title": _string(TITLE_MAX_STRING),
         },
         "required": ["result_id", "chart_type", "x_column", "y_column"],
@@ -147,6 +149,13 @@ def validate_present_chart(args: dict[str, Any], *, access_scope: str | None) ->
         check_accessible(result_id, access_scope)
     except QueryResultError as exc:
         raise _fail(exc.code, exc.message, "$.result_id") from None
+    bar_mode = args.get("bar_mode", "grouped")
+    if bar_mode not in BAR_MODES:
+        raise _fail("INVALID_REQUEST", "bar_mode은 grouped 또는 stacked여야 합니다.", "$.bar_mode")
+    if bar_mode == "stacked" and args["chart_type"] != "bar":
+        raise _fail("INVALID_REQUEST", "stacked bar_mode은 막대 차트에서만 사용할 수 있습니다.", "$.bar_mode")
+    if bar_mode == "stacked" and args.get("group_by_column") in (None, ""):
+        raise _fail("INVALID_REQUEST", "누적 막대 차트에는 group_by_column이 필요합니다.", "$.group_by_column")
     try:
         read_chart(
             result_id,
