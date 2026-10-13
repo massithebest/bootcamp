@@ -66,7 +66,8 @@ def _build_options(
         resume_session_at=resume_session_at,
         model=AGENT_MODEL,
         # LLM_PROVIDER=openrouter 이면 base URL / 토큰을 주입한다. (기본: {})
-        env=agent_provider_env() or None,
+        # SDK 0.2.x 는 env 를 dict 로 펼치므로 None 대신 빈 dict 를 넘긴다.
+        env=agent_provider_env(),
         # PATH 에 `claude` 가 없어도 실행되도록 경로를 명시한다. (없으면 SDK 자체 탐색)
         cli_path=CLAUDE_CLI_PATH,
         # SDK의 최종 AssistantMessage를 기다리지 않고 text_delta를 받아
