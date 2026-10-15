@@ -297,7 +297,8 @@ def _present_simulation_tool(access_scope: str | None):
     SUGGESTION_TOOL_NAME,
     "최종 답변을 쓰기 직전에 사용자가 이어서 물어볼 만한 후속질문 2~4개를 등록한다. "
     "각 질문은 사용자가 그대로 보낼 수 있는 1~120자의 한국어 질문 문장으로 쓰고 서로 겹치지 않게 한다. "
-    "조회 결과의 수치·결론을 질문에 미리 적지 않는다. 화면에는 답변 뒤 선택지로만 표시된다.",
+    "조회 결과의 수치·결론을 질문에 미리 적지 않고, 이번 답변이나 앞선 대화에서 이미 다룬 내용은 "
+    "다시 묻지 않는다. 화면에는 답변 뒤 선택지로만 표시된다.",
     suggest_follow_ups_input_schema(),
 )
 async def _suggest_follow_ups(args: dict[str, Any]) -> dict[str, Any]:
