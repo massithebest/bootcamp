@@ -35,3 +35,11 @@ test('inline table and preview summary retain source values', () => {
   assert.match(render('database', { table: { columns: ['part', 'qty'], rows: [['part_1', 12]] } }), /part_1/);
   assert.match(render('database', { status: 'ok', result_id: 'fixture', row_count: 500, columns: [{ name: 'qty' }], sample_rows: [{ qty: 42 }], statistics: {} }), /42/);
 });
+test('table cells drop floating point aggregation noise', async () => {
+  const { displayCell } = await server.ssrLoadModule('/src/lib/format-cell.ts');
+  assert.equal(displayCell(13083.199999999999), '13083.2');
+  assert.equal(displayCell(0.1 + 0.2), '0.3');
+  assert.equal(displayCell(7072.3), '7072.3');
+  assert.equal(displayCell(5882), '5882');
+  assert.equal(displayCell(null), '—');
+});
