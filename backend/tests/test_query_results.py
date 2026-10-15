@@ -452,7 +452,8 @@ def test_query_result_api_round_trip_and_headers(store) -> None:
     assert chart.json()["chart"]["categories"] == ["2026-01", "2026-02"]
     for response in (preview, table, chart):
         assert response.headers["cache-control"].startswith("private, max-age=")
-        assert response.headers["vary"] == "Cookie"
+        # CORS 미들웨어(starlette 버전에 따라)가 Origin 을 덧붙일 수 있다.
+        assert "Cookie" in {v.strip() for v in response.headers["vary"].split(",")}
 
 
 def test_query_result_api_errors_are_uniform_and_safe(store) -> None:

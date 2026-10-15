@@ -111,8 +111,8 @@ class KnowledgeStore:
             items = []
             for path in sorted(root.glob(f"{spec.directory}/*.yaml")):
                 item = _parse(spec.model, _read_yaml(path), path)
-                source_paths[(kind, getattr(item, spec.key_field))] = str(
-                    path.relative_to(root)
+                source_paths[(kind, getattr(item, spec.key_field))] = (
+                    path.relative_to(root).as_posix()
                 )
                 items.append(item)
             return items

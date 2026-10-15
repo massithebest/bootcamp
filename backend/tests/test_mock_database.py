@@ -1,6 +1,7 @@
 """Synthetic mock database generator: schema, counts, atomic replacement, and joins."""
 
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -176,10 +177,11 @@ def test_scenario_expectations_match_generated_database(
 def test_repeated_build_is_deterministic(tmp_path: Path, mock_database) -> None:
     target = tmp_path / "mock_planning.db"
     mock_database.main(target)
-    with sqlite3.connect(target) as conn:
+    # sqlite3 의 with 는 연결을 닫지 않는다. 열린 파일은 Windows 에서 교체할 수 없다.
+    with closing(sqlite3.connect(target)) as conn:
         first = conn.execute("SELECT dataset, part, route FROM part ORDER BY 1,2").fetchall()
     mock_database.main(target)
-    with sqlite3.connect(target) as conn:
+    with closing(sqlite3.connect(target)) as conn:
         second = conn.execute("SELECT dataset, part, route FROM part ORDER BY 1,2").fetchall()
     assert first == second
 

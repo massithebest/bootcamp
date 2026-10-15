@@ -241,7 +241,8 @@ def _atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
     try:
-        temporary.write_text(text, encoding="utf-8")
+        # 텍스트 모드는 Windows 에서 \n 을 \r\n 으로 바꿔 복구 시 원본과 달라진다.
+        temporary.write_bytes(text.encode("utf-8"))
         os.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)

@@ -2,6 +2,18 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-10-15 — Windows 실패 테스트 4건 수정
+
+- 지식 YAML 원자 쓰기를 바이트 쓰기로 바꿔, Windows에서 승인 실패 후 복구한 파일에
+  `\r\r\n`이 생기던 문제를 고쳤다. 새로 쓰는 YAML도 운영체제와 무관하게 LF로 남는다.
+- `KnowledgeStore.source_paths`를 `as_posix()`로 기록해 Windows에서도
+  `catalog/tables/wip.yaml` 형식을 유지한다.
+- mock DB 반복 생성 테스트가 `sqlite3` 연결을 닫지 않아 Windows에서 파일 교체가
+  거부되던 문제를 `contextlib.closing`으로 고쳤다. 생성기는 변경하지 않았다.
+- starlette 1.8.0 CORS 미들웨어가 `Vary: Origin`을 덧붙여, 결과 API 테스트가
+  `Vary`에 `Cookie`가 포함됐는지만 확인하도록 완화했다.
+- Windows에서 Backend 381 passed(2회 연속).
+
 ## 2026-10-15 — 후속질문 동적 생성
 
 - Agent가 최종 답변 직전에 내부 Tool `suggest_follow_ups(questions)`로 후속질문
