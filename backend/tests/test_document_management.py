@@ -106,7 +106,7 @@ def test_catalog_matches_sdk_wire_and_structured_readonly(store):
     wire = asyncio.run(server._request_handlers["tools/list"].handler(None, PaginatedRequestParams()))
     assert {"mcp__planning__" + row["name"] for row in rows} == set(TOOL_NAMES)
     assert {r["name"]: r["input_schema"] for r in rows} == {r.name: r.input_schema for r in wire.tools}
-    assert len(rows) == 16
+    assert len(rows) == 17
     entries = client.get("/api/knowledge/entries").json()
     assert {e["type"] for e in entries} >= {"table", "kpi", "recipe", "glossary", "simulation"}
     assert all(e["active"] is True for e in entries)

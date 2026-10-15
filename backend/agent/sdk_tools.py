@@ -36,9 +36,13 @@ from tools.rag_tool import search_documents
 from tools.result_tool import get_result_page, get_result_summary
 from tools.simulation_tool import list_simulation, run_simulation
 from tools.sql_tool import execute_sql
+from tools.suggestion_tool import suggest_follow_ups, suggest_follow_ups_input_schema
 
 
 MCP_SERVER_NAME = "planning"
+
+#: 화면의 Tool 사용 기록에 표시하지 않고 `done.data.suggestions` 로만 전달하는 Tool.
+SUGGESTION_TOOL_NAME = "suggest_follow_ups"
 
 
 
@@ -289,6 +293,17 @@ def _present_simulation_tool(access_scope: str | None):
     return _present_simulation
 
 
+@tool(
+    SUGGESTION_TOOL_NAME,
+    "최종 답변을 쓰기 직전에 사용자가 이어서 물어볼 만한 후속질문 2~4개를 등록한다. "
+    "각 질문은 사용자가 그대로 보낼 수 있는 1~120자의 한국어 질문 문장으로 쓰고 서로 겹치지 않게 한다. "
+    "조회 결과의 수치·결론을 질문에 미리 적지 않는다. 화면에는 답변 뒤 선택지로만 표시된다.",
+    suggest_follow_ups_input_schema(),
+)
+async def _suggest_follow_ups(args: dict[str, Any]) -> dict[str, Any]:
+    return _ok(await suggest_follow_ups(args.get("questions")))
+
+
 def planning_tools(access_scope: str | None = None):
     """Single source for SDK registration, allowed names and UI discovery.
 
@@ -304,6 +319,7 @@ def planning_tools(access_scope: str | None = None):
         _present_chart_tool(access_scope),
         _present_table_tool(access_scope),
         _present_simulation_tool(access_scope),
+        _suggest_follow_ups,
     ]
 
 
@@ -338,6 +354,7 @@ async def tool_catalog() -> list[dict]:
         "present_chart": "차트 표시 설정 검증 결과(빈 객체 또는 안전한 오류)",
         "present_table": "표 표시 설정 검증 결과(빈 객체 또는 안전한 오류)",
         "present_simulation": "시뮬레이션 요약 표시 설정 검증 결과(빈 객체 또는 안전한 오류)",
+        SUGGESTION_TOOL_NAME: "후속질문 검증 결과(화면에는 답변 뒤 선택지로만 표시)",
     }
     return [{"name": t.name, "description": t.description or "", "input_schema": t.input_schema,
              "output": output[t.name], "status": "available"} for t in result.tools]

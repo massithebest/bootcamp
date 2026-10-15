@@ -50,6 +50,10 @@ Backend가 소유하는 범위는 다음과 같다.
 - 같은 Tool 호출은 안정적인 `tool_call_id`를 공유한다.
 - `tool_call.data.args`에는 공개 가능한 모델 입력만 포함한다.
 - 성공한 `done.data.turn_id`만 이후 포크 anchor로 사용한다.
+- 성공한 `done.data.suggestions?: string[]`는 선택 필드다. 앞뒤 공백·중복을 제거한
+  2~4개의 한국어 질문(각 1~120자)만 싣고, 형식이 맞지 않거나 Agent가 등록하지
+  않았으면 생략한다. 오류·취소 turn의 `done`에는 붙이지 않는다. 출처는 내부 Tool
+  `suggest_follow_ups`이며 이 Tool은 `tool_call`·`tool_result`·`status`로 공개하지 않는다.
 - streaming 실패는 내부 예외를 숨긴 `error` 다음 terminal `done`을 보낸다.
 - 모델 thinking(`ThinkingBlock`), signature와 불완전 Tool JSON은 공개하지 않는다.
 

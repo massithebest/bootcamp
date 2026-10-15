@@ -27,6 +27,7 @@ from tools.rag_tool import search_documents
 from tools.result_tool import get_result_page, get_result_summary
 from tools.simulation_tool import list_simulation, run_simulation
 from tools.sql_tool import execute_sql
+from tools.suggestion_tool import suggest_follow_ups
 
 
 ALL_TOOLS = (
@@ -46,6 +47,7 @@ ALL_TOOLS = (
     present_chart,
     present_table,
     present_simulation,
+    suggest_follow_ups,
 )
 
 

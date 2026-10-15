@@ -34,7 +34,7 @@ Backend에 없는 기능을 동작하는 것처럼 표시하는 것은 범위 �
 | 표 | 완료 | `QueryTable` 최대 1,000건 서버 검색·정렬·10/25/50/100 pagination |
 | 차트 | 완료 | `QueryChart`(bar/line/area, 서버 집계), grouped/stacked 막대 표시, loading/error와 데이터 표 대안 |
 | 조합형 결과 | 완료 | flat `present_sql_preview`·`present_chart`·`present_table`·`present_simulation` Tool renderer(`SqlPreview`·`QueryChart`·`QueryTable`·`SimulationSummary`) |
-| 후속질문 | 파서·UI 완료 | `done.data.suggestions`를 Backend가 보내면 표시(현재 미전송) |
+| 후속질문 | 완료 | 성공한 `done.data.suggestions`를 답변 뒤 선택지로 표시, 클릭 시 전송 |
 | 지식 관리 | 완료 | 구조화 지식 조회·수정 요청·검토·승인(가이드 폼·원문 YAML·diff), 텍스트 등록·검토·활성화, 정확한 버전 인용 |
 | Layout | 완료 | Sidebar·Chat·Inspector, Inspector resize, 좁은 화면 overlay |
 | 접근성 감사 | 범위 내 완료 | keyboard/focus/label/landmark/reduced-motion/긴 문자열/0행·빈 응답 |

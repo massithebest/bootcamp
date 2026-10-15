@@ -2,6 +2,24 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-10-15 — 후속질문 동적 생성
+
+- Agent가 최종 답변 직전에 내부 Tool `suggest_follow_ups(questions)`로 후속질문
+  2~4개를 등록하고, Backend가 검증을 통과한 마지막 값만 성공한 `done.data.suggestions`에
+  싣는다. 별도 LLM 호출을 추가하지 않아 응답 지연과 비용이 늘지 않는다.
+- 검증은 `tools/suggestion_tool.py`의 `normalize_suggestions` 한 곳에서 한다(공백·중복
+  제거, 각 1~120자, 한글 포함, 2~4개). 실패하면 보정하지 않고 생략하며 응답은 성공으로 끝난다.
+- 이 Tool은 Tool trace에 노출하지 않는다. 런타임 `agent_sdk/CLAUDE.md`에 호출 시점과
+  수치·결론을 질문에 미리 적지 않는 규칙을 추가했다.
+- `tests/test_suggestions.py` 추가. 실제 Agent 응답에서 후속질문 4개가 표시되고 클릭 시
+  전송되는 것을 확인했다. Windows 환경 차이로 실패하는 기존 4건을 제외하고 통과.
+
+## 2026-10-13 — Agent SDK env 전달 오류 수정
+
+- `LLM_PROVIDER=anthropic`에서 `ClaudeAgentOptions.env`에 `None`을 넘겨
+  `claude-agent-sdk` 0.2.152가 모든 채팅을 `CLIConnectionError`로 실패시켰다.
+  빈 dict를 그대로 넘기도록 고쳤다.
+
 ## 2026-09-30 — 계획·가이드 문서 역할 정리
 
 - 할 일과 아이디어를 `Todo.md`, 현재 상태·계약을 `InProgress.md`, 완료 기록을

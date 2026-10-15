@@ -183,4 +183,7 @@ async def run_agent(
     if adapter.session_id:
         record_turn_anchor(turn_id, adapter.session_id, adapter.last_entry_uuid)
 
-    yield AgentEvent(type="done", data={"turn_id": turn_id})
+    done_data: dict[str, object] = {"turn_id": turn_id}
+    if adapter.suggestions:
+        done_data["suggestions"] = adapter.suggestions
+    yield AgentEvent(type="done", data=done_data)

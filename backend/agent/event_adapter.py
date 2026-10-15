@@ -15,10 +15,12 @@ from claude_agent_sdk import (
 )
 
 from api.schemas import AgentEvent
-from agent.sdk_tools import MCP_SERVER_NAME
+from agent.sdk_tools import MCP_SERVER_NAME, SUGGESTION_TOOL_NAME
+from tools.suggestion_tool import normalize_suggestions
 
 
 _MCP_PREFIX = f"mcp__{MCP_SERVER_NAME}__"
+_SUGGESTION_TOOL = f"{_MCP_PREFIX}{SUGGESTION_TOOL_NAME}"
 
 
 def _is_business_tool(name: str | None) -> bool:
@@ -27,7 +29,7 @@ def _is_business_tool(name: str | None) -> bool:
     `Skill`, `Read`, `Bash` 등 SDK 내장 Tool 은 Frontend 계약에서 제외한다.
     """
 
-    return bool(name) and name.startswith(_MCP_PREFIX)
+    return bool(name) and name.startswith(_MCP_PREFIX) and name != _SUGGESTION_TOOL
 
 
 def _short_tool_name(name: str | None) -> str | None:
@@ -91,6 +93,13 @@ class AgentEventAdapter:
         self._streamed_text_message_ids: set[str] = set()
         self._has_pending_streamed_text = False
         self.result_succeeded: bool | None = None
+        self._suggestions: list[str] | None = None
+
+    @property
+    def suggestions(self) -> list[str] | None:
+        """이번 실행에서 마지막으로 검증을 통과한 후속질문. 없으면 None."""
+
+        return self._suggestions
 
     @property
     def session_id(self) -> str | None:
@@ -204,6 +213,12 @@ class AgentEventAdapter:
 
             elif isinstance(block, ToolUseBlock):
                 self._tool_name_by_id[block.id] = block.name
+                if block.name == _SUGGESTION_TOOL:
+                    # 후속질문은 Tool trace 가 아니라 성공한 done 에만 싣는다.
+                    suggestions = normalize_suggestions(block.input.get("questions"))
+                    if suggestions is not None:
+                        self._suggestions = suggestions
+                    continue
                 if not _is_business_tool(block.name):
                     # 내장 Tool(Skill/Read/Bash 등)은 Frontend 로 전달하지 않는다.
                     continue
