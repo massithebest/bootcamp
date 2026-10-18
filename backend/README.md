@@ -140,6 +140,18 @@ python -m pytest -q -m "not bundled_knowledge and not mock_service and not e2e"
 
 E2E가 아닌 공통 테스트가 외부 provider나 인터넷에 의존하도록 만들지 않는다.
 
+### Agent 정량 평가
+
+`evals/agent_eval_set.yaml`의 고정 질문으로 실제 Agent를 실행해 정답률·완료율·응답
+시간·조회 규칙 준수·출처 표기·쓰기 SQL 시도·후속질문 제공률·비용을 계산한다. 정답은
+질문마다 `truth_sql`로 합성 mock DB에서 다시 계산한다. LLM 인증이 필요하며 결과는
+저장소 루트 `artifacts/evals/`에 남는다(Git 제외).
+
+```bash
+python -m scripts.evaluate_agent
+python -m scripts.evaluate_agent --static-only  # 지식 검증률·SQL 가드 차단율만, LLM 불필요
+```
+
 ## 참고
 
 - [Backend 작업 지침](AGENTS.md)
