@@ -38,6 +38,7 @@ Backend가 소유하는 범위는 다음과 같다.
 | 결과 API·표·시각화 | 완료 | `/api/query-results/{id}/preview|table|chart`, `present_sql_preview`·`present_chart`·`present_table`·`present_simulation` flat Tool·검증(유일한 결과 표시 경로, 최대 500 points·8 series), `present_chart.bar_mode=grouped|stacked` |
 | RAG | Local 완료 / Vector 미구현 | 활성 검토 문서 local 검색; Milvus·문서 색인 후속 |
 | 실행 환경 | 완료 | Python 3.11 `.venv`, Backend 기본 포트 8100 |
+| LLM provider | 완료 | `anthropic`·`openrouter`·`azure_openai`(백엔드 `/anthropic` 프록시가 Anthropic Messages↔Azure OpenAI chat completions 변환, 프로세스별 토큰 인증)·`local`(폐쇄망 구현 반입 전 501) |
 | Service logging | 완료 | 공개 작업 시작·완료·실패, 소요 시간, 중첩 DEBUG와 민감정보 비노출 |
 
 ## 외부에 제공하는 안정 계약

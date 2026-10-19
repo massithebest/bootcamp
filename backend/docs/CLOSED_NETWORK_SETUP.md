@@ -146,6 +146,9 @@ PRIVATE_LLM_MODEL_KEY=
 - `PRIVATE_LLM_MODEL_ENDPOINT`와 `PRIVATE_LLM_MODEL_KEY`는 기존 설정 예시로
   남아 있다. 반입할 구현의 실제 환경변수·인증 규칙에 맞춰 필요 여부와 사용법을
   확인한다.
+- 사내 LLM이 Anthropic 형식이 아니라 Azure OpenAI 호환 chat completions만 제공하면
+  `LLM_PROVIDER=azure_openai`와 `.env.example`의 `AZURE_OPENAI_*` 설정을 먼저 검토한다.
+  같은 `/anthropic` 경로에서 형식을 변환하며 `LLM_PROVIDER=local` 반입 구현과는 독립적이다.
 
 ## 1-5. 기동 전 확인
 

@@ -78,7 +78,11 @@ curl http://localhost:8100/health
 ```
 
 `/api/chat`은 항상 실제 Claude Agent SDK를 호출하므로 `.env`에 provider와 CLI
-설정이 필요하다. 지식·시각화 API와 `pytest`는 provider 없이 동작하며, 테스트는
+설정이 필요하다. `LLM_PROVIDER`는 `anthropic`, `openrouter`, `azure_openai`, `local`
+중 하나다. `azure_openai`는 Azure OpenAI 호환 게이트웨이(GPT 계열 deployment)를 쓰며,
+CLI의 Anthropic 형식 요청을 백엔드 `/anthropic` 프록시가 chat completions로 변환한다.
+프록시는 서버 프로세스마다 새로 만든 토큰을 가진 CLI 요청만 받으므로 `BACKEND_PORT`가
+`--port`와 같아야 한다. 설정 항목은 `.env.example`의 `AZURE_OPENAI_*`를 따른다. 지식·시각화 API와 `pytest`는 provider 없이 동작하며, 테스트는
 SDK `query`를 대체해 Agent 이벤트 흐름을 검증한다. `services/production`은 폐쇄망
 사내 DB·RAG·simulation 구현으로 교체하는 경계이며 mock과 함수 시그니처·반환 형태를
 유지해야 한다.

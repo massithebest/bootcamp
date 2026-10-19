@@ -2,6 +2,20 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-10-19 — Azure OpenAI 호환 게이트웨이 연결(`LLM_PROVIDER=azure_openai`)
+
+- GPT 계열만 제공하는 Azure OpenAI 호환 게이트웨이를 쓰기 위해 `services/llm/azure_openai_proxy.py`에
+  Anthropic Messages ↔ chat completions 변환(텍스트·이미지·tool_use/tool_result·tool_choice·
+  스트리밍 SSE 재구성·count_tokens 근사)을 구현하고 `/anthropic` 경로가 이 provider일 때만 쓰게 했다.
+  `local`은 기존대로 폐쇄망 구현 반입 전 501을 유지한다.
+- CLI는 서버 프로세스마다 생성한 `LOCAL_PROXY_TOKEN`으로만 프록시를 호출한다. thinking·
+  cache_control·temperature·stop은 전달하지 않는다(reasoning 계열 거부 방지). Claude 모델명
+  요청은 `AZURE_OPENAI_DEPLOYMENT`로 바꾼다.
+- 실제 게이트웨이 확인: gpt-4.1·gpt-5-mini·gpt-5.4 모두 Tool 호출·스트리밍 지원. `/api/chat`
+  관통 시 gpt-4.1은 테이블 검색 0건에서 답을 포기했고, gpt-5.4는 describe_table→SQL→규칙
+  적용→후속질문까지 정답(6월 계획 139,953)을 냈다.
+- `tests/test_azure_openai_proxy.py` 11건(변환·인증·비스트리밍/스트리밍 관통·오류 비노출) 추가.
+
 ## 2026-10-19 — Agent 정량 평가 도구
 
 - `evals/agent_eval_set.yaml`(13문항: SQL 8·문서 2·시뮬레이션 1·데이터 없음 1·삭제

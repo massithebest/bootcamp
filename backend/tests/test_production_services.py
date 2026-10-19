@@ -113,7 +113,8 @@ def test_mock_run_simulation_returns_missing_params_without_touching_db() -> Non
 # ---- /anthropic 프록시: 폐쇄망 구현 반입 전 미구현 상태 ----
 
 
-def test_anthropic_proxy_is_unimplemented_until_closed_network_code_is_imported() -> None:
+def test_anthropic_proxy_is_unimplemented_until_closed_network_code_is_imported(monkeypatch) -> None:
+    monkeypatch.setattr("core.config.LLM_PROVIDER", "local")
     client = TestClient(app)
 
     response = client.post(

@@ -6,6 +6,7 @@
 
 import json
 import os
+import secrets
 import shutil
 from pathlib import Path
 
@@ -159,11 +160,27 @@ PRIVATE_LLM_MODEL_NAME = os.getenv("PRIVATE_LLM_MODEL_NAME", "")
 PRIVATE_LLM_MODEL_ENDPOINT = os.getenv("PRIVATE_LLM_MODEL_ENDPOINT", "")
 PRIVATE_LLM_MODEL_KEY = os.getenv("PRIVATE_LLM_MODEL_KEY", "")
 
+#: LLM_PROVIDER=azure_openai(Azure OpenAI 호환 게이트웨이) 전용 설정. CLI 의 Anthropic
+#: 형식 요청을 백엔드 `/anthropic` 프록시가 chat completions 로 변환해 전달한다.
+#: 실제 endpoint·key 는 `backend/.env`에만 둔다.
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip().rstrip("/")
+AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY", "").strip()
+AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "").strip() or "2024-12-01-preview"
+#: 요청 모델이 Claude 이름(CLI 기본값·보조 모델)일 때 대신 쓸 기본 deployment.
+AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "").strip()
+#: 모델별 최대 출력 토큰보다 CLI 요청값이 클 때 잘라 쓸 상한. 비우면 요청값 그대로.
+AZURE_OPENAI_MAX_TOKENS = int(os.getenv("AZURE_OPENAI_MAX_TOKENS") or 0) or None
+
+#: CLI 만 백엔드 프록시를 쓰도록 프로세스마다 새로 만드는 토큰. 외부에 공개하지 않는다.
+LOCAL_PROXY_TOKEN = secrets.token_urlsafe(32)
+
 #: Agent 가 사용할 모델. 비어 있으면 Claude Code 기본값을 쓴다.
-#: LLM_PROVIDER=local 이고 AGENT_MODEL 이 비어 있으면 PRIVATE_LLM_MODEL_NAME 으로 폴백한다.
+#: LLM_PROVIDER=local 이고 AGENT_MODEL 이 비어 있으면 PRIVATE_LLM_MODEL_NAME 으로,
+#: LLM_PROVIDER=azure_openai 이면 AZURE_OPENAI_DEPLOYMENT 로 폴백한다.
 AGENT_MODEL = (
     os.getenv("AGENT_MODEL")
     or (PRIVATE_LLM_MODEL_NAME if LLM_PROVIDER == "local" else None)
+    or (AZURE_OPENAI_DEPLOYMENT if LLM_PROVIDER == "azure_openai" else None)
     or None
 )
 
@@ -180,6 +197,8 @@ def agent_provider_env() -> dict[str, str]:
     - openrouter : base URL 을 OpenRouter 로 바꾸고 bearer 토큰으로 인증한다.
     - local      : CLI 요청을 백엔드 자신의 `/anthropic` 경로로 보낸다. 이 경로의
       실제 게이트웨이 전달 구현은 폐쇄망 반입 후 채운다.
+    - azure_openai : CLI 요청을 백엔드 `/anthropic` 프록시로 보내고, 프록시가 Azure
+      OpenAI 호환 chat completions 로 변환한다. 프로세스별 토큰으로만 인증한다.
     """
 
     if LLM_PROVIDER == "openrouter":
@@ -189,6 +208,13 @@ def agent_provider_env() -> dict[str, str]:
             "ANTHROPIC_BASE_URL": base_url,
             "ANTHROPIC_AUTH_TOKEN": api_key,
             # Anthropic 직결 fallback 방지를 위해 명시적으로 비운다.
+            "ANTHROPIC_API_KEY": "",
+        }
+
+    if LLM_PROVIDER == "azure_openai":
+        return {
+            "ANTHROPIC_BASE_URL": f"http://127.0.0.1:{BACKEND_PORT}/anthropic",
+            "ANTHROPIC_AUTH_TOKEN": LOCAL_PROXY_TOKEN,
             "ANTHROPIC_API_KEY": "",
         }
 
