@@ -143,6 +143,15 @@ def test_present_tool_descriptions_forbid_position_words_and_raw_tree() -> None:
     # 여러 지표 비교는 지표마다 차트를 나누지 않고 long 형식 + group_by_column 으로 묶는다.
     assert "long 형식" in chart and "group_by_column=지표 이름 컬럼" in chart
     assert "위/아래" in table and "표에는" in table and "result_id" in table
+    # result_id 는 Tool 인자 전용이며 답변 본문에 노출하지 않는다.
+    assert "답변 본문에 적지 않는다" in tools["execute_sql"].description
+
+
+def test_claude_md_keeps_internal_ids_out_and_does_not_turn_include_rules_into_filters() -> None:
+    text = CLAUDE_MD.read_text(encoding="utf-8")
+
+    assert "내부 식별자를 쓰지 않는다" in text
+    assert "제외 필터로 바꾸지 않" in text
 
 
 def test_routing_policy_uses_requested_operation_and_evidence() -> None:

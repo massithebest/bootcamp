@@ -69,7 +69,8 @@ def _execute_sql_tool(access_scope: str | None):
         "데이터베이스/DB에 저장된 계획·실적·제품 행과 수치를 카탈로그 등록 테이블에서 SELECT 로 조회한다. "
         "사용자가 DB/데이터베이스/SQL 조회를 명시한 경우 이 도구를 사용한다. "
         "테이블·컬럼은 describe_table 로 먼저 확인한다. "
-        "purpose 에는 이 쿼리로 확인하려는 것을 한 줄로 쓴다.",
+        "purpose 에는 이 쿼리로 확인하려는 것을 한 줄로 쓴다. "
+        "반환된 result_id 는 present_*·결과 조회 Tool 인자로만 쓰고 답변 본문에 적지 않는다.",
         {"sql": str, "purpose": str},
     )
     async def _execute_sql(args: dict[str, Any]) -> dict[str, Any]:

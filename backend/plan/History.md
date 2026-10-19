@@ -2,6 +2,16 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-10-19 — 내부 식별자 비노출·"필수 포함" 규칙 해석 지침
+
+- gpt-5.4가 답변 본문에 `result_id`를 쓰고, `query_rules`의 "SALES_BATCH_CD를 필수로 포함한다"를
+  `SALES_BATCH_CD IS NOT NULL` 필터로 해석했다. 지식 YAML은 바꾸지 않고(승인 시 verified로 바뀌는
+  부작용) 해석 원칙을 `agent_sdk/CLAUDE.md`·`sql-analysis` Skill에, `result_id` 비노출을
+  `execute_sql` 설명에 추가했다. "필수 포함"은 결과 컬럼에 넣으라는 뜻이며 제외 필터로 바꾸거나
+  질문·규칙에 없는 필터를 덧붙이지 않는다. 답변에는 `result_id`·Tool 이름을 쓰지 않는다.
+- 같은 질문 재실행: `result_id`·Tool 이름 노출 없음, `SALES_BATCH_CD`는 상세 표 컬럼으로 포함되고
+  NOT NULL 필터 없음, 등급별 수치 정답 일치. Tool 호출은 13회로 늘었다(이전 7회, 모델 편차).
+
 ## 2026-10-19 — 여러 지표 비교 차트 묶기 지침
 
 - gpt-5.4가 계획·실적 비교 요청에 지표별 차트 2개를 그리고 조회 월(고정값)을 계열로 쓴 문제가
