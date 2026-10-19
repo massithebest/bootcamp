@@ -2,6 +2,16 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-10-19 — 여러 지표 비교 차트 묶기 지침
+
+- gpt-5.4가 계획·실적 비교 요청에 지표별 차트 2개를 그리고 조회 월(고정값)을 계열로 쓴 문제가
+  있었다. `present_chart` 설명의 "지표별로 따로 보여줄 때" 예시를 지우고, 비교 지표는 지표 이름·값의
+  long 형식으로 조회해 `group_by_column`=지표 이름으로 한 번 호출하며 고정값 컬럼은 계열로 쓰지 않고
+  단위가 다른 지표만 나눈다는 규칙을 Tool 설명·`agent_sdk/CLAUDE.md`·`sql-analysis` Skill(UNION ALL
+  예시)에 추가했다. 프롬프트 정합성 테스트에 단정을 추가했다.
+- 같은 질문을 gpt-5.4로 다시 실행해 막대 차트 1개(계열 2개: 계획수량·실적수량), Tool 9회로 줄어든
+  것을 확인했다(이전 차트 2개, Tool 11회, 오류 1회).
+
 ## 2026-10-19 — Azure OpenAI 호환 게이트웨이 연결(`LLM_PROVIDER=azure_openai`)
 
 - GPT 계열만 제공하는 Azure OpenAI 호환 게이트웨이를 쓰기 위해 `services/llm/azure_openai_proxy.py`에

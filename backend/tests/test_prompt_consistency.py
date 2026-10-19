@@ -140,6 +140,8 @@ def test_present_tool_descriptions_forbid_position_words_and_raw_tree() -> None:
 
     assert "위/아래" in chart and "차트에서는" in chart and "result_id" in chart
     assert "bar_mode=stacked" in chart and "group_by_column" in chart
+    # 여러 지표 비교는 지표마다 차트를 나누지 않고 long 형식 + group_by_column 으로 묶는다.
+    assert "long 형식" in chart and "group_by_column=지표 이름 컬럼" in chart
     assert "위/아래" in table and "표에는" in table and "result_id" in table
 
 

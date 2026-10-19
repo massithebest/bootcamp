@@ -251,8 +251,13 @@ def _present_chart_tool(access_scope: str | None):
         "보여준다. 행·차트 데이터는 넣지 않고 result_id와 표시 설정만 넣는다. "
         "추이·비교를 보여줄 때 쓴다. 막대 차트는 기본 grouped이며, 같은 단위의 합산 가능한 "
         "값을 group_by_column별 구성으로 비교할 때만 bar_mode=stacked를 지정한다. "
-        "stacked는 chart_type=bar와 group_by_column이 필요하다. 필요하면 한 응답에서 여러 번 호출할 수 있다(예: 지표별로 "
-        "따로 보여줄 때). 성공한 호출을 Markdown 표나 코드 펜스로 반복하지 않는다. "
+        "stacked는 chart_type=bar와 group_by_column이 필요하다. "
+        "계획·실적처럼 사용자가 비교를 요청한 여러 지표는 지표마다 차트를 나누지 않고 한 차트에 묶는다: "
+        "SQL을 지표 이름 컬럼(예: metric)과 값 컬럼(예: qty)의 long 형식으로 조회한 뒤 "
+        "y_column=값 컬럼, group_by_column=지표 이름 컬럼으로 한 번 호출한다. "
+        "모든 행이 같은 값인 컬럼(예: 조회 월)은 group_by_column으로 쓰지 않는다. "
+        "단위가 서로 달라 한 축에 놓을 수 없는 지표만 따로 호출한다. "
+        "성공한 호출을 Markdown 표나 코드 펜스로 반복하지 않는다. "
         "호출 뒤에는 '위/아래' 같은 위치 표현 대신 '차트에서는'처럼 결과를 해석한다.",
         present_chart_input_schema(),
     )
