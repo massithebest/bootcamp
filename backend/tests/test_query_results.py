@@ -76,6 +76,49 @@ MONTHLY = pd.DataFrame(
 # ---------------------------------------------------------------- projection
 
 
+LONG_METRICS = pd.DataFrame(
+    {
+        "dataset": ["SEG_A", "SEG_A", "SEG_B", "SEG_B"],
+        "part": ["part_1", "part_1", "part_1", "part_1"],
+        "metric": ["lot_count", "piece_count", "lot_count", "piece_count"],
+        "qty": [1128, 113932, 216, 21587],
+    }
+)
+
+
+def test_metric_column_outside_axes_is_rejected_instead_of_summed() -> None:
+    """Lot 수와 수량이 섞인 long 결과를 세그먼트로만 묶으면 두 지표가 더해진다."""
+
+    error = _error(
+        "INVALID_REQUEST", frame=LONG_METRICS, chart_type="bar", x_column="part",
+        y_column="qty", group_by_column="dataset", aggregation="sum",
+    )
+
+    assert error.details["column"] == "metric"
+    assert set(error.details["values"]) == {"lot_count", "piece_count"}
+
+
+def test_metric_column_used_as_series_or_single_metric_is_allowed() -> None:
+    one_segment = LONG_METRICS[LONG_METRICS["dataset"] == "SEG_A"]
+    chart, _ = _frame_project(frame=one_segment, chart_type="bar", x_column="part",
+                              y_column="qty", group_by_column="metric")
+    assert [s["label"] for s in chart["series"]] == ["lot_count", "piece_count"]
+
+    lots_only = LONG_METRICS[LONG_METRICS["metric"] == "lot_count"]
+    chart, _ = _frame_project(frame=lots_only, chart_type="bar", x_column="part",
+                              y_column="qty", group_by_column="dataset")
+    assert len(chart["series"]) == 2
+
+
+def test_other_dimensions_can_still_roll_up() -> None:
+    """지표 이름이 아닌 범주(예: 영업배치)는 기존처럼 aggregation으로 합칠 수 있다."""
+
+    frame = pd.DataFrame({"area": ["A", "A", "B"], "batch": ["B1", "B2", "B1"], "qty": [1, 2, 3]})
+    chart, _ = _frame_project(frame=frame, chart_type="bar", x_column="area",
+                              y_column="qty", aggregation="sum")
+    assert chart["data"] == [{"area": "A", "series_0": 3}, {"area": "B", "series_0": 3}]
+
+
 def test_line_chart_sorts_time_and_reports_axes() -> None:
     frame = MONTHLY.iloc[[2, 0, 1]].reset_index(drop=True)
 

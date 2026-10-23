@@ -258,7 +258,9 @@ def _present_chart_tool(access_scope: str | None):
         "SQL을 지표 이름 컬럼(예: metric)과 값 컬럼(예: qty)의 long 형식으로 조회한 뒤 "
         "y_column=값 컬럼, group_by_column=지표 이름 컬럼으로 한 번 호출한다. "
         "모든 행이 같은 값인 컬럼(예: 조회 월)은 group_by_column으로 쓰지 않는다. "
-        "단위가 서로 달라 한 축에 놓을 수 없는 지표만 따로 호출한다. "
+        "차트는 x_column·group_by_column 외의 행을 aggregation으로 합치므로, 지표 이름 컬럼(metric)을 "
+        "그 둘 중 하나로 쓰지 않으면 서로 다른 지표가 더해진다(서버가 오류로 거부한다). "
+        "Lot 수와 수량처럼 단위가 다른 지표는 한 차트에 묶지 말고 SQL에서 지표 하나만 남겨 지표별로 따로 호출한다. "
         "성공한 호출을 Markdown 표나 코드 펜스로 반복하지 않는다. "
         "호출 뒤에는 '위/아래' 같은 위치 표현 대신 '차트에서는'처럼 결과를 해석한다.",
         present_chart_input_schema(),

@@ -2,6 +2,17 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-10-23 — 단위가 다른 지표 합산 차트 차단
+
+- gpt-5.4가 Lot 수·수량(piece)을 long 형식 한 결과에 담고 `group_by_column=dataset`, `aggregation=sum`으로
+  차트를 그려 두 지표가 한 막대에 합산됐다(예: 1,128 + 113,932).
+- `services/results/chart.py` `project_chart`가 지표 이름으로 보이는 범주 컬럼(`metric`·`measure`·
+  `indicator`·`kpi`·`지표` 포함)에 값이 둘 이상인데 x·group_by가 아니면 `INVALID_REQUEST`(details: column,
+  values)로 거부한다. `present_chart` 검증과 `/api/query-results/{id}/chart`가 같은 경로라 함께 막히며 오류
+  코드는 기존 계약 안에서 쓴다. 지표가 아닌 범주(예: 영업배치)의 합산은 그대로 허용한다.
+- `present_chart` 설명·`agent_sdk/CLAUDE.md`·`sql-analysis` Skill에 합산 동작과 "단위가 다른 지표는 지표별로
+  따로" 규칙을 보강했다. 재실행에서는 Agent가 Lot 수·수량을 wide 표로만 제시해 서버 거부 경로는 타지 않았다.
+
 ## 2026-10-23 — 카탈로그 키워드 검색 보강
 
 - gpt-5.4가 `list_tables`를 "계획 실적"·"plan actual"처럼 띄어 쓴 키워드로만 검색해 0건을 받고 답을

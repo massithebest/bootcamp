@@ -142,6 +142,7 @@ def test_present_tool_descriptions_forbid_position_words_and_raw_tree() -> None:
     assert "bar_mode=stacked" in chart and "group_by_column" in chart
     # 여러 지표 비교는 지표마다 차트를 나누지 않고 long 형식 + group_by_column 으로 묶는다.
     assert "long 형식" in chart and "group_by_column=지표 이름 컬럼" in chart
+    assert "단위가 다른 지표는 한 차트에 묶지 말고" in chart
     assert "위/아래" in table and "표에는" in table and "result_id" in table
     # result_id 는 Tool 인자 전용이며 답변 본문에 노출하지 않는다.
     assert "답변 본문에 적지 않는다" in tools["execute_sql"].description

@@ -24,6 +24,8 @@ MAX_SERIES = 8
 TITLE_MAX_LENGTH = 120
 _BUCKET_LEVELS = ("week", "month", "quarter", "year")
 _BUCKET_LABEL = {"week": "주", "month": "월", "quarter": "분기", "year": "연"}
+#: long 형식 결과에서 지표 이름을 담는 범주 컬럼으로 보는 이름(metric, measure_name, 지표명 등).
+_METRIC_COLUMN = re.compile(r"(?i)(?:^|_)(?:metric|measure|indicator|kpi)s?(?:_|$)|지표")
 
 
 def _json_value(value: Any) -> Any:
@@ -182,6 +184,26 @@ def project_chart(
             "group_by_column에는 범주 컬럼만 사용할 수 있습니다.",
             column=group,
         )
+    # long 형식 결과의 지표 이름 컬럼(metric 등)이 x·group_by 가 아니면 서로 다른 지표
+    # (예: Lot 수와 수량)가 한 막대에 합산된다. 의미 없는 차트를 만들지 않고 되돌려 보낸다.
+    for column in columns:
+        name = column.name
+        if (
+            name not in mapped
+            and column.role == "category"
+            and _METRIC_COLUMN.search(name)
+            and name in frame.columns
+            and frame[name].nunique(dropna=True) > 1
+        ):
+            raise query_error(
+                "INVALID_REQUEST",
+                f"'{name}' 컬럼에 서로 다른 지표가 섞여 있어 하나의 값으로 합칠 수 없습니다. "
+                "같은 단위의 지표면 group_by_column(또는 x_column)으로 지정하고, 단위가 다르면 "
+                "SQL에서 지표 하나만 남겨 지표별로 따로 그려 주세요.",
+                column=name,
+                values=[str(value) for value in frame[name].dropna().unique()[:5]],
+            )
+
     numeric_y = pd.api.types.is_numeric_dtype(frame[y].dtype) and not pd.api.types.is_bool_dtype(
         frame[y].dtype
     )
