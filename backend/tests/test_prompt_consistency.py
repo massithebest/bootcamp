@@ -154,6 +154,8 @@ def test_claude_md_keeps_internal_ids_out_and_does_not_turn_include_rules_into_f
     assert "내부 식별자를 쓰지 않는다" in text
     assert "recipe_id" in text and "kpi_id" in text and "표시 이름" in text
     assert "distinct_counts" in text and "풀어 쓰" in text
+    # 추가 제안은 후속질문 버튼으로만 하고, 모호할 때의 확인 질문은 본문에 남긴다.
+    assert "추가 제안 문장도 쓰지 않" in text and "확인" in text
     assert "제외 필터로 바꾸지 않" in text
     # 포함 규칙과 달리 "요청했을 때만 포함" 같은 기본 제외 조건은 반드시 필터로 적용한다.
     assert "명시적으로 요청했을 때만 포함한다" in text and "반드시" in text
