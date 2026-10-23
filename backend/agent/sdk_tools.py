@@ -70,7 +70,9 @@ def _execute_sql_tool(access_scope: str | None):
         "사용자가 DB/데이터베이스/SQL 조회를 명시한 경우 이 도구를 사용한다. "
         "테이블·컬럼은 describe_table 로 먼저 확인한다. "
         "purpose 에는 이 쿼리로 확인하려는 것을 한 줄로 쓴다. "
-        "반환된 result_id 는 present_*·결과 조회 Tool 인자로만 쓰고 답변 본문에 적지 않는다.",
+        "반환된 result_id 는 present_*·결과 조회 Tool 인자로만 쓰고 답변 본문에 적지 않는다. "
+        "결과 요약 필드 이름(row_count·distinct_counts·top_groups 등)도 답변에 쓰지 않고 "
+        "'고유 Part 10개'처럼 풀어 쓴다.",
         {"sql": str, "purpose": str},
     )
     async def _execute_sql(args: dict[str, Any]) -> dict[str, Any]:

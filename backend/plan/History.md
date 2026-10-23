@@ -2,6 +2,13 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-10-23 — 조회 결과 요약 필드명 비노출
+
+- 답변 근거에 "distinct_counts.part = 10, top_groups.dataset…"처럼 SQL 미리보기 요약의 필드명이 노출됐다.
+  `agent_sdk/CLAUDE.md` 내부 식별자 규칙에 `row_count`·`distinct_counts`·`top_groups`·`sample_rows`·
+  `statistics` 등을 넣고 "전체 12행", "고유 Part 10개"처럼 풀어 쓰게 했으며, `execute_sql` 설명에도 같은 문구를 넣었다.
+- 같은 질문 재실행: 요약 필드명·레시피 ID·Tool 이름·`result_id` 노출 없음, Part별 수치 정답 일치.
+
 ## 2026-10-23 — 지식 항목 내부 ID 비노출
 
 - gpt-5.4 답변에 레시피 ID(`initial_wip_by_part`)가 노출됐다. `agent_sdk/CLAUDE.md`의 내부 식별자 규칙에
