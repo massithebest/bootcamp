@@ -66,3 +66,17 @@ test('skill markdown renders readable nested headings and lists instead of raw s
   assert.match(html, /<strong[^>]*>확인<\/strong>/);
   assert.doesNotMatch(html, /# 분석 절차|\*\*확인\*\*/);
 });
+
+test('a single tilde range is not rendered as strikethrough in chat or skill markdown', async () => {
+  const { default: ReactMarkdown } = await import('react-markdown');
+  const { CHAT_REMARK_PLUGINS } = await server.ssrLoadModule('/src/lib/markdown-options.ts');
+  const text = 'part_3~part_10: 각 215~216 Lot, 20,260~23,522 pcs. ~~삭제~~';
+  const chat = renderToStaticMarkup(createElement(ReactMarkdown, { remarkPlugins: CHAT_REMARK_PLUGINS }, text));
+  const skill = renderToStaticMarkup(createElement(SkillMarkdown, { content: text }));
+  for (const html of [chat, skill]) {
+    assert.match(html, /215~216/);
+    assert.match(html, /part_3~part_10/);
+    assert.match(html, /<del>삭제<\/del>/);
+    assert.equal((html.match(/<del>/g) ?? []).length, 1);
+  }
+});

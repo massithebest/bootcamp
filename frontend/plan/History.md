@@ -2,6 +2,15 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-10-23 — 물결표 범위 표기의 취소선 오표시 수정
+
+- 실제 답변 "part_3~part_10: 각 215~216 Lot"이 `part_10: 각 215` 취소선으로 표시됐다. `remark-gfm` 기본값이
+  물결표 하나(`~…~`)도 취소선으로 처리하기 때문이다. 한국어 범위 표기에 물결표를 흔히 쓰므로
+  `lib/markdown-options.ts`의 `GFM_OPTIONS`(`singleTilde: false`)를 채팅 답변(`CHAT_REMARK_PLUGINS`)과
+  지식 관리 Markdown(`skill-markdown.tsx`)에 함께 적용했다. `~~삭제~~`는 그대로 취소선이다.
+- 같은 답변을 브라우저에서 다시 그려 취소선 0개, "215~216" 원문 표시를 확인했다. Frontend 107 tests passed,
+  build·lint 성공.
+
 ## 2026-10-15 — 후속질문 실제 응답 검증
 
 - Backend가 성공한 `done.data.suggestions`를 보내기 시작해, 실제 Agent 응답 뒤에

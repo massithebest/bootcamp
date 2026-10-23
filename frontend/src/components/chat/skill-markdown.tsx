@@ -1,6 +1,7 @@
 import type { ComponentPropsWithoutRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { GFM_OPTIONS } from "@/lib/markdown-options";
 
 function Heading4(props: ComponentPropsWithoutRef<"h4">) {
   return <h4 className="pt-1 text-ui-lg font-semibold leading-relaxed text-ink">{props.children}</h4>;
@@ -30,7 +31,7 @@ export function SkillMarkdown({ content }: { content: string }) {
     <div className="flex min-w-0 flex-col gap-3 [overflow-wrap:anywhere] [&_pre]:[overflow-wrap:normal]">
       <ReactMarkdown
         skipHtml
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[[remarkGfm, GFM_OPTIONS]]}
         components={{
           h1: Heading4,
           h2: Heading5,

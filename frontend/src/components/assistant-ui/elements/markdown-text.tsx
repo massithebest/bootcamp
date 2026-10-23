@@ -12,11 +12,10 @@
  */
 
 import { Children, Fragment, type ComponentPropsWithoutRef } from "react";
-import remarkGfm from "remark-gfm";
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
 import { useAuiState } from "@assistant-ui/react";
 import { TABLE_DISPLAY_ROW_LIMIT } from "@/components/chat/primitives";
-import { remarkChatHeadings } from "@/lib/markdown-headings";
+import { CHAT_REMARK_PLUGINS } from "@/lib/markdown-options";
 
 /**
  * 자체 파서가 지원하던 `· item` 불릿을 remark 가 인식하는 `- item` 으로
@@ -191,7 +190,7 @@ function Pre(props: ComponentPropsWithoutRef<"pre">) {
 export function MarkdownText() {
   return (
     <MarkdownTextPrimitive
-      remarkPlugins={[remarkGfm, remarkChatHeadings]}
+      remarkPlugins={CHAT_REMARK_PLUGINS}
       preprocess={preprocess}
       className="flex min-w-0 flex-col gap-2 [overflow-wrap:anywhere] [&_pre]:[overflow-wrap:normal] [&_table]:[overflow-wrap:normal]"
       components={{
