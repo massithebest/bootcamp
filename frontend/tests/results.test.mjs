@@ -43,3 +43,15 @@ test('table cells drop floating point aggregation noise', async () => {
   assert.equal(displayCell(5882), '5882');
   assert.equal(displayCell(null), '—');
 });
+test('KPI cards group thousands and space latin units only', async () => {
+  const kpis = [{ label: '초기 WIP', value: 2255, unit: 'lot' }, { label: 'Part', value: 2, unit: '개' }, { label: '달성률', value: 50.789, unit: '%' }];
+  const { SimulationSummary } = await server.ssrLoadModule('/src/components/chat/generative/simulation-summary.tsx');
+  const summary = renderToStaticMarkup(createElement(SimulationSummary, { scenario: 'SEG_A 입력 검증', summary: '정상', kpis }));
+  const result = render('simulation', { kpis });
+  for (const html of [summary, result]) {
+    const text = html.replace(/<[^>]+>/g, '');
+    assert.match(text, /2,255 lot/);
+    assert.match(text, /2개/);
+    assert.match(text, /50\.79%/);
+  }
+});

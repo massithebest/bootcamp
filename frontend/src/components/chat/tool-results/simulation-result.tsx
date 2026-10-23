@@ -1,3 +1,4 @@
+import { displayKpiValue, kpiUnitSeparator } from "@/lib/format-cell";
 import { DataTable, Disclosure, StatusDot } from "../primitives";
 import { ResultSummaryCard } from "./result-summary";
 import { asRecord, asRecords, asRows, asStrings, isPreviewResult, num, str, toneOf } from "./shared";
@@ -49,9 +50,10 @@ export function SimulationResult({ data }: { data: Record<string, unknown> }) {
                   {str(kpi.label) ?? ""}
                 </dt>
                 <dd className="font-mono text-ui-lg font-medium tabular-nums text-ink">
-                  {num(kpi.value) ?? str(kpi.value) ?? "—"}
+                  {displayKpiValue(num(kpi.value) ?? str(kpi.value) ?? "—")}
                   {str(kpi.unit) && (
                     <span className="ml-0.5 text-2xs font-normal text-ink-3">
+                      {kpiUnitSeparator(str(kpi.unit) ?? "")}
                       {str(kpi.unit)}
                     </span>
                   )}

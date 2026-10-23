@@ -12,3 +12,14 @@ export function displayCell(value: DisplayCell): string {
   }
   return String(value);
 }
+
+/** KPI 카드 숫자. 표와 달리 읽기용이라 천 단위 구분을 붙이고 소수는 최대 2자리까지 보인다. */
+export function displayKpiValue(value: string | number): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return String(value);
+  return value.toLocaleString("ko-KR", { maximumFractionDigits: 2 });
+}
+
+/** 영문 단위(lot, pcs)는 숫자와 띄우고 한글 단위(개, 건)·기호(%)는 붙인다. */
+export function kpiUnitSeparator(unit: string): string {
+  return /^[A-Za-z]/.test(unit) ? " " : "";
+}

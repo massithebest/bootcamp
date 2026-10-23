@@ -2,6 +2,15 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-10-23 — 시뮬레이션 KPI 카드 숫자·단위 표기
+
+- 실제 시뮬레이션 요약 카드에 초기 WIP가 "2255lot"처럼 천 단위 구분 없이 단위와 붙어 표시됐다.
+  `lib/format-cell.ts`에 `displayKpiValue`(천 단위 구분, 소수 최대 2자리)와 `kpiUnitSeparator`(영문 단위만 띄움,
+  한글 단위·기호는 붙임)를 두고 `SimulationSummary`·`SimulationResult` KPI 카드에 적용했다. 표 셀은 복사용으로
+  천 단위 구분을 붙이지 않는 기존 규칙을 유지한다.
+- 브라우저의 같은 답변에서 "2개 · 926개 · 106개 · 2,255 lot" 표시를 확인했다. Frontend 108 tests passed,
+  build·lint 성공.
+
 ## 2026-10-23 — 물결표 범위 표기의 취소선 오표시 수정
 
 - 실제 답변 "part_3~part_10: 각 215~216 Lot"이 `part_10: 각 215` 취소선으로 표시됐다. `remark-gfm` 기본값이
