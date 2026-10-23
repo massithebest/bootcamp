@@ -135,7 +135,8 @@ class _ListTablesInput(TypedDict):
     "list_tables",
     "조회 가능한 테이블 목록을 요약으로 돌려준다. "
     "keyword(테이블명·설명·태그·컬럼명 부분일치) 나 tag 로 좁힐 수 있으며 "
-    "두 필터는 모두 생략할 수 있다.",
+    "두 필터는 모두 생략할 수 있다. 키워드는 공백으로 나눈 단어 중 하나라도 맞으면 찾는다. "
+    "결과가 0건이면 테이블이 없다고 단정하지 말고 필터 없이 다시 호출해 전체 목록을 보고 판단한다.",
     _ListTablesInput,
 )
 async def _list_tables(args: _ListTablesInput) -> dict[str, Any]:

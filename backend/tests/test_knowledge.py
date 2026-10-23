@@ -322,6 +322,31 @@ def test_list_tables_keyword_and_tag_filter(root: Path) -> None:
     assert store.list_tables(keyword="존재하지않는") == []
 
 
+@pytest.mark.usefixtures("bundled_knowledge")
+def test_keyword_search_ignores_spacing_and_matches_any_word() -> None:
+    """Agent 가 "계획 실적"처럼 띄어 쓴 키워드로 검색해도 "계획실적" 태그 테이블을 찾는다."""
+
+    from services.knowledge.catalog import get_store
+
+    store = get_store()
+    for keyword in ("계획 실적", "계획·실적", "계획실적", "plan actual"):
+        assert "FP_TARGET" in {t["table"] for t in store.list_tables(keyword=keyword)}, keyword
+    assert store.list_tables(keyword="존재하지않는 단어들") == []
+
+
+@pytest.mark.usefixtures("bundled_knowledge")
+def test_empty_filtered_catalog_result_suggests_listing_everything() -> None:
+    import asyncio
+
+    from tools.knowledge_tool import EMPTY_FILTER_HINT, list_tables
+
+    empty = asyncio.run(list_tables(keyword="존재하지않는"))
+    unfiltered = asyncio.run(list_tables())
+
+    assert empty["data"] == [] and empty["message"] == EMPTY_FILTER_HINT
+    assert unfiltered["data"] and "message" not in unfiltered
+
+
 def test_list_tables_summary_shape(root: Path) -> None:
     (row,) = store_rows = [
         t for t in KnowledgeStore.load(root).list_tables(tag="WIP")

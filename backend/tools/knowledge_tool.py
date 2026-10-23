@@ -11,7 +11,11 @@
 from services.knowledge.catalog import get_store
 
 
-def _catalog(catalog_type: str, data, verified: bool | None = None) -> dict:
+#: 필터 검색 결과가 비었을 때 Agent 가 포기하지 않고 전체 목록을 확인하도록 돕는 안내.
+EMPTY_FILTER_HINT = "조건에 맞는 항목이 없습니다. keyword·tag 없이 다시 호출하면 전체 목록을 확인할 수 있습니다."
+
+
+def _catalog(catalog_type: str, data, verified: bool | None = None, *, filtered: bool = False) -> dict:
     payload = {
         "status": "ok",
         "kind": "catalog",
@@ -20,6 +24,8 @@ def _catalog(catalog_type: str, data, verified: bool | None = None) -> dict:
     }
     if verified is not None:
         payload["verified"] = verified
+    if filtered and not data:
+        payload["message"] = EMPTY_FILTER_HINT
     return payload
 
 
@@ -30,7 +36,7 @@ async def list_tables(keyword: str | None = None, tag: str | None = None) -> dic
     Call `describe_table` for columns, joins, code values and caveats.
     """
 
-    return _catalog("table_list", get_store().list_tables(keyword, tag))
+    return _catalog("table_list", get_store().list_tables(keyword, tag), filtered=bool(keyword or tag))
 
 
 async def describe_table(table: str) -> dict:
@@ -49,7 +55,7 @@ async def describe_table(table: str) -> dict:
 async def list_kpis(keyword: str | None = None) -> dict:
     """List KPI definitions, optionally filtered by keyword (name / alias)."""
 
-    return _catalog("kpi_list", get_store().list_kpis(keyword))
+    return _catalog("kpi_list", get_store().list_kpis(keyword), filtered=bool(keyword))
 
 
 async def get_kpi(kpi_id: str) -> dict:
@@ -71,7 +77,7 @@ async def list_recipes(keyword: str | None = None) -> dict:
     and aggregation guide. Keywords also match the recipe's intended uses.
     """
 
-    return _catalog("recipe_list", get_store().list_recipes(keyword))
+    return _catalog("recipe_list", get_store().list_recipes(keyword), filtered=bool(keyword))
 
 
 async def get_recipe(recipe_id: str) -> dict:

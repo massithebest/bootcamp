@@ -10,6 +10,7 @@ pydantic 으로 검증하고, tool/서비스/API 가 함께 쓰는 조회 인터
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -60,15 +61,31 @@ def _parse(model: type[BaseModel], raw: Any, path: Path) -> Any:
         raise ValueError(f"{path.name}: {model.__name__} 검증 실패 — {exc}") from exc
 
 
-def _contains(needle: str, *haystacks: Any) -> bool:
-    """대소문자를 무시한 부분일치. 문자열/문자열 리스트를 함께 받는다."""
+_KEYWORD_SEPARATORS = re.compile(r"[\s·,/]+")
 
-    lowered = needle.lower()
-    for haystack in haystacks:
-        values = haystack if isinstance(haystack, list) else [haystack]
-        if any(lowered in str(value).lower() for value in values):
-            return True
-    return False
+
+def _compact(text: str) -> str:
+    """대소문자·공백·가운뎃점 차이를 없앤 비교용 문자열("계획·실적" == "계획 실적" == "계획실적")."""
+
+    return _KEYWORD_SEPARATORS.sub("", text).lower()
+
+
+def _contains(needle: str, *haystacks: Any) -> bool:
+    """대소문자를 무시한 부분일치. 문자열/문자열 리스트를 함께 받는다.
+
+    키워드를 공백·가운뎃점·쉼표·슬래시로 나눈 단어 중 하나라도 맞으면 일치로 본다.
+    키워드 전체를 붙여 쓴 형태도 비교해 "계획 실적"이 "계획실적" 태그와 맞는다.
+    """
+
+    words = {_compact(word) for word in _KEYWORD_SEPARATORS.split(needle) if word.strip()}
+    words.add(_compact(needle))
+    words.discard("")
+    values = [
+        _compact(str(value))
+        for haystack in haystacks
+        for value in (haystack if isinstance(haystack, list) else [haystack])
+    ]
+    return any(word in value for word in words for value in values)
 
 
 class KnowledgeStore:
