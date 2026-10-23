@@ -170,7 +170,8 @@ async def _list_kpis(args: _OptionalKeywordInput) -> dict[str, Any]:
 @tool(
     "get_kpi",
     "KPI 하나의 정의·공식·원천 테이블·비교 기준·부진 판정 규칙·"
-    "집계 가이드·레시피 참조·SQL 템플릿·원인 후보(diagnostics)를 조회한다.",
+    "집계 가이드·레시피 참조·SQL 템플릿·원인 후보(diagnostics)를 조회한다. "
+    "답변에서는 kpi_id 대신 결과의 name 으로 부른다.",
     {"kpi_id": str},
 )
 async def _get_kpi(args: dict[str, Any]) -> dict[str, Any]:
@@ -191,7 +192,8 @@ async def _list_recipes(args: _OptionalKeywordInput) -> dict[str, Any]:
     "get_recipe",
     "레시피의 적용 목적·출력 단위·컬럼 의미·조회 규칙·집계 가이드·표현 힌트·"
     "CTE SQL과 질문·SQL 예시를 조회한다. "
-    "cte_sql 을 WITH 절로 복사해 execute_sql 에 조합해 쓴다 (자동 치환 없음).",
+    "cte_sql 을 WITH 절로 복사해 execute_sql 에 조합해 쓴다 (자동 치환 없음). "
+    "답변에서는 recipe_id 대신 결과의 name 으로 부른다.",
     {"recipe_id": str},
 )
 async def _get_recipe(args: dict[str, Any]) -> dict[str, Any]:

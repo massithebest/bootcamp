@@ -2,6 +2,14 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-10-23 — 지식 항목 내부 ID 비노출
+
+- gpt-5.4 답변에 레시피 ID(`initial_wip_by_part`)가 노출됐다. `agent_sdk/CLAUDE.md`의 내부 식별자 규칙에
+  레시피·KPI·시뮬레이션·시나리오 ID를 포함하고 결과의 `name`(표시 이름)으로 부르게 했으며, `get_recipe`·`get_kpi`
+  설명에도 "ID 대신 name" 문구를 넣었다. 테이블·컬럼명과 문서 출처 ID는 근거 표기로 계속 허용한다.
+- 같은 질문 재실행: ID 대신 "Part별 초기 WIP 레시피"로 표기, Tool 이름·`result_id` 노출 없음. 미리보기 통계
+  필드명(`distinct_counts`·`top_groups`)이 근거 문장에 남는 점은 별도로 관찰됐다.
+
 ## 2026-10-23 — 단위가 다른 지표 합산 차트 차단
 
 - gpt-5.4가 Lot 수·수량(piece)을 long 형식 한 결과에 담고 `group_by_column=dataset`, `aggregation=sum`으로
