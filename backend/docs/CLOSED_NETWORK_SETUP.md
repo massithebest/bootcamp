@@ -110,6 +110,7 @@ Copy-Item .env.example .env
 | `BACKEND_PORT` | 실제 기동 포트(예: `8100`) | `uvicorn --port`와 반드시 일치. `LLM_PROVIDER=local`의 `/anthropic` 자기 참조 URL에 쓰임 |
 | `API_TIMEOUT_SECONDS` | `60`(기본) | 폐쇄망 production API 요청 timeout(초). 실제 SQL/RAG/simulation API adapter가 연결되면 이 값을 사용 |
 | `KNOWLEDGE_DIR` | 운영 YAML의 별도 절대경로 | bundled mock 지식 경로는 허용하지 않음 |
+| `PRODUCTION_SQL_DIALECT` | 사내 DB 방언(예: `Oracle`) | Agent가 SQL 함수·날짜 문법을 맞추도록 `execute_sql` 설명에 알린다. 비우면 안내하지 않음(mock은 항상 SQLite) |
 | `LLM_PROVIDER` | 사내 지원 provider | 사내 LLM 반입 정책에 따름 |
 | provider 인증값 | 사내 발급 값 | 코드·문서·로그에 기록하지 않음 |
 | `KNOWLEDGE_DB_PATH` | 영속 볼륨의 SQLite 경로 | 텍스트 지식 저장소. 비우면 `backend/data/knowledge.sqlite3` |

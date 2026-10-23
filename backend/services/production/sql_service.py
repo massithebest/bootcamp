@@ -1,9 +1,14 @@
 """Production SQL query service."""
 
+from core.config import PRODUCTION_SQL_DIALECT
 from services.knowledge.catalog import get_store
 from services.production.common_sql_client import CommonSqlClient
 from services.service_logging import logged_service_operation
 from services.sql.guard import MAX_ROWS, SqlGuardError, check_sql
+
+
+#: Agent 에게 알리는 SQL 방언(`PRODUCTION_SQL_DIALECT`). 비어 있으면 안내하지 않는다.
+SQL_DIALECT = PRODUCTION_SQL_DIALECT
 
 
 def _error(message: str, sql: str) -> dict:

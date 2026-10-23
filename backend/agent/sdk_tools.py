@@ -63,10 +63,32 @@ def _ok(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def sql_dialect_note() -> str:
+    """현재 SQL 서비스의 방언 안내. 방언을 모르면 빈 문자열."""
+
+    from services import sql_service
+
+    dialect = getattr(sql_service, "SQL_DIALECT", "")
+    if not dialect:
+        return ""
+    note = (
+        f"이 DB의 SQL 방언은 {dialect}이다. 함수·날짜 문법은 {dialect}에 맞게 쓰고, 카탈로그 규칙에 다른 DB "
+        f"함수(예: NVL)가 적혀 있으면 {dialect}의 같은 기능 함수로 바꿔 쓴다. 날짜 함수를 쓰기 전에 describe_table 의 "
+        f"컬럼 설명에서 저장 형식(예: YYYYMMDD 문자열)을 확인한다. "
+    )
+    if dialect.lower() == "sqlite":
+        note += (
+            "예: NVL→COALESCE. 오늘 연월은 서버 현지 시간 기준 strftime('%Y%m', 'now', 'localtime')('now' 만 쓰면 UTC). strftime·date 는 'YYYY-MM-DD' 형식에만 동작하고 "
+            "YYYYMMDD 문자열에는 NULL 을 돌려주므로, 그런 컬럼의 연월은 substr(컬럼, 1, 6)으로 구하거나 연월 컬럼을 쓴다. "
+        )
+    return note
+
+
 def _execute_sql_tool(access_scope: str | None):
     @tool(
         "execute_sql",
         "데이터베이스/DB에 저장된 계획·실적·제품 행과 수치를 카탈로그 등록 테이블에서 SELECT 로 조회한다. "
+        + sql_dialect_note() +
         "사용자가 DB/데이터베이스/SQL 조회를 명시한 경우 이 도구를 사용한다. "
         "테이블·컬럼은 describe_table 로 먼저 확인한다. "
         "purpose 에는 이 쿼리로 확인하려는 것을 한 줄로 쓴다. "

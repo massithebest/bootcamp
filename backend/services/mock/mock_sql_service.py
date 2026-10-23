@@ -18,6 +18,10 @@ from services.service_logging import logged_service_operation
 from services.sql.guard import MAX_ROWS, SqlGuardError, check_sql
 
 
+#: Agent 에게 알리는 SQL 방언. production sql_service 와 같은 이름으로 공개한다.
+SQL_DIALECT = "SQLite"
+
+
 def _error(message: str, sql: str) -> dict:
     return {"status": "error", "kind": "database", "message": message, "sql": sql}
 
@@ -59,7 +63,7 @@ class MockSQLService:
                 columns = [description[0] for description in cursor.description or []]
                 fetched = cursor.fetchmany(MAX_ROWS + 1)
         except sqlite3.Error as exc:
-            return _error(f"SQL 실행 오류: {exc}", sql)
+            return _error(f"SQL 실행 오류: {exc} (이 DB의 SQL 방언은 {SQL_DIALECT}입니다.)", sql)
         finally:
             conn.close()
 

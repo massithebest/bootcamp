@@ -2,6 +2,19 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-10-23 — SQL 방언 안내(`SQL_DIALECT`)
+
+- "이번 달" 질문마다 첫 SQL이 `TO_CHAR(CURRENT_DATE, 'YYYYMM')`(Oracle 계열)로 실패해 mock SQLite에서
+  `no such function`이 났다. Agent가 DB 방언을 몰랐고 카탈로그 규칙의 `NVL`도 Oracle식이다.
+- mock·production `sql_service`가 같은 이름의 `SQL_DIALECT`를 공개한다(mock `SQLite`, production은 새 환경변수
+  `PRODUCTION_SQL_DIALECT`, 비우면 안내 없음). `agent/sdk_tools.py` `sql_dialect_note()`가 이를 `execute_sql` 설명에
+  넣고, SQLite면 NVL→COALESCE·오늘 연월 `strftime('%Y%m', 'now', 'localtime')`(UTC 회피)·YYYYMMDD 문자열은 `substr(컬럼, 1, 6)`을 안내한다.
+  mock SQL 실행 오류 메시지에도 방언을 덧붙인다. `.env.example`·`docs/CLOSED_NETWORK_SETUP.md`에 키를 추가했다.
+- 첫 안내에 `TO_CHAR→strftime(날짜)` 예시를 넣었더니 YYYYMMDD 문자열 `WORK_DT`에 `strftime`을 써 NULL이 되고
+  "월이 비어 있다"는 오판이 나왔다. 저장 형식 확인과 `substr` 안내로 고쳤다.
+- 재실행: SQL 오류 없이 `WORK_YM = strftime('%Y%m', 'now')`(0건) → 보유 월 확인(202601~202606) → 확인 질문으로 멈춤.
+  `tests/test_sql_dialect.py` 4건 추가, Backend 414 passed.
+
 ## 2026-10-23 — 확인 질문 선택지를 확인된 범위로 제한
 
 - 데이터 없는 월을 물었을 때 선택지에 "다른 테이블로 확인"이 나왔지만 계획수량은 해당 테이블에만 있다.

@@ -121,6 +121,9 @@ API_TIMEOUT_SECONDS = int(os.getenv("API_TIMEOUT_SECONDS", "60"))
 #: 이식(`docs/CLOSED_NETWORK_SETUP.md` §2-1) 전까지는 어떤 service도 이 값을
 #: 읽지 않고, 이식된 adapter가 호출 시점에 `require_production_env`로 검증한다.
 COMMON_SQL_API_URL = os.getenv("COMMON_SQL_API_URL", "")
+#: 사내 DB의 SQL 방언(예: Oracle). Agent 가 함수·날짜 문법을 맞추도록 execute_sql 설명에 알린다.
+#: 비우면 방언 안내를 넣지 않는다. mock 은 항상 SQLite 다.
+PRODUCTION_SQL_DIALECT = os.getenv("PRODUCTION_SQL_DIALECT", "").strip()
 SIMULATION_API_URL = os.getenv("SIMULATION_API_URL", "")
 MILVUS_HOST = os.getenv("MILVUS_HOST", "")
 MILVUS_PORT = os.getenv("MILVUS_PORT", "")
