@@ -147,6 +147,7 @@ def test_present_tool_descriptions_forbid_position_words_and_raw_tree() -> None:
     assert "결론 문장에는 핵심 수치" in chart and "결론 문장에는 핵심 수치" in table
     assert "비슷한 컬럼으로 가정해 조회하지 말고" in tools["describe_table"].description
     assert "아직 검토되지 않은 테이블 정의 기준" in tools["describe_table"].description
+    assert "일반 지식으로 후보를 만들어 선택지로 내지 말고" in tools["describe_table"].description
     # result_id 는 Tool 인자 전용이며 답변 본문에 노출하지 않는다.
     assert "답변 본문에 적지 않는다" in tools["execute_sql"].description
     # 컬럼 후보를 pragma_table_info 로 직접 조회하다 가드에 막혀 "오류"로 보였다.
@@ -171,6 +172,8 @@ def test_claude_md_keeps_internal_ids_out_and_does_not_turn_include_rules_into_f
     assert "한 줄씩 다시 나열하지 않는다" in text and "영문 점검 코드" in text
     # 당월 데이터가 아예 없는데 "실적 없는 계획이 없습니다"로 답했고, 다른 달 건수가 무엇을 센 값인지 모호했다.
     assert "\"해당 기간 데이터가 없다\"를 먼저 밝힌다" in text and "무엇을 센 값인지" in text
+    # 담당자 테이블이 없는데 "영업 담당/생산계획 담당…"처럼 일반 지식으로 만든 후보를 선택지로 냈다.
+    assert "일반 지식으로 후보" in text and "테이블·화면 이름을 알려 달라고만" in text
     # 추가 제안은 후속질문 버튼으로만 하고, 모호할 때의 확인 질문은 본문에 남긴다.
     assert "추가 제안 문장도 쓰지 않" in text and "확인" in text
     # 지정한 기간에 데이터가 없으면 다른 기간으로 바꿔 답하지 않고 묻고 멈춘다.
