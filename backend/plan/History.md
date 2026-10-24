@@ -2,6 +2,17 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-10-24 — 지식 관리 화면 점검 결과 반영
+
+- `fp_target.yaml`의 `WORK_YM`·`WORK_DT` 설명이 따옴표 없는 flow mapping 안의 쉼표에서 잘려
+  `describe_table`과 지식 화면에 "제품 계획 년월(실제 작업 월"처럼 노출됐고 YYYYMM 형식 안내가 빠져 있었다.
+  쉼표 뒤 조각은 별도 키가 되어 `Column` 모델이 조용히 버렸다. 두 설명을 따옴표로 감싸고, `Column`에
+  `extra="forbid"`를 적용해 같은 실수가 로드·검증 단계의 오류로 드러나게 했다. 번들 지식에서 해당 패턴은 이 두 줄뿐이었다.
+- 시뮬레이션은 `description` 없이 `when_to_use`만 가져 지식 목록에 "요약 없음"으로 보였다. 목록 요약이
+  `description` → `definition` → `when_to_use` 순으로 값을 고른다.
+- 지식 화면에서 grain에 없는 컬럼을 `/validate`에 보내면 거부되는 것을 확인했다. 쉼표로 잘린 컬럼 YAML 거부와
+  시뮬레이션 요약 테스트를 추가했다.
+
 ## 2026-10-24 — gpt-5.4 정량 평가 기준선(14문항)
 
 - `LLM_PROVIDER=azure_openai`(gpt-5.4)로 평가 세트 14문항 전체를 실행했다(`artifacts/evals/agent-eval-20261024-145511`).

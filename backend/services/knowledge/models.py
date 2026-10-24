@@ -18,6 +18,9 @@ class KnowledgeMeta(BaseModel):
 
 
 class Column(BaseModel):
+    # 따옴표 없는 flow mapping 의 쉼표가 desc 를 잘라 만든 키를 조용히 버리지 않는다.
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     type: str
     desc: str = ""

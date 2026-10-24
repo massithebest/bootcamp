@@ -110,6 +110,8 @@ def test_catalog_matches_sdk_wire_and_structured_readonly(store):
     entries = client.get("/api/knowledge/entries").json()
     assert {e["type"] for e in entries} >= {"table", "kpi", "recipe", "glossary", "simulation"}
     assert all(e["active"] is True for e in entries)
+    simulations = [e for e in entries if e["type"] == "simulation"]
+    assert simulations and all(e["summary"] == get_store().simulations[e["id"]].when_to_use for e in simulations)
     detail = client.get("/api/knowledge/entries/kpi/initial_wip").json()
     assert detail["detail"] == get_store().kpis["initial_wip"].model_dump(mode="json")
     table_detail = client.get("/api/knowledge/entries/table/wip").json()["detail"]

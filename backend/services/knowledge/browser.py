@@ -20,7 +20,7 @@ def entries(query: str = "", kind: str | None = None) -> list[dict]:
             data = model.model_dump(mode="json")
             items.append({"type": category, "id": key,
                 "title": data.get("name", data.get("term", key)),
-                "summary": data.get("description", data.get("definition", "")),
+                "summary": data.get("description") or data.get("definition") or data.get("when_to_use", ""),
                 "status": data["status"], "source": data["source"], "owner": data["owner"],
                 "updated": str(data["updated"] or ""), "active": data["active"], "archived": False,
                 "pending_change": pending.get((category, key)), "detail": data})

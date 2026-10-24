@@ -332,6 +332,16 @@ def test_validate_reports_field_paths(client):
     assert broken["ok"] is False and broken["parsed"] is False and broken["errors"][0]["line"] is not None
 
 
+def test_validate_rejects_column_desc_split_by_unquoted_comma(client):
+    text = (
+        "table: x\ndescription: d\ngrain: [WORK_YM]\ncolumns:\n"
+        "  - {name: WORK_YM, type: varchar, desc: 작업 월(실제 작업 월, YYYYMM)}\n"
+    )
+    response = client.post("/api/knowledge/validate", json={"kind": "table", "yaml": text}, headers=USER).json()
+    assert response["ok"] is False and response["parsed"] is True
+    assert any(error["path"].startswith("columns[0]") for error in response["errors"]), response["errors"]
+
+
 def test_validate_returns_yaml_for_an_incomplete_form(client):
     response = client.post("/api/knowledge/validate", json={"kind": "table", "data": {"table": "x"}}, headers=USER).json()
     assert response["ok"] is False and response["parsed"] is True
