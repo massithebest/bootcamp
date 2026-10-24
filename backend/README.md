@@ -149,7 +149,11 @@ E2E가 아닌 공통 테스트가 외부 provider나 인터넷에 의존하도�
 `evals/agent_eval_set.yaml`의 고정 질문으로 실제 Agent를 실행해 정답률·완료율·응답
 시간·조회 규칙 준수·출처 표기·쓰기 SQL 시도·후속질문 제공률·비용을 계산한다. 정답은
 질문마다 `truth_sql`로 합성 mock DB에서 다시 계산한다. LLM 인증이 필요하며 결과는
-저장소 루트 `artifacts/evals/`에 남는다(Git 제외).
+저장소 루트 `artifacts/evals/`에 남는다(Git 제외). `LLM_PROVIDER=azure_openai`면 스크립트가
+`/anthropic` 프록시를 같은 프로세스 안에 빈 포트로 띄우므로 실행 중인 Backend가 없어도 된다.
+"조회 데이터 정답률"은 SQL 결과 행에 정답 값이 그대로 있는지 보는 보조 지표라, 세분화해 조회한
+뒤 답변에서 합산하면 최종 답변이 맞아도 불일치로 잡힐 수 있다. 질문당 비용은 CLI가 Claude 요금표로
+추정한 값이라 GPT 게이트웨이의 실제 과금과 다를 수 있다.
 
 ```bash
 python -m scripts.evaluate_agent

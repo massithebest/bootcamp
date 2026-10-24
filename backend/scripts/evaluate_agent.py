@@ -9,6 +9,8 @@
 정답은 `evals/agent_eval_set.yaml` 의 truth_sql 로 mock DB 에서 다시 계산한다.
 결과는 저장소 루트 `artifacts/evals/` 에 JSON·Markdown 으로 남긴다(Git 제외 경로).
 채점 함수는 LLM 없이 단위 테스트한다(`tests/test_agent_eval.py`).
+`LLM_PROVIDER=azure_openai` 면 CLI 가 거칠 `/anthropic` 프록시를 이 프로세스 안에 빈 포트로 띄우므로
+실행 중인 Backend 가 없어도 된다(프록시 토큰이 프로세스마다 다르기 때문).
 """
 
 from __future__ import annotations
@@ -23,7 +25,7 @@ import statistics
 import sys
 import time
 import uuid
-from contextlib import closing
+from contextlib import closing, contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -287,6 +289,57 @@ def _install_meter() -> dict:
     return meter
 
 
+def needs_local_proxy() -> bool:
+    """CLI 가 백엔드 `/anthropic` 프록시를 거쳐야 하는 provider 인지(현재 azure_openai)."""
+
+    from core import config
+
+    return config.LLM_PROVIDER == "azure_openai"
+
+
+@contextmanager
+def local_proxy_server():
+    """프록시가 필요한 provider 면 이 프로세스 안에 앱을 빈 포트로 띄운다.
+
+    프록시는 서버 프로세스마다 만든 토큰(`LOCAL_PROXY_TOKEN`)만 받으므로, 평가 프로세스가 띄운 CLI 는
+    다른 프로세스의 Backend 가 아니라 같은 프로세스의 서버를 바라봐야 한다. `agent_provider_env()` 가
+    호출 시점의 `config.BACKEND_PORT` 를 읽으므로 그 값을 임시 포트로 바꾼다.
+    """
+
+    if not needs_local_proxy():
+        yield None
+        return
+
+    import socket
+    import threading
+
+    import uvicorn
+
+    from core import config
+    from main import app
+
+    with closing(socket.socket()) as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    previous_port = config.BACKEND_PORT
+    config.BACKEND_PORT = port
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 15
+    while not server.started:
+        if time.monotonic() > deadline or not thread.is_alive():
+            config.BACKEND_PORT = previous_port
+            raise RuntimeError("평가용 로컬 프록시 서버를 시작하지 못했습니다.")
+        time.sleep(0.05)
+    try:
+        yield port
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+        config.BACKEND_PORT = previous_port
+
+
 #: 이후 질문도 같은 이유로 모두 실패하므로 평가를 멈출 오류(크레딧·인증·CLI 연결).
 _FATAL_ERRORS = ("credit balance", "not logged in", "authentication", "api key", "api-key", "CLIConnectionError")
 
@@ -393,7 +446,10 @@ def main(argv: list[str] | None = None) -> int:
     skipped: list[str] = []
     if not args.static_only:
         cases = load_cases(set(args.cases.split(",")) if args.cases else None)
-        records, skipped = asyncio.run(evaluate(cases, Path(config.MOCK_DB_PATH)))
+        with local_proxy_server() as proxy_port:
+            if proxy_port:
+                print(f"{config.LLM_PROVIDER}: 평가용 로컬 프록시를 127.0.0.1:{proxy_port} 에 띄웠습니다.", flush=True)
+            records, skipped = asyncio.run(evaluate(cases, Path(config.MOCK_DB_PATH)))
     kpi = aggregate(records) if records else {}
 
     args.out.mkdir(parents=True, exist_ok=True)

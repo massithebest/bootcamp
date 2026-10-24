@@ -172,3 +172,24 @@ def test_evaluate_records_case_errors_and_stops_on_fatal(monkeypatch, tmp_path: 
     assert records[0]["answer_correct"] is True
     assert records[1]["answer_correct"] is False and records[1]["error"] == "RuntimeError: boom"
     assert skipped == ["c2", "c3"]
+
+
+def test_local_proxy_server_runs_only_for_proxy_providers(monkeypatch) -> None:
+    """azure_openai 평가는 같은 프로세스의 프록시를 써야 토큰이 맞는다(다른 Backend 로 보내면 401)."""
+
+    import httpx
+
+    from core import config
+    from scripts.evaluate_agent import local_proxy_server
+
+    monkeypatch.setattr(config, "LLM_PROVIDER", "anthropic")
+    with local_proxy_server() as port:
+        assert port is None
+
+    monkeypatch.setattr(config, "LLM_PROVIDER", "azure_openai")
+    before = config.BACKEND_PORT
+    with local_proxy_server() as port:
+        assert port and config.BACKEND_PORT == port
+        assert config.agent_provider_env()["ANTHROPIC_BASE_URL"] == f"http://127.0.0.1:{port}/anthropic"
+        assert httpx.get(f"http://127.0.0.1:{port}/health", timeout=5).status_code == 200
+    assert config.BACKEND_PORT == before

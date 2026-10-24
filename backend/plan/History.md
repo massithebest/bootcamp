@@ -2,6 +2,17 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-10-24 — 평가 스크립트 azure_openai 지원
+
+- `LLM_PROVIDER=azure_openai`에서 평가 프로세스가 띄운 CLI가 다른 프로세스의 Backend 프록시로 가 토큰 불일치(401)로
+  실패했다. `scripts/evaluate_agent.py`의 `local_proxy_server()`가 프록시 provider일 때 같은 프로세스에 앱을 빈 포트로
+  띄우고 `config.BACKEND_PORT`를 그 포트로 바꿨다가 끝나면 되돌린다. 실행 중인 Backend가 없어도 평가할 수 있고, SDK
+  결과의 비용·토큰 기록도 유지된다.
+- `jun_plan_total`·`seg_a_wip_with_route_steps` 2문항을 gpt-5.4로 실행해 둘 다 PASS(17.2초·26.6초)였다. "조회 데이터
+  정답률"은 결과 행에 정답 값이 그대로 있어야 하는 보조 지표라, 영업배치별로 조회해 본문에서 합산한 `jun_plan_total`은
+  답변이 맞아도 불일치로 잡혔다. 질문당 비용은 CLI가 Claude 요금표로 추정한 값이다. README에 두 한계를 적었다.
+- `tests/test_agent_eval.py`에 프록시 provider일 때만 서버를 띄우고 포트를 원복하는지 확인하는 테스트를 추가했다.
+
 ## 2026-10-24 — 1:N 조인 중복 합산 방지 보강
 
 - 시나리오 회귀(13건) 중 SC-007에서 gpt-5.4가 재공을 Route Step과 먼저 조인한 뒤 `COUNT(*)`·`SUM(pieces)`를 해 Lot 1,128→522,264,
