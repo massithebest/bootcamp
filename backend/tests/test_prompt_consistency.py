@@ -146,6 +146,7 @@ def test_present_tool_descriptions_forbid_position_words_and_raw_tree() -> None:
     assert "위/아래" in table and "표에는" in table and "result_id" in table
     assert "결론 문장에는 핵심 수치" in chart and "결론 문장에는 핵심 수치" in table
     assert "비슷한 컬럼으로 가정해 조회하지 말고" in tools["describe_table"].description
+    assert "아직 검토되지 않은 테이블 정의 기준" in tools["describe_table"].description
     # result_id 는 Tool 인자 전용이며 답변 본문에 노출하지 않는다.
     assert "답변 본문에 적지 않는다" in tools["execute_sql"].description
     # 컬럼 후보를 pragma_table_info 로 직접 조회하다 가드에 막혀 "오류"로 보였다.
@@ -160,6 +161,10 @@ def test_claude_md_keeps_internal_ids_out_and_does_not_turn_include_rules_into_f
     assert "내부 식별자를 쓰지 않는다" in text
     assert "recipe_id" in text and "kpi_id" in text and "표시 이름" in text
     assert "distinct_counts" in text and "풀어 쓰" in text
+    # 미검증 정의를 밝히라는 지침을 따르며 "verified: false"를 본문에 그대로 썼다.
+    assert "`verified`" in text and "그대로 쓰지 않는다" in text
+    # 계획 대비 실적 비교용 포함 규칙을 계획수량만 묻는 질문에도 적용해 영업배치별로 쪼갰다.
+    assert "질문에 맞을 때만 적용" in text and "질문이 요청한 기준" in text
     # 추가 제안은 후속질문 버튼으로만 하고, 모호할 때의 확인 질문은 본문에 남긴다.
     assert "추가 제안 문장도 쓰지 않" in text and "확인" in text
     # 지정한 기간에 데이터가 없으면 다른 기간으로 바꿔 답하지 않고 묻고 멈춘다.

@@ -178,7 +178,9 @@ async def _list_tables(args: _ListTablesInput) -> dict[str, Any]:
     "시각화 안내와 질문·SQL 예시를 조회한다. "
     "SQL 을 작성하기 전에 반드시 호출한다. "
     "질문의 기준(예: '세그먼트별')이 이 테이블의 컬럼·코드값에 없으면 비슷한 컬럼으로 가정해 조회하지 말고, "
-    "후보 컬럼(이름과 의미)을 들어 어느 기준인지 묻고 멈춘다.",
+    "후보 컬럼(이름과 의미)을 들어 어느 기준인지 묻고 멈춘다. "
+    "결과의 verified 가 false 이면 답변에 '아직 검토되지 않은 테이블 정의 기준'처럼 풀어 쓰고 "
+    "verified 같은 필드 이름은 쓰지 않는다.",
     {"table": str},
 )
 async def _describe_table(args: dict[str, Any]) -> dict[str, Any]:
