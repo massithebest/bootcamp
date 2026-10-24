@@ -113,7 +113,8 @@ def _execute_sql_tool(access_scope: str | None):
     "search_documents",
     "공정 매뉴얼·업무 용어·생산계획 정책 등 비정형 도메인 지식을 검색한다. "
     "옵션·결과의 의미·화면 버튼·변경 위치·조회 방법을 설명할 때 사용한다. "
-    "실제 저장 수치 조회나 simulation 실행을 대신하지 않는다.",
+    "실제 저장 수치 조회나 simulation 실행을 대신하지 않는다. "
+    "결과에 그 용어를 직접 정의한 문서가 없으면 일반 지식으로 정의를 만들지 말고 찾지 못했다고 먼저 밝힌다.",
     {"query": str},
 )
 async def _search_documents(args: dict[str, Any]) -> dict[str, Any]:
@@ -171,7 +172,9 @@ async def _list_tables(args: _ListTablesInput) -> dict[str, Any]:
     "describe_table",
     "테이블 하나의 컬럼·키·조인·코드값·주의사항·조회 규칙·집계 가이드·"
     "시각화 안내와 질문·SQL 예시를 조회한다. "
-    "SQL 을 작성하기 전에 반드시 호출한다.",
+    "SQL 을 작성하기 전에 반드시 호출한다. "
+    "질문의 기준(예: '세그먼트별')이 이 테이블의 컬럼·코드값에 없으면 비슷한 컬럼으로 가정해 조회하지 말고, "
+    "후보 컬럼(이름과 의미)을 들어 어느 기준인지 묻고 멈춘다.",
     {"table": str},
 )
 async def _describe_table(args: dict[str, Any]) -> dict[str, Any]:
@@ -288,7 +291,8 @@ def _present_chart_tool(access_scope: str | None):
         "그 둘 중 하나로 쓰지 않으면 서로 다른 지표가 더해진다(서버가 오류로 거부한다). "
         "Lot 수와 수량처럼 단위가 다른 지표는 한 차트에 묶지 말고 SQL에서 지표 하나만 남겨 지표별로 따로 호출한다. "
         "성공한 호출을 Markdown 표나 코드 펜스로 반복하지 않는다. "
-        "호출 뒤에는 '위/아래' 같은 위치 표현 대신 '차트에서는'처럼 결과를 해석한다.",
+        "호출 뒤에는 '위/아래' 같은 위치 표현 대신 '차트에서는'처럼 결과를 해석한다. "
+        "결론 문장에는 핵심 수치(합계·비율·최대·최소)를 직접 쓰고 '차트로 보여드렸습니다' 같은 결론은 쓰지 않는다.",
         present_chart_input_schema(),
     )
     async def _present_chart(args: dict[str, Any]) -> dict[str, Any]:
@@ -304,7 +308,8 @@ def _present_table_tool(access_scope: str | None):
         "행 데이터는 넣지 않고 result_id와 표시 설정만 넣는다. "
         "상세 행을 보여줄 때 쓴다. 필요하면 한 응답에서 여러 번 호출할 수 있다. "
         "성공한 호출을 Markdown 표나 코드 펜스로 반복하지 않는다. "
-        "호출 뒤에는 '위/아래' 같은 위치 표현 대신 '표에는'처럼 결과를 해석한다.",
+        "호출 뒤에는 '위/아래' 같은 위치 표현 대신 '표에는'처럼 결과를 해석한다. "
+        "결론 문장에는 핵심 수치(합계·비율·최대·최소)를 직접 쓰고 '표로 보여드렸습니다' 같은 결론은 쓰지 않는다.",
         present_table_input_schema(),
     )
     async def _present_table(args: dict[str, Any]) -> dict[str, Any]:

@@ -144,6 +144,8 @@ def test_present_tool_descriptions_forbid_position_words_and_raw_tree() -> None:
     assert "long 형식" in chart and "group_by_column=지표 이름 컬럼" in chart
     assert "단위가 다른 지표는 한 차트에 묶지 말고" in chart
     assert "위/아래" in table and "표에는" in table and "result_id" in table
+    assert "결론 문장에는 핵심 수치" in chart and "결론 문장에는 핵심 수치" in table
+    assert "비슷한 컬럼으로 가정해 조회하지 말고" in tools["describe_table"].description
     # result_id 는 Tool 인자 전용이며 답변 본문에 노출하지 않는다.
     assert "답변 본문에 적지 않는다" in tools["execute_sql"].description
 
@@ -159,6 +161,11 @@ def test_claude_md_keeps_internal_ids_out_and_does_not_turn_include_rules_into_f
     # 지정한 기간에 데이터가 없으면 다른 기간으로 바꿔 답하지 않고 묻고 멈춘다.
     assert "다른 기간·기준으로 바꿔 답하지 않는다" in text
     assert "확인하지 않은 다른 테이블·기준은 선택지로 내지 않는다" in text
+    # 시나리오 검증(SC-001·003·006)에서 드러난 규칙
+    assert "비슷한 컬럼으로 가정해 답하지 않는다" in text
+    assert "\"찾지 못했다\"를 먼저 밝힌다" in text
+    assert "결론 문장에는 핵심 수치" in text
+    assert "요청을 거절한 응답에서는 가능한 대안" in text
     assert "제외 필터로 바꾸지 않" in text
     # 포함 규칙과 달리 "요청했을 때만 포함" 같은 기본 제외 조건은 반드시 필터로 적용한다.
     assert "명시적으로 요청했을 때만 포함한다" in text and "반드시" in text

@@ -515,3 +515,24 @@ def test_logs_do_not_contain_knowledge_bodies(client, caplog):
         act(client, change, "approve", ADMIN)
     assert secret not in caplog.text
     assert "services.knowledge.changes" in caplog.text
+
+
+def test_change_with_unknown_grain_or_time_column_is_rejected(client, knowledge):
+    """SC-005: grain 에 없는 컬럼을 넣은 변경이 제출·승인까지 통과하던 정합성 검사 누락.
+
+    이제 초안 생성 또는 제출 단계에서 거부되어 승인 대기열과 지식 파일에 들어가지 않는다.
+    """
+
+    for field, value in (("grain", lambda d: d["grain"] + ["NOT_A_COLUMN"]), ("time_column", lambda d: "NOT_A_COLUMN")):
+        data = source(client, "table", "wip")["data"]
+        data[field] = value(data)
+        response = client.post("/api/knowledge/changes", json={"kind": "table", "key": "wip", "data": data}, headers=USER)
+        draft = response.json() if response.status_code == 201 else None
+        if draft:
+            response = act(client, draft, "submit", USER)
+
+        assert response.status_code == 422, (field, response.text)
+        assert field in response.json()["detail"] and "NOT_A_COLUMN" in response.json()["detail"]
+        if draft:  # 거부된 초안을 정리해 다음 케이스가 진행 중 요청과 충돌하지 않게 한다
+            assert act(client, draft, "withdraw", USER).status_code == 200
+    assert "NOT_A_COLUMN" not in (knowledge / "catalog/tables/wip.yaml").read_text(encoding="utf-8")

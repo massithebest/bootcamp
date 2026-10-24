@@ -68,6 +68,18 @@ class KnowledgeTable(KnowledgeMeta):
     visualization_hints: list[str] = []
     sample_queries: list[SqlQueryExample] = []
 
+    @model_validator(mode="after")
+    def _validate_column_refs(self) -> KnowledgeTable:
+        """grain·time_column 은 columns 에 정의된 컬럼이어야 한다(오타가 승인까지 통과하지 않게)."""
+
+        names = {column.name for column in self.columns}
+        missing = [name for name in self.grain if name not in names]
+        if missing:
+            raise ValueError(f"grain 은 columns 에 있는 컬럼이어야 합니다: {', '.join(missing)}")
+        if self.time_column and self.time_column not in names:
+            raise ValueError(f"time_column 은 columns 에 있는 컬럼이어야 합니다: {self.time_column}")
+        return self
+
 
 class Diagnostic(BaseModel):
     hypothesis: str

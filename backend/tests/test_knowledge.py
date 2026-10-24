@@ -27,6 +27,7 @@ def root(tmp_path: Path) -> Path:
           - {name: dataset, type: varchar, desc: 데이터셋}
           - {name: lot, type: varchar, desc: Lot ID}
           - {name: part, type: varchar, desc: Part ID, ref: part.part}
+          - {name: due, type: datetime, desc: 납기 시각}
         joins:
           - {to: part, on: [dataset, part], kind: many-to-one}
         caveats: ["JOIN에 dataset을 포함"]
