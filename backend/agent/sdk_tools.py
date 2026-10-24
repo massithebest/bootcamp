@@ -123,7 +123,9 @@ def _execute_sql_tool(access_scope: str | None):
     "실제 저장 수치 조회나 simulation 실행을 대신하지 않는다. "
     "결과에 그 용어를 직접 정의한 문서가 없으면 일반 지식으로 정의를 만들지 말고 찾지 못했다고 먼저 밝힌다. "
     "이때 사용자에게 뜻을 되묻기 전에 그 용어를 keyword 로 list_tables 를 호출해 테이블·컬럼 정의에 근거가 "
-    "있는지 확인하고, 있으면 describe_table 의 컬럼 설명을 출처와 함께 제시한다. 검색어는 답변에 적지 않는다.",
+    "있는지 확인하고, 있으면 describe_table 의 컬럼 설명을 출처와 함께 제시한다. 검색어는 답변에 적지 않는다. "
+    "프로세스·절차·흐름을 물었는데 그 절차를 직접 설명한 문서가 없으면 개별 용어 문서를 이어 붙여 흐름을 만들지 말고, "
+    "찾지 못했다고 밝힌 뒤 관련 문서 이름만 출처와 함께 나열하고 멈춘다.",
     {"query": str},
 )
 async def _search_documents(args: dict[str, Any]) -> dict[str, Any]:

@@ -14,7 +14,7 @@ export const CURRENT_USER: CurrentUser = {
 export const EXAMPLE_QUESTIONS: string[] = [
   "당월 계획 중 실적이 하나도 발생하지 않은 계획을 보여주세요.",
   "등급이 여러 개로 나누어진 제품 알려주세요.",
-  "FGS IN 필요량 관리부터 PKT 생산 계획까지, 전체 FP 계획 수립 프로세스는 어떻게 흘러가나요?",
+  "WIP(재공)는 어떻게 관리되나요?",
   "2026년 5월 공정별 계획수량 합계 알려주세요.",
   "SEG_A 시뮬레이션 입력 정합성을 검증해 주세요.",
 ];

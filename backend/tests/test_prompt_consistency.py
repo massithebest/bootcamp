@@ -174,6 +174,8 @@ def test_claude_md_keeps_internal_ids_out_and_does_not_turn_include_rules_into_f
     assert "\"해당 기간 데이터가 없다\"를 먼저 밝힌다" in text and "무엇을 센 값인지" in text
     # 담당자 테이블이 없는데 "영업 담당/생산계획 담당…"처럼 일반 지식으로 만든 후보를 선택지로 냈다.
     assert "일반 지식으로 후보" in text and "테이블·화면 이름을 알려 달라고만" in text
+    # FGS IN~PKT 프로세스 질문에 관계없는 용어 문서 6개를 엮어 흐름을 지어내 결론으로 제시했다.
+    assert "이어 붙여 흐름이나 단계를 만들지 않는다" in text
     # 추가 제안은 후속질문 버튼으로만 하고, 모호할 때의 확인 질문은 본문에 남긴다.
     assert "추가 제안 문장도 쓰지 않" in text and "확인" in text
     # 지정한 기간에 데이터가 없으면 다른 기간으로 바꿔 답하지 않고 묻고 멈춘다.
@@ -221,6 +223,7 @@ def test_data_tool_descriptions_distinguish_sql_simulation_and_documents() -> No
     assert "화면 버튼·변경 위치·조회 방법" in tools["search_documents"].description
     assert "실제 저장 수치 조회나 simulation 실행을 대신하지 않는다" in tools["search_documents"].description
     assert "뜻을 되묻기 전에 그 용어를 keyword 로 list_tables" in tools["search_documents"].description
+    assert "이어 붙여 흐름을 만들지 말고" in tools["search_documents"].description
     assert "한 줄씩 다시 나열하지 않고" in tools["present_table"].description
     assert "문제(미일치 등)가 있는 항목만 짚는다" in tools["run_simulation"].description
     assert "해당 기간 데이터가 없다" in tools["execute_sql"].description
