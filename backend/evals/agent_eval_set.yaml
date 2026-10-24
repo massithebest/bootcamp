@@ -62,6 +62,17 @@ cases:
     question: SEG_A의 Route Step 수는 모두 몇 개인가요?
     truth_sql: SELECT COUNT(*) FROM route_step WHERE dataset = 'SEG_A'
 
+  # 1:N 조인 중복 합산 방지(SC-007). 재공을 Route Step 과 먼저 조인하면 수량이 463배가 된다.
+  - id: seg_a_wip_with_route_steps
+    category: sql
+    question: SEG_A의 Part별 초기 WIP 수량과 Route Step 수를 함께 보여 주세요.
+    truth_sql: >-
+      SELECT w.pieces_sum, s.steps
+      FROM (SELECT part, SUM(pieces) AS pieces_sum FROM wip WHERE dataset = 'SEG_A' GROUP BY part) w
+      JOIN (SELECT p.part, COUNT(*) AS steps FROM part p
+            JOIN route_step r ON r.dataset = p.dataset AND r.route = p.route
+            WHERE p.dataset = 'SEG_A' GROUP BY p.part) s ON s.part = w.part
+
   - id: doc_wip
     category: document
     question: WIP(재공)이 무엇인지 설명해 주세요.

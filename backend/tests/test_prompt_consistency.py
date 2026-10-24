@@ -150,6 +150,8 @@ def test_present_tool_descriptions_forbid_position_words_and_raw_tree() -> None:
     assert "답변 본문에 적지 않는다" in tools["execute_sql"].description
     # 컬럼 후보를 pragma_table_info 로 직접 조회하다 가드에 막혀 "오류"로 보였다.
     assert "describe_table 로만 확인" in tools["execute_sql"].description and "information_schema" in tools["execute_sql"].description
+    # SC-007: 재공을 Route Step 과 먼저 조인해 수량이 463배로 부풀었다.
+    assert "N배로 부풀어 오른다" in tools["execute_sql"].description and "먼저 집계" in tools["execute_sql"].description
 
 
 def test_claude_md_keeps_internal_ids_out_and_does_not_turn_include_rules_into_filters() -> None:

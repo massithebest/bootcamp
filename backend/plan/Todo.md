@@ -7,7 +7,10 @@
 
 ### P2
 
-- [ ] Agent 평가 세트(`evals/agent_eval_set.yaml`)를 확대한다. 현재 13문항은 모두 통과해
+- [ ] `scripts/evaluate_agent.py`가 `LLM_PROVIDER=azure_openai`에서 동작하게 한다. 평가 프로세스가 직접 띄운 CLI는
+  실행 중인 Backend 프록시와 프로세스별 토큰이 달라 401이 난다. 평가 스크립트가 `/api/chat`(HTTP)으로 질문하거나 같은
+  프로세스에서 앱을 띄우는 방식을 검토한다. 실행마다 달라지는 실패(예: 1:N 조인 중복)를 반복 측정하는 데 필요하다.
+- [ ] Agent 평가 세트(`evals/agent_eval_set.yaml`)를 확대한다. 기존 13문항은 Claude 기준 모두 통과해
   변별력이 없다. 다중 조건·기간 비교·조인·모호한 기준·후속 턴(대화 맥락) 문항을 추가하고,
   같은 문항을 반복 실행해 정답률 편차를 본다.
 
