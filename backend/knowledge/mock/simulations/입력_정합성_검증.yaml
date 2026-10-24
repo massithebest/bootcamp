@@ -7,7 +7,14 @@ params:
 output_schema:
   kpis: {type: array, desc: "part, route step, tool family, 초기 WIP lot 건수"}
   table: {type: object, desc: "11개 입력 테이블의 row count 표"}
-  results: {type: array, desc: "핵심 관계별 source/matched/unmatched 건수"}
+  results:
+    type: array
+    desc: >-
+      핵심 관계별 원본 건수(source_rows)·일치 건수(matched_rows)·미일치 건수(unmatched_rows).
+      check 값의 뜻은 part_to_route_step=Part→Route 연결, route_step_to_tool=Route Step→설비 Family 연결,
+      wip_to_part=초기 재공 Lot→Part 연결, orders_to_part=신규 투입 Lot→Part 연결,
+      wip_curstep_to_route_step=재공 Lot의 현재 Step→Route Step 연결이다.
+      답변 문장에서는 영문 check 값과 컬럼 이름 대신 이 한국어 뜻으로 부른다
   summary: {type: string, desc: 실제 DES 결과가 아닌 입력 정합성 mock 설명}
 aggregation_rules:
   - 테이블 건수와 관계별 unmatched 건수는 dataset 하나를 기준으로 집계하며 SEG_A와 SEG_B 값을 합산하지 않는다

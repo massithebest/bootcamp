@@ -167,6 +167,8 @@ def test_claude_md_keeps_internal_ids_out_and_does_not_turn_include_rules_into_f
     assert "질문에 맞을 때만 적용" in text and "질문이 요청한 기준" in text
     # 후속질문이 "특정 제품의 ~"로 대상을 비워 둬 누르면 확인 질문만 돌아왔다.
     assert "대상을 비워 두지 않는다" in text
+    # 시뮬레이션 답변이 표 5행을 "part_to_route_step: source 2건, matched 2건"처럼 영문 그대로 다시 나열했다.
+    assert "한 줄씩 다시 나열하지 않는다" in text and "영문 점검 코드" in text
     # 추가 제안은 후속질문 버튼으로만 하고, 모호할 때의 확인 질문은 본문에 남긴다.
     assert "추가 제안 문장도 쓰지 않" in text and "확인" in text
     # 지정한 기간에 데이터가 없으면 다른 기간으로 바꿔 답하지 않고 묻고 멈춘다.
@@ -214,6 +216,8 @@ def test_data_tool_descriptions_distinguish_sql_simulation_and_documents() -> No
     assert "화면 버튼·변경 위치·조회 방법" in tools["search_documents"].description
     assert "실제 저장 수치 조회나 simulation 실행을 대신하지 않는다" in tools["search_documents"].description
     assert "뜻을 되묻기 전에 그 용어를 keyword 로 list_tables" in tools["search_documents"].description
+    assert "한 줄씩 다시 나열하지 않고" in tools["present_table"].description
+    assert "문제(미일치 등)가 있는 항목만 짚는다" in tools["run_simulation"].description
 
 
 def test_rag_final_answers_require_a_source_or_url() -> None:

@@ -142,7 +142,9 @@ def _run_simulation_tool(access_scope: str | None):
         "run_simulation",
         "사용자가 요청한 등록 simulation을 지정한 simulation_type 과 params 로 수행한다. "
         "종류/파라미터를 모르면 list_simulation 을 먼저 호출한다. "
-        "적합한 등록 종류가 없으면 임의의 종류를 만들지 않는다.",
+        "적합한 등록 종류가 없으면 임의의 종류를 만들지 않는다. "
+        "결과를 표로 보여 줬다면 답변 근거에 표의 행을 한 줄씩 다시 적지 말고, 검증 결과는 문제(미일치 등)가 "
+        "있는 항목만 짚는다. 모두 통과했으면 '5개 관계 모두 미일치 0건'처럼 한 문장으로 요약한다.",
         {"simulation_type": str, "params": dict},
     )
     async def _run_simulation(args: dict[str, Any]) -> dict[str, Any]:
@@ -317,7 +319,9 @@ def _present_table_tool(access_scope: str | None):
         "상세 행을 보여줄 때 쓴다. 필요하면 한 응답에서 여러 번 호출할 수 있다. "
         "성공한 호출을 Markdown 표나 코드 펜스로 반복하지 않는다. "
         "호출 뒤에는 '위/아래' 같은 위치 표현 대신 '표에는'처럼 결과를 해석한다. "
-        "결론 문장에는 핵심 수치(합계·비율·최대·최소)를 직접 쓰고 '표로 보여드렸습니다' 같은 결론은 쓰지 않는다.",
+        "결론 문장에는 핵심 수치(합계·비율·최대·최소)를 직접 쓰고 '표로 보여드렸습니다' 같은 결론은 쓰지 않는다. "
+        "표의 행을 본문에 한 줄씩 다시 나열하지 않고, 결과 컬럼 이름·영문 코드 값(예: source_rows, "
+        "part_to_route_step)은 지식에 적힌 한국어 뜻으로 풀어 쓴다.",
         present_table_input_schema(),
     )
     async def _present_table(args: dict[str, Any]) -> dict[str, Any]:
