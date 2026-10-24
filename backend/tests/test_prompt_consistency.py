@@ -165,6 +165,8 @@ def test_claude_md_keeps_internal_ids_out_and_does_not_turn_include_rules_into_f
     assert "`verified`" in text and "그대로 쓰지 않는다" in text
     # 계획 대비 실적 비교용 포함 규칙을 계획수량만 묻는 질문에도 적용해 영업배치별로 쪼갰다.
     assert "질문에 맞을 때만 적용" in text and "질문이 요청한 기준" in text
+    # 후속질문이 "특정 제품의 ~"로 대상을 비워 둬 누르면 확인 질문만 돌아왔다.
+    assert "대상을 비워 두지 않는다" in text
     # 추가 제안은 후속질문 버튼으로만 하고, 모호할 때의 확인 질문은 본문에 남긴다.
     assert "추가 제안 문장도 쓰지 않" in text and "확인" in text
     # 지정한 기간에 데이터가 없으면 다른 기간으로 바꿔 답하지 않고 묻고 멈춘다.

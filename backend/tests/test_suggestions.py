@@ -39,6 +39,14 @@ def test_normalize_trims_and_dedupes() -> None:
     ]
 
 
+def test_normalize_drops_questions_without_a_concrete_subject() -> None:
+    # "특정 제품"은 눌러도 어떤 제품인지 되묻는 확인 질문만 돌아온다.
+    assert normalize_suggestions(
+        ["제품별 등급을 보여주세요.", "특정 제품의 등급별 계획수량을 보여주세요.", "PROD_0001 등급별 계획수량은?"]
+    ) == ["제품별 등급을 보여주세요.", "PROD_0001 등급별 계획수량은?"]
+    assert normalize_suggestions(["특정 제품 실적은?", "특정공정 실적은?", "A라인 실적은?"]) is None
+
+
 @pytest.mark.parametrize(
     "value",
     [
