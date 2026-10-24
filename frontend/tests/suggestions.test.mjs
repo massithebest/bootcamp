@@ -41,6 +41,16 @@ test('suggestion adapter reads only the last completed assistant message', async
   assert.deepEqual(await gen([{ ...done, metadata: { custom: {} } }]), []);
 });
 
+test('follow-ups follow the selected branch, not the last generated run', () => {
+  // 질문 수정 후 1/2 버전으로 돌아가도 2/2 버전 답변의 후속질문이 남아 있었다.
+  const v1 = { role: 'assistant', status: { type: 'complete' }, metadata: { custom: { suggestions: ['WIP 집계 기준은?', 'WIP와 Order 차이는?'] } } };
+  const v2 = { ...v1, metadata: { custom: { suggestions: ['Hotlot 차이는?', 'Lot 추적 방법은?'] } } };
+  assert.deepEqual(threads.branchSuggestions(v1), ['WIP 집계 기준은?', 'WIP와 Order 차이는?']);
+  assert.deepEqual(threads.branchSuggestions(v2), ['Hotlot 차이는?', 'Lot 추적 방법은?']);
+  assert.deepEqual(threads.branchSuggestions(undefined), []);
+  assert.deepEqual(threads.branchSuggestions({ role: 'assistant', status: { type: 'complete' } }), []);
+});
+
 test('toolkit registers every Backend tool', () => {
   const expected = ['execute_sql', 'search_documents', 'list_simulation', 'run_simulation', 'list_tables', 'describe_table', 'list_kpis', 'get_kpi', 'list_recipes', 'get_recipe', 'get_result_summary', 'get_result_page', 'present_sql_preview', 'present_chart', 'present_table', 'present_simulation'];
   assert.deepEqual(Object.keys(toolkitModule.productionPlanningToolkit).sort(), expected.sort());

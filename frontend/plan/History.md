@@ -2,6 +2,16 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-10-24 — 질문 수정 분기별 후속질문
+
+- 질문을 수정해 2/2 버전을 만든 뒤 1/2로 돌아가도 후속질문 버튼이 2/2 답변의 질문으로 남았다. assistant-ui의
+  `thread.suggestions`는 실행이 끝날 때만 adapter로 다시 만들어져 분기 전환을 따라가지 않는다.
+  `lib/agent-threads.ts`에 현재 분기의 마지막 완료 assistant 메시지에서 검증된 `done.data.suggestions`를 읽는
+  `branchSuggestions`를 두고, `ThreadFollowupSuggestions`가 `thread.messages`의 마지막 메시지로 표시 여부와 목록을
+  정한다. adapter도 같은 함수를 쓴다.
+- 브라우저에서 WIP 질문을 Lot 질문으로 수정한 뒤 2/2(Hotlot 등)와 1/2(초기 WIP 집계 기준 등)를 오가며 후속질문이
+  각 분기 답변의 것으로 바뀌는 것을 확인했다. Frontend 109 tests passed, build·lint 성공, 콘솔 오류 없음.
+
 ## 2026-10-24 — 초기 화면 예시 질문 교체
 
 - 예시 질문 5개 중 "MP Version은 언제 변경되며…"와 "제품별 담당자 정보 알려 주세요."는 합성 mock 데이터·문서에

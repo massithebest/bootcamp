@@ -62,12 +62,20 @@ export function createMemoryHistory(threadId: string): ThreadHistoryAdapter {
  */
 export const suggestionAdapter: SuggestionAdapter = {
   async generate({ messages }) {
-    const last = messages.at(-1);
-    if (last?.role !== "assistant" || last.status?.type !== "complete") return [];
-    const suggestions = parseSuggestions(last.metadata.custom.suggestions);
-    return (suggestions ?? []).map((prompt) => ({ prompt }));
+    return branchSuggestions(messages.at(-1)).map((prompt) => ({ prompt }));
   },
 };
+
+/**
+ * 현재 선택된 분기의 마지막 메시지에 실린 후속질문. adapter 결과는 실행이 끝날 때만 갱신되므로
+ * 버전을 바꾸면 다른 분기의 질문이 남는다. 화면은 이 값을 분기마다 다시 읽는다.
+ */
+export function branchSuggestions(
+  last: { role: string; status?: { type: string }; metadata?: { custom?: Record<string, unknown> } } | undefined,
+): string[] {
+  if (last?.role !== "assistant" || last.status?.type !== "complete") return [];
+  return parseSuggestions(last.metadata?.custom?.suggestions) ?? [];
+}
 
 export const TITLE_MAX_LENGTH = 28;
 
