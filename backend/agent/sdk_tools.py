@@ -98,7 +98,10 @@ def _execute_sql_tool(access_scope: str | None):
         "purpose 에는 이 쿼리로 확인하려는 것을 한 줄로 쓴다. "
         "반환된 result_id 는 present_*·결과 조회 Tool 인자로만 쓰고 답변 본문에 적지 않는다. "
         "결과 요약 필드 이름(row_count·distinct_counts·top_groups 등)도 답변에 쓰지 않고 "
-        "'고유 Part 10개'처럼 풀어 쓴다.",
+        "'고유 Part 10개'처럼 풀어 쓴다. "
+        "조건을 건 조회가 0행이면 조건 없이 그 기간·대상의 행이 있는지 확인해, 데이터 자체가 없으면 "
+        "'조건에 맞는 항목이 없다'가 아니라 '해당 기간 데이터가 없다'고 먼저 밝힌다. 다른 기간의 건수를 함께 "
+        "보여 줄 때는 무엇을 센 값인지(예: 실적이 없는 계획 수, 전체 계획 행 수) 밝힌다.",
         {"sql": str, "purpose": str},
     )
     async def _execute_sql(args: dict[str, Any]) -> dict[str, Any]:
