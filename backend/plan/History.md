@@ -12,6 +12,9 @@
   결론 문장에는 핵심 수치를 쓴다. 근거 문서가 없는 용어는 정의를 지어내지 않고 "찾지 못했다"를 먼저 밝힌다. 데이터
   변경 거절 응답은 대안을 본문에 안내할 수 있다(추가 제안 문장 금지의 예외). `agent_sdk/CLAUDE.md`만으로는 gpt-5.4가
   "세그먼트" 가정과 수치 없는 결론을 반복해 `describe_table`·`present_chart`·`present_table` 설명에도 넣었다.
+- 브라우저 확인 중 Agent가 컬럼 후보를 `pragma_table_info`로 직접 조회하다 SQL 가드에 막혀 "오류 1개"로 보였다.
+  `execute_sql` 설명에 "구조는 describe_table로만 확인, DB 시스템 테이블·메타데이터(pragma·sqlite_master·
+  information_schema)는 조회 불가"를 넣었고, 같은 질문 2회 재실행에서 메타데이터 SQL·Tool 오류 없이 확인 질문으로 멈췄다.
 - 재실행: "세그먼트별" 질문은 SQL 없이 후보 컬럼(제품구분·영업배치 등)을 들어 묻고, 제품구분별·GB1 영업배치별 답변 결론에
   수치가 들어가며, "계획수립옵션"은 "찾지 못했습니다"로 시작했다. Backend 415 passed.
 
