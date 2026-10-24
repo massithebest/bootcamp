@@ -175,6 +175,8 @@ def test_claude_md_keeps_internal_ids_out_and_does_not_turn_include_rules_into_f
     # 시나리오 검증(SC-001·003·006)에서 드러난 규칙
     assert "비슷한 컬럼으로 가정해 답하지 않는다" in text
     assert "\"찾지 못했다\"를 먼저 밝힌다" in text
+    # "MP Version" 질문에 문서만 찾고, MP_VER(마스터플랜 버전) 컬럼 정의를 확인하지 않은 채 뜻을 되물었다.
+    assert "되묻기 전에 그 용어를 keyword로 `list_tables`" in text and "문서 검색어를 적지 않고" in text
     assert "결론 문장에는 핵심 수치" in text
     assert "요청을 거절한 응답에서는 가능한 대안" in text
     assert "제외 필터로 바꾸지 않" in text
@@ -211,6 +213,7 @@ def test_data_tool_descriptions_distinguish_sql_simulation_and_documents() -> No
     assert "임의의 종류" in tools["run_simulation"].description
     assert "화면 버튼·변경 위치·조회 방법" in tools["search_documents"].description
     assert "실제 저장 수치 조회나 simulation 실행을 대신하지 않는다" in tools["search_documents"].description
+    assert "뜻을 되묻기 전에 그 용어를 keyword 로 list_tables" in tools["search_documents"].description
 
 
 def test_rag_final_answers_require_a_source_or_url() -> None:
