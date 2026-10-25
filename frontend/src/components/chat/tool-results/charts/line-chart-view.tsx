@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/chart";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import type { ChartSpec } from "@/types/chat";
-import { LINE_DASHES } from "./chart-style";
+import { LINE_DASHES, lineDot } from "./chart-style";
 import { formatYAxisTick } from "./axis-format";
 
 const PALETTE = [
@@ -72,7 +72,7 @@ export function LineChartView({
             type="monotone"
             stroke={PALETTE[i % PALETTE.length]}
             strokeWidth={2}
-            dot={false}
+            dot={lineDot(chart.data.length)}
             connectNulls={false}
             strokeDasharray={LINE_DASHES[i % LINE_DASHES.length]}
             isAnimationActive={!reduced}

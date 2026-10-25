@@ -287,3 +287,11 @@ test('table keeps the last page of the same result while a new search or sort lo
   const fresh = table({ page: 2 });
   assert.equal(displayedTablePage({ type: 'success', value: fresh }, last, ID, 'new-search'), fresh);
 });
+
+test('line charts mark each point only while points stay readable', async () => {
+  // 6개월 추이에 점이 없어 각 달의 값을 읽기 어려웠다. 계열당 최대 500포인트라 많을 때는 점을 숨긴다.
+  const { lineDot, LINE_DOT_MAX_POINTS } = await server.ssrLoadModule('/src/components/chat/tool-results/charts/chart-style.ts');
+  assert.equal(lineDot(6).r, 3);
+  assert.equal(lineDot(LINE_DOT_MAX_POINTS).strokeDasharray, '0');
+  assert.equal(lineDot(LINE_DOT_MAX_POINTS + 1), false);
+});
