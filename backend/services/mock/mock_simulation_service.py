@@ -65,8 +65,8 @@ def _pkt_swap_tool_result(response: dict, *, access_scope: str | None) -> dict:
         kpis=[
             {"label": "행 수", "value": metadata["itemCount"], "unit": "건"},
             {"label": "Swap 발생", "value": metadata["swapCount"], "unit": "건"},
-            {"label": "targetQty 합계", "value": metadata["totalTarget"], "unit": ""},
-            {"label": "planQty 합계", "value": metadata["totalPlanQty"], "unit": ""},
+            {"label": "목표수량 합계", "value": metadata["totalTarget"], "unit": ""},
+            {"label": "계획수량 합계", "value": metadata["totalPlanQty"], "unit": ""},
         ],
     )
 

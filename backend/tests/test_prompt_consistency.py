@@ -164,6 +164,7 @@ def test_claude_md_keeps_internal_ids_out_and_does_not_turn_include_rules_into_f
     assert "distinct_counts" in text and "풀어 쓰" in text
     # 미검증 정의를 밝히라는 지침을 따르며 "verified: false"를 본문에 그대로 썼다.
     assert "`verified`" in text and "그대로 쓰지 않는다" in text
+    assert "시뮬레이션 파라미터 이름·값" in text
     # 계획 대비 실적 비교용 포함 규칙을 계획수량만 묻는 질문에도 적용해 영업배치별로 쪼갰다.
     assert "질문에 맞을 때만 적용" in text and "질문이 요청한 기준" in text
     # 후속질문이 "특정 제품의 ~"로 대상을 비워 둬 누르면 확인 질문만 돌아왔다.
@@ -231,6 +232,8 @@ def test_data_tool_descriptions_distinguish_sql_simulation_and_documents() -> No
     assert "한 줄씩 다시 나열하지 않고" in tools["present_table"].description
     assert "문제(미일치 등)가 있는 항목만 짚는다" in tools["run_simulation"].description
     assert "해당 기간 데이터가 없다" in tools["execute_sql"].description
+    # PKT swap 답변 근거에 "view=swapped 조건으로 조회"처럼 시뮬레이션 파라미터가 그대로 나왔다.
+    assert "swap이 발생한 행만" in tools["run_simulation"].description
     assert "정렬 순서만 바꾸거나" in tools["suggest_follow_ups"].description
     assert "ID를 짝지은 세그먼트 비교" in tools["suggest_follow_ups"].description
     assert "최대·최소 값에는 그 대상도 함께 쓴다" in tools["present_table"].description

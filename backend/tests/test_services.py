@@ -207,6 +207,8 @@ def test_mock_pkt_swap_all_view_returns_items_and_metadata(mock_db) -> None:
     assert result["simulation_type"] == "PKT_목표수량_스왑산출"
     labels = {kpi["label"]: kpi["value"] for kpi in result["kpis"]}
     assert labels["행 수"] > 0
+    # 요약 카드에 "targetQty 합계"처럼 영어 필드명이 그대로 보였다.
+    assert {"목표수량 합계", "계획수량 합계"} <= labels.keys()
     assert re.fullmatch(r"[0-9a-f]{32}", result["result_id"])
 
 

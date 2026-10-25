@@ -149,7 +149,8 @@ def _run_simulation_tool(access_scope: str | None):
         "종류/파라미터를 모르면 list_simulation 을 먼저 호출한다. "
         "적합한 등록 종류가 없으면 임의의 종류를 만들지 않는다. "
         "결과를 표로 보여 줬다면 답변 근거에 표의 행을 한 줄씩 다시 적지 말고, 검증 결과는 문제(미일치 등)가 "
-        "있는 항목만 짚는다. 모두 통과했으면 '5개 관계 모두 미일치 0건'처럼 한 문장으로 요약한다.",
+        "있는 항목만 짚는다. 모두 통과했으면 '5개 관계 모두 미일치 0건'처럼 한 문장으로 요약한다. "
+        "params 의 이름·값(예: view=swapped)은 답변에 그대로 쓰지 말고 'swap이 발생한 행만'처럼 풀어 쓴다.",
         {"simulation_type": str, "params": dict},
     )
     async def _run_simulation(args: dict[str, Any]) -> dict[str, Any]:
