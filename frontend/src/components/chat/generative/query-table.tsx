@@ -22,6 +22,7 @@ import {
 import { useQueryTable } from "@/hooks/use-query-result";
 import { displayCell } from "@/lib/format-cell";
 import type { QueryTablePage } from "@/types/query-result";
+import { displayedTablePage, type LastPage } from "./displayed-table-page";
 import { ResultNotice, RetryButton } from "./message";
 
 export interface QueryTableProps {
@@ -31,10 +32,6 @@ export interface QueryTableProps {
 }
 
 type DataRow = { cells: QueryTablePage["rows"][number] };
-type LastPage = {
-  requestBaseKey: string;
-  value: QueryTablePage;
-};
 
 const PAGE_SIZES = [10, 25, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 10;
@@ -109,17 +106,10 @@ export function QueryTable({ resultId, columns, title }: QueryTableProps) {
   ]);
   useEffect(() => {
     if (state.type === "success") {
-      lastPage.current = { requestBaseKey, value: state.value };
+      lastPage.current = { resultId, requestBaseKey, value: state.value };
     }
-  }, [request.page, requestBaseKey, state]);
-  const retainedPage = lastPage.current?.requestBaseKey === requestBaseKey
-    ? lastPage.current.value
-    : null;
-  const current = state.type === "success"
-    ? state.value
-    : state.type === "loading"
-      ? state.stale ?? retainedPage
-      : retainedPage;
+  }, [request.page, requestBaseKey, resultId, state]);
+  const current = displayedTablePage(state, lastPage.current, resultId, requestBaseKey);
   const loading = state.type === "loading";
 
   const data = useMemo<DataRow[]>(

@@ -274,3 +274,16 @@ test('only a valid successful present_table suppresses Markdown tables in its ow
   assert.equal(convertMessage(assistant([text('only', prose)])).metadata.custom.hideMarkdownTables, false);
   assert.equal(convertMessage({ id: 'u', role: 'user', content: prose }).content[0].text, prose);
 });
+
+test('table keeps the last page of the same result while a new search or sort loads', async () => {
+  // 검색어를 입력하면 표 전체가 "불러오는 중"으로 바뀌어 검색창이 다시 그려지고 포커스를 잃었다.
+  const { displayedTablePage } = await server.ssrLoadModule('/src/components/chat/generative/displayed-table-page.ts');
+  const page = table();
+  const last = { resultId: ID, requestBaseKey: 'old-search', value: page };
+  assert.equal(displayedTablePage({ type: 'loading' }, last, ID, 'new-search'), page);
+  assert.equal(displayedTablePage({ type: 'loading' }, { ...last, resultId: 'b'.repeat(32) }, ID, 'new-search'), null);
+  assert.equal(displayedTablePage({ type: 'error' }, last, ID, 'new-search'), null);
+  assert.equal(displayedTablePage({ type: 'error' }, last, ID, 'old-search'), page);
+  const fresh = table({ page: 2 });
+  assert.equal(displayedTablePage({ type: 'success', value: fresh }, last, ID, 'new-search'), fresh);
+});

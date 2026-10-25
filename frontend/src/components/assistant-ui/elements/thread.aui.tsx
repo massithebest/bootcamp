@@ -59,7 +59,8 @@ export function Thread({ components = EMPTY_COMPONENTS, notice, autoFocus = true
           <ThreadFollowupSuggestions />
           {notice && <div className="pb-4">{notice}</div>}
           <AuiIf condition={(s) => !s.thread.isEmpty}>
-            <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mt-auto flex flex-col gap-2 bg-canvas pb-5 pt-3">
+            {/* 결과 표의 sticky 머리글(z-10)이 입력창 위로 비치지 않게 더 위에 쌓는다. */}
+            <ThreadPrimitive.ViewportFooter className="sticky bottom-0 z-20 mt-auto flex flex-col gap-2 bg-canvas pb-5 pt-3">
               <ThreadPrimitive.ScrollToBottom asChild>
                 <TooltipIconButton tooltip="맨 아래로 이동" className="absolute -top-9 left-1/2 -translate-x-1/2 border border-line-strong bg-canvas shadow-sm disabled:invisible">
                   <ArrowDownIcon />
