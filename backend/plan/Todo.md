@@ -19,7 +19,9 @@
 
 ### P3
 
-- [ ] 로컬 vector DB 기반 문서 색인·검색·출처 반환 RAG를 구현한다.
+- [ ] PoC 해싱 임베딩 검색(2026-10-24)을 의미 검색이 되는 임베딩으로 바꾼다. 사내 임베딩 모델·반입 가능
+  런타임(예: ONNX)을 정하고 `services/knowledge/embedding.py`의 `get_embedder()`를 교체한다. 문서가 수천 건을
+  넘으면 SQLite 전수 비교 대신 vector DB(Milvus 등) 색인을 검토한다.
 - [ ] `services/production`에 실제 사내 DB·RAG·simulation provider를 연결한다.
   인터페이스·설정 가드레일(`common_sql_client.py`·`milvus_client.py`·
   `simulation_api_client.py` 스텁과 env var 자리는 선행 준비를 마쳤다(2026-09-23).

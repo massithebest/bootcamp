@@ -114,7 +114,7 @@ Copy-Item .env.example .env
 | `LLM_PROVIDER` | 사내 지원 provider | 사내 LLM 반입 정책에 따름 |
 | provider 인증값 | 사내 발급 값 | 코드·문서·로그에 기록하지 않음 |
 | `KNOWLEDGE_DB_PATH` | 영속 볼륨의 SQLite 경로 | 텍스트 지식 저장소. 비우면 `backend/data/knowledge.sqlite3` |
-| `KNOWLEDGE_SEARCH_BACKEND` | `local`(기본) 또는 `service` | `service`는 사내 RAG 어댑터(`services/production/rag_service.py`) 구현 후에만 사용 |
+| `KNOWLEDGE_SEARCH_BACKEND` | `local`(기본) 또는 `service` | `local`은 승인 문서를 키워드 점수와 PoC 해싱 임베딩 벡터 유사도로 함께 찾는 하이브리드 검색(모델 다운로드 없음, 벡터는 `KNOWLEDGE_DB_PATH`의 `chunks` 테이블). 사내 임베딩만 쓰려면 `services/knowledge/embedding.py`의 `get_embedder()`를 교체하고, 전체 RAG를 쓰려면 `service`로 사내 RAG 어댑터(`services/production/rag_service.py`) 구현 후 사용 |
 | `CORS_ALLOW_ORIGINS` | 실제 Frontend Origin | 기본값은 localhost 개발 Origin |
 | `KNOWLEDGE_MANAGEMENT_ENABLED` | `true`(기본) 또는 `false` | `false`면 구조화 지식 변경 요청의 쓰기를 막고 조회만 허용. 현재 `X-User-Id` 권한 스텁은 인증이 아니므로 실제 사용자에게 쓰기를 열기 전에 인증을 연결하거나 접근을 제한 |
 | `KNOWLEDGE_PRINCIPALS` | `{id: {name, permissions[]}}` JSON | 인증 체계 전 스텁. 비우면 사용자(작성)·관리자(작성+승인) 기본값 |

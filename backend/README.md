@@ -31,7 +31,11 @@ Windows PowerShell에서는 `py -3.11 -m venv .venv`와
 - `LLM_PROVIDER`, `AGENT_MODEL`, provider key: 실제 Agent SDK 설정
 - `KNOWLEDGE_DIR`, `KNOWLEDGE_DB_PATH`: 구조화 YAML과 텍스트 지식 SQLite 위치. 개발 기본값은
   `knowledge/mock`, 폐쇄망 반입 YAML 기본 위치는 `knowledge/production`
-- `KNOWLEDGE_SEARCH_BACKEND=local|service`: `search_documents`가 로컬 SQLite 또는 사내 RAG 어댑터를 쓸지 선택
+- `KNOWLEDGE_SEARCH_BACKEND=local|service`: `search_documents`가 로컬 SQLite 또는 사내 RAG 어댑터를 쓸지 선택.
+  `local`은 검토·활성화된 문서를 제목·문단 기준 400자 청크(80자 겹침)로 색인하고, 키워드 점수와 문자 n-gram 해싱
+  임베딩(2048차원, `services/knowledge/embedding.py`)의 코사인 유사도를 더해 찾는 PoC 하이브리드 검색이다. 벡터는
+  지식 SQLite의 `chunks` 테이블에 두며 모델 다운로드가 없다. 동의어 같은 의미 검색은 하지 못하므로 운영 임베딩은
+  `get_embedder()`를 교체해 연결한다
 - `KNOWLEDGE_MANAGEMENT_ENABLED`, `KNOWLEDGE_ALLOW_SELF_APPROVAL`, `KNOWLEDGE_PRINCIPALS`,
   `KNOWLEDGE_DEFAULT_PRINCIPAL`: 구조화 지식 변경 요청·승인의 스텁 권한 설정(값은 `.env.example` 참고)
 - `RESULT_STORE_DIR`: 조회 결과 저장 위치
@@ -61,7 +65,7 @@ python -m scripts.generate_mock_documents   # RAG mock 검색용 일반 생산�
 
 ## Service 디렉터리
 
-- `services/knowledge`: YAML 카탈로그, 문서 저장소, 변경 승인과 검색
+- `services/knowledge`: YAML 카탈로그, 문서 저장소, 변경 승인과 검색(청킹·해싱 임베딩은 `embedding.py`)
 - `services/results`: Result Store, 결과 조회·차트 투영·표시 검증
 - `services/sql/guard.py`: mock과 production이 공유하는 읽기 전용 SQL 가드
 - `services/simulation`: 공통 시뮬레이션 정의와 입력 검증
