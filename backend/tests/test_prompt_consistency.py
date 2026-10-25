@@ -235,6 +235,8 @@ def test_data_tool_descriptions_distinguish_sql_simulation_and_documents() -> No
     # PKT swap 답변 근거에 "view=swapped 조건으로 조회"처럼 시뮬레이션 파라미터가 그대로 나왔다.
     assert "swap이 발생한 행만" in tools["run_simulation"].description
     assert "정렬 순서만 바꾸거나" in tools["suggest_follow_ups"].description
+    # 제품 2개뿐인 결과에 "Lot 수 기준 상위 제품만", "납기 기준으로 정렬해줘" 후속질문이 나왔다.
+    assert "다시 정렬·잘라 보는 질문" in tools["suggest_follow_ups"].description
     assert "ID를 짝지은 세그먼트 비교" in tools["suggest_follow_ups"].description
     assert "최대·최소 값에는 그 대상도 함께 쓴다" in tools["present_table"].description
 
