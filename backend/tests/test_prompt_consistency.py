@@ -170,6 +170,8 @@ def test_claude_md_keeps_internal_ids_out_and_does_not_turn_include_rules_into_f
     assert "대상을 비워 두지 않는다" in text
     # 이미 큰 순서로 답한 공정별 합계를 "많은 순서로 설명해 주세요"로 다시 묻는 후속질문이 나왔다.
     assert "새 기준" in text and "많은 순서로 설명해 주세요" in text
+    # 최솟값을 "20,260개"로만 쓰고 대상(part_7)을 빠뜨렸고, 세그먼트 간 같은 Part ID를 짝지어 비교하는 후속질문이 나왔다.
+    assert "그 대상(예: part_7)도 함께 쓴다" in text and "caveats·query_rules를 지킨다" in text
     # 시뮬레이션 답변이 표 5행을 "part_to_route_step: source 2건, matched 2건"처럼 영문 그대로 다시 나열했다.
     assert "한 줄씩 다시 나열하지 않는다" in text and "영문 점검 코드" in text
     # 당월 데이터가 아예 없는데 "실적 없는 계획이 없습니다"로 답했고, 다른 달 건수가 무엇을 센 값인지 모호했다.
@@ -230,6 +232,8 @@ def test_data_tool_descriptions_distinguish_sql_simulation_and_documents() -> No
     assert "문제(미일치 등)가 있는 항목만 짚는다" in tools["run_simulation"].description
     assert "해당 기간 데이터가 없다" in tools["execute_sql"].description
     assert "정렬 순서만 바꾸거나" in tools["suggest_follow_ups"].description
+    assert "ID를 짝지은 세그먼트 비교" in tools["suggest_follow_ups"].description
+    assert "최대·최소 값에는 그 대상도 함께 쓴다" in tools["present_table"].description
 
 
 def test_rag_final_answers_require_a_source_or_url() -> None:

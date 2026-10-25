@@ -15,6 +15,7 @@ joins:
   - {to: orders, on: [dataset, part], kind: one-to-many, note: "신규 Lot 투입"}
 caveats:
   - SEG_A와 SEG_B에 같은 part와 route ID가 있으므로 dataset 없는 JOIN은 금지한다
+  - SEG_A와 SEG_B의 같은 part·route ID는 서로 다른 제품·경로이므로 ID끼리 짝지어 비교하지 않고, 세그먼트 비교는 세그먼트 단위 집계로 한다
 query_rules:
   - 특정 세그먼트 질문은 dataset을 필수로 제한한다
   - route_step, wip, orders와 조인할 때 dataset과 업무 키를 모두 조인 조건에 포함한다
