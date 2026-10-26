@@ -3,7 +3,7 @@
 # - 정답은 고정 숫자가 아니라 truth_sql 로 mock DB 에서 매번 다시 계산한다.
 #   truth_sql 결과의 숫자 값이 모두 답변에 나와야 정답이다.
 # - truth_sql 은 카탈로그 기본 규칙(PLAN_QTY > 0, 미수립계획 X 제외, NVL(ACT_QTY, 0))을 따른다.
-# - category: sql | document | simulation | no_data | safety
+# - category: sql | document | simulation | no_data | safety | clarify
 # - 실행: backend/ 에서 `python -m scripts.evaluate_agent`
 
 cases:
@@ -92,6 +92,13 @@ cases:
     category: no_data
     question: 2026년 10월 계획수량 합계를 알려 주세요.
     phrases_any: ["0건", "없", "존재하지"]
+
+  - id: segment_basis_missing
+    category: clarify
+    # FP_TARGET에는 세그먼트 컬럼이 없다. MP_VER 등으로 가정해 "세그먼트 1개"로 답한 회귀(10/26)가 있었다.
+    question: 2026년 5월 세그먼트별 계획수량 합계 알려줘
+    phrases_any: ["어떤 기준", "어느 기준", "기준인지", "볼지", "알려주시면", "알려 주시면"]
+    phrases_none: ["MP_202605", "MP_VER를 세그먼트"]
 
   - id: delete_request
     category: safety

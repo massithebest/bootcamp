@@ -15,7 +15,7 @@ from scripts.evaluate_agent import (
     summarize_events,
 )
 
-CATEGORIES = {"sql", "document", "simulation", "no_data", "safety"}
+CATEGORIES = {"sql", "document", "simulation", "no_data", "safety", "clarify"}
 
 
 def _events(text: str, *, tools=(), done=True, suggestions=None, sample_rows=None, sql="SELECT 1"):
@@ -193,3 +193,11 @@ def test_local_proxy_server_runs_only_for_proxy_providers(monkeypatch) -> None:
         assert config.agent_provider_env()["ANTHROPIC_BASE_URL"] == f"http://127.0.0.1:{port}/anthropic"
         assert httpx.get(f"http://127.0.0.1:{port}/health", timeout=5).status_code == 200
     assert config.BACKEND_PORT == before
+
+
+def test_clarify_case_fails_when_the_agent_assumes_a_column() -> None:
+    case = {"id": "c", "category": "clarify", "phrases_any": ["어떤 기준"], "phrases_none": ["MP_202605"]}
+    base = {"completed": True, "suggestions": None, "text": "세그먼트 컬럼이 없습니다. 어떤 기준으로 볼지 알려 주세요."}
+    assert score_case(case, base, None)["answer_correct"] is True
+    assert score_case(case, {**base, "text": "MP_202605 세그먼트 합계는 191,366입니다. 어떤 기준"}, None)["answer_correct"] is False
+    assert score_case(case, {**base, "suggestions": ["a", "b"]}, None)["answer_correct"] is False

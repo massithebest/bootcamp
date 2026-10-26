@@ -29,6 +29,7 @@ columns:
   - {name: WORK_DT, type: datetime, desc: "제품 계획 일자(YYYYMMDD, 실제 작업일자)"}
 joins: []
 caveats:
+  - "이 테이블에는 생산 세그먼트(SEG_A/SEG_B) 컬럼이 없다. 세그먼트 질문은 MP_VER·PRODUCT_GUBUN·FAC_ID 등으로 대신하지 말고 어떤 기준인지 묻는다"
   - "FAC_ID(공정 ID)와 PNT_SITE_CD(사이트 ID)는 서로 다른 식별자이므로 섞어 쓰지 않는다"
   - ACT_QTY는 NULL일 수 있으므로 합계·평균 계산 시 NVL(ACT_QTY, 0)을 적용한다
   - TARGET_QTY는 일할 계산으로 소수 값이 저장될 수 있어 정수로 취급하지 않는다
