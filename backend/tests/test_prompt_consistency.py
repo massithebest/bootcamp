@@ -169,7 +169,7 @@ def test_claude_md_keeps_internal_ids_out_and_does_not_turn_include_rules_into_f
     assert "질문에 맞을 때만 적용" in text and "질문이 요청한 기준" in text
     # 후속질문이 "특정 제품의 ~"로 대상을 비워 둬 누르면 확인 질문만 돌아왔다.
     assert "대상을 비워 두지 않는다" in text
-    # 이미 큰 순서로 답한 공정별 합계를 "많은 순서로 설명해 주세요"로 다시 묻는 후속질문이 나왔다.
+    # 이미 큰 순서로 답한 공장별 합계를 "많은 순서로 설명해 주세요"로 다시 묻는 후속질문이 나왔다.
     assert "새 기준" in text and "많은 순서로 설명해 주세요" in text
     # 최솟값을 "20,260개"로만 쓰고 대상(part_7)을 빠뜨렸고, 세그먼트 간 같은 Part ID를 짝지어 비교하는 후속질문이 나왔다.
     assert "그 대상(예: part_7)도 함께 쓴다" in text and "caveats·query_rules를 지킨다" in text
@@ -239,6 +239,28 @@ def test_data_tool_descriptions_distinguish_sql_simulation_and_documents() -> No
     assert "다시 정렬·잘라 보는 질문" in tools["suggest_follow_ups"].description
     assert "ID를 짝지은 세그먼트 비교" in tools["suggest_follow_ups"].description
     assert "최대·최소 값에는 그 대상도 함께 쓴다" in tools["present_table"].description
+
+
+def test_presented_results_use_readable_labels_and_are_not_repeated() -> None:
+    tools = {t.name: t for t in planning_tools(access_scope="scope-a")}
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+    skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
+
+    # 공장별 비교 답변이 표·차트의 6개 값을 "공장별 월 계획수량 합계는 다음 값입니다"로 다시 나열했다.
+    assert "근거에서 다시 나열하지 않는다" in SYSTEM_PROMPT
+    assert "계산에 사용한 값은 다음과 같습니다" in claude
+    assert "계산에 사용한 값은 다음과 같습니다" in tools["present_chart"].description
+    assert "계산에 사용한 값은 다음과 같습니다" in tools["present_table"].description
+    # 본문 근거에 "(PLAN_OPT_CD IS NULL OR PLAN_OPT_CD <> 'X') 조건을 적용"처럼 SQL 식이 그대로 나왔다.
+    for text in (claude, skill, tools["execute_sql"].description):
+        assert "SQL 식" in text and "계획수량이 0보다 큰 행" in text
+    # 차트 축·범례가 FAC_ID, plan_qty, change_rate_pct, 202605처럼 내부 이름 그대로 나왔다.
+    for text in (claude, skill, tools["execute_sql"].description):
+        assert "한국어 별칭" in text and "'2026-05'" in text
+    # 차트와 같은 결과로 표를 한 번 더 띄웠다.
+    assert "같은 result_id로 present_table을 또 호출하지 않는다" in tools["present_chart"].description
+    assert "present_chart로 이미 보여 줬으면" in tools["present_table"].description
+    assert "같은 `result_id`로 `present_table`을 또 호출하지" in claude
 
 
 def test_rag_final_answers_require_a_source_or_url() -> None:

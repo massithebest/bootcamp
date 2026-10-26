@@ -7,7 +7,7 @@ time_column: WORK_DT
 tags: [FP, 생산계획, 계획실적, Swap]
 columns:
   - {name: MP_VER, type: varchar, desc: MP(마스터플랜) 버전}
-  - {name: FAC_ID, type: varchar, desc: "공정 ID. 사이트 식별용 PNT_SITE_CD와 혼동하지 않는다"}
+  - {name: FAC_ID, type: varchar, desc: "공장 ID. 사이트 식별용 PNT_SITE_CD와 혼동하지 않는다"}
   - {name: PLAN_DT, type: datetime, desc: "FP IF 결과 생성일. WORK_DT(실제 작업일)와 다른 개념"}
   - {name: PLAN_OPT_CD, type: varchar, desc: 계획옵션코드, codes: {X: 미수립계획, N: "정상 계획(그 외 값 포함)"}}
   - {name: PLAN_PROD_ID, type: varchar, desc: "계획 제품 ID. 제품/계획 질의의 필수 컬럼"}
@@ -18,7 +18,7 @@ columns:
   - {name: GRADE_CD, type: varchar, desc: 등급코드}
   - {name: SWAP_QTY, type: number, desc: "스와핑 수량. 스왑잔여계획수량·swap 완료 여부 판단용"}
   - {name: SALES_BATCH_CD, type: varchar, desc: "영업배치코드. 계획 대비 실적 비교 질의 시 필수"}
-  - {name: PNT_SITE_CD, type: varchar, desc: "PNT 사이트 코드. 사이트 식별용, FAC_ID(공정 ID)와 혼동하지 않는다"}
+  - {name: PNT_SITE_CD, type: varchar, desc: "PNT 사이트 코드. 사이트 식별용, FAC_ID(공장 ID)와 혼동하지 않는다"}
   - {name: COMPLT_DT, type: datetime, desc: 완료 납기일자}
   - {name: PLAN_STATE_DT, type: datetime, desc: 계획시작일자(YYYYMMDD)}
   - {name: PRIORTY, type: int, desc: "우선순위. 숫자가 작을수록 우선순위가 높다"}
@@ -30,7 +30,7 @@ columns:
 joins: []
 caveats:
   - "이 테이블에는 생산 세그먼트(SEG_A/SEG_B) 컬럼이 없다. 세그먼트 질문은 MP_VER·PRODUCT_GUBUN·FAC_ID 등으로 대신하지 말고 어떤 기준인지 묻는다"
-  - "FAC_ID(공정 ID)와 PNT_SITE_CD(사이트 ID)는 서로 다른 식별자이므로 섞어 쓰지 않는다"
+  - "FAC_ID(공장 ID)와 PNT_SITE_CD(사이트 ID)는 서로 다른 식별자이므로 섞어 쓰지 않는다"
   - ACT_QTY는 NULL일 수 있으므로 합계·평균 계산 시 NVL(ACT_QTY, 0)을 적용한다
   - TARGET_QTY는 일할 계산으로 소수 값이 저장될 수 있어 정수로 취급하지 않는다
   - "grain(FAC_ID, PLAN_PROD_ID, WORK_DT, SALES_BATCH_CD)은 실제 PK가 아직 확인되지 않은 추정값이다"
