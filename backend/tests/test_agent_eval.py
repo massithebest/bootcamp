@@ -201,3 +201,11 @@ def test_clarify_case_fails_when_the_agent_assumes_a_column() -> None:
     assert score_case(case, base, None)["answer_correct"] is True
     assert score_case(case, {**base, "text": "MP_202605 세그먼트 합계는 191,366입니다. 어떤 기준"}, None)["answer_correct"] is False
     assert score_case(case, {**base, "suggestions": ["a", "b"]}, None)["answer_correct"] is False
+
+
+def test_summary_keeps_the_agent_error_message() -> None:
+    # 응답 시간 초과로 끝난 질문이 결과 파일에 error 없이 빈 답변으로만 남아 원인을 알 수 없었다.
+    events = [{"type": "error", "content": "LLM 응답이 지연되고 있습니다."}, {"type": "done", "data": {}}]
+    summary = summarize_events(events)
+    assert summary["agent_error"] == "LLM 응답이 지연되고 있습니다." and summary["completed"] is False
+    assert summarize_events([{"type": "done", "data": {"turn_id": "t"}}])["agent_error"] is None

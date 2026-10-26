@@ -122,6 +122,8 @@ def summarize_events(events: list[dict]) -> dict[str, Any]:
             for n in numbers_from_rows((r.get("data") or {}).get("sample_rows") or [])
         ],
         "tool_results": {r.get("tool_name"): (r.get("data") or {}) for r in results},
+        # Agent 가 보낸 error 이벤트(응답 시간 초과·SDK 실패 등). 없으면 None.
+        "agent_error": next((e.get("content") for e in events if e["type"] == "error" and e.get("content")), None),
     }
 
 
@@ -373,7 +375,7 @@ async def evaluate(cases: list[dict], db_path: Path) -> tuple[list[dict], list[s
             "expected": expected, **score,
             "answer_correct": score["answer_correct"] and not failed,
             "completed": summary["completed"] and not failed,
-            "error": run["error"] or ("timeout" if run["timed_out"] else None),
+            "error": run["error"] or ("timeout" if run["timed_out"] else None) or summary["agent_error"],
             "first_text_s": run["first_text_s"], "total_s": run["total_s"],
             "tools": summary["tools"], "describe_before_sql": summary["describe_before_sql"],
             "sql_calls": summary["sql_calls"], "sql_errors": summary["sql_errors"],
@@ -383,7 +385,7 @@ async def evaluate(cases: list[dict], db_path: Path) -> tuple[list[dict], list[s
         mark = "PASS" if record["answer_correct"] else "FAIL"
         print(f"    {mark} {record['total_s']}s tools={len(record['tools'])}"
               + (f" error={record['error']}" if record["error"] else ""), flush=True)
-        if is_fatal_error(run["error"]):
+        if is_fatal_error(run["error"] or summary["agent_error"]):
             # 실행 환경 문제는 Agent 품질 지표에 넣지 않고, 남은 질문과 함께 미실행으로 남긴다.
             skipped = [c["id"] for c in cases[index - 1:]]
             print(f"치명적 오류로 평가를 멈춥니다. 미실행 {len(skipped)}건: {', '.join(skipped)}", flush=True)
