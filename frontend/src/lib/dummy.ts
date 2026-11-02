@@ -8,7 +8,7 @@ import type { CurrentUser } from "@/types/workspace";
 
 export const CURRENT_USER: CurrentUser = {
   name: "손흥민",
-  team: "생산관리팀 · 계획파트",
+  team: "제조운영",
 };
 
 export const EXAMPLE_QUESTIONS: string[] = [
