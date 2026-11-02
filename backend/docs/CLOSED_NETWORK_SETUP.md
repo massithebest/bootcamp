@@ -113,8 +113,10 @@ Copy-Item .env.example .env
 | `API_TIMEOUT_SECONDS` | `60`(기본) | 폐쇄망 production API 요청 timeout(초). 실제 SQL/RAG/simulation API adapter가 연결되면 이 값을 사용 |
 | `KNOWLEDGE_DIR` | 운영 YAML의 별도 절대경로 | bundled mock 지식 경로는 허용하지 않음 |
 | `PRODUCTION_SQL_DIALECT` | 사내 DB 방언(예: `Oracle`) | Agent가 SQL 함수·날짜 문법을 맞추도록 `execute_sql` 설명에 알린다. 비우면 안내하지 않음(mock은 항상 SQLite) |
-| `LLM_PROVIDER` | 사내 지원 provider | 사내 LLM 반입 정책에 따름 |
-| provider 인증값 | 사내 발급 값 | 코드·문서·로그에 기록하지 않음 |
+| `AGENT_RUNTIME` | `openai`(기본) 또는 `claude` | Agent 실행부. 아래 "Agent 실행부와 LLM 연결" 참고 |
+| `AZURE_OPENAI_ENDPOINT`·`AZURE_OPENAI_API_KEY`·`AZURE_OPENAI_DEPLOYMENT` | 사내 게이트웨이 값 | `openai` 실행부 필수. 비어 있으면 시작 로그에 빈 변수 이름이 남고 채팅이 실패한다. 값은 코드·문서·로그에 기록하지 않음 |
+| `LLM_PROVIDER` | 사내 지원 provider | `AGENT_RUNTIME=claude`일 때만. 사내 LLM 반입 정책에 따름 |
+| provider 인증값 | 사내 발급 값 | `AGENT_RUNTIME=claude`일 때만. 코드·문서·로그에 기록하지 않음 |
 | `KNOWLEDGE_DB_PATH` | 영속 볼륨의 SQLite 경로 | 텍스트 지식 저장소. 비우면 `backend/data/knowledge.sqlite3` |
 | `KNOWLEDGE_SEARCH_BACKEND` | `local`(기본) 또는 `service` | `local`은 승인 문서를 키워드 점수와 PoC 해싱 임베딩 벡터 유사도로 함께 찾는 하이브리드 검색(모델 다운로드 없음, 벡터는 `KNOWLEDGE_DB_PATH`의 `chunks` 테이블). 사내 임베딩만 쓰려면 `services/knowledge/embedding.py`의 `get_embedder()`를 교체하고, 전체 RAG를 쓰려면 `service`로 사내 RAG 어댑터(`services/production/rag_service.py`) 구현 후 사용 |
 | `CORS_ALLOW_ORIGINS` | 실제 Frontend Origin | 기본값은 localhost 개발 Origin |
@@ -127,8 +129,22 @@ Part 2 §2-3을 따라 추가한다. `MOCK_DB_PATH`는 설정하지 않는다.
 `API_TIMEOUT_SECONDS`는 공통 timeout 설정으로 미리 제공하며, 현재 production
 서비스는 외부 API 호출을 구현하지 않아 아직 이 값을 사용하지 않는다.
 
+### Agent 실행부와 LLM 연결
+
+- 기본 실행부 `AGENT_RUNTIME=openai`는 OpenAI Agents SDK(`openai-agents`)로 Azure OpenAI 호환 게이트웨이의
+  Chat Completions를 직접 호출한다. Node.js·Claude Code CLI·`/anthropic` 프록시가 필요 없고 `LLM_PROVIDER`도 쓰지 않는다.
+- SDK 트레이싱은 기본값이 외부(OpenAI)로 전송하므로 실행부가 import 시점과 실행마다 끈다. 반입 뒤 첫 기동에서
+  외부 주소로 나가는 요청이 없는지 방화벽·프록시 로그로 확인한다.
+- 게이트웨이가 요청 제한(429)·일시 오류를 주면 실행부가 1·2·4·8·16·32초 간격으로 다시 보내고, 재시도를 기다리는 동안은
+  `LLM_RESPONSE_TIMEOUT_SECONDS` 응답 지연 한도를 세지 않는다.
+- 대화 기록·질문 편집 분기는 Backend 프로세스 메모리에 둔다. 재시작하면 이전 대화를 이어 쓰거나 분기할 수 없고
+  (새 대화 경고), 여러 워커로 띄우면 워커마다 기록이 따로 생긴다.
+- `AGENT_RUNTIME=claude`는 Claude Agent SDK(`claude-agent-sdk`)와 Node.js·Claude Code CLI(`claude`)가 필요하며
+  아래 `LLM_PROVIDER` 설정을 따른다. 실행 PC 의 사용자 MCP 설정은 불러오지 않는다(`strict_mcp_config`).
+
 ### `LLM_PROVIDER=local`과 `/anthropic` 프록시
 
+`AGENT_RUNTIME=claude`일 때만 해당한다.
 사내 LLM 게이트웨이(HCP)가 Claude CLI의 User-Agent를 차단해 직접 연결할 수 없을
 때 사용한다. 이 저장소에는 `/anthropic` 경로와 `LLM_PROVIDER=local` 분기만 준비돼
 있다. 프록시 본문은 의도적으로 비워 둔 상태이며, 폐쇄망에서 동작 가능한 구현을
@@ -156,7 +172,9 @@ PRIVATE_LLM_MODEL_KEY=
 ## 1-5. 기동 전 확인
 
 - [ ] 합성 mock DB/문서 생성기의 산출물(`backend/data/`)이 반입물에 없는지 확인
-- [ ] `requirements.txt` 설치가 완료됐는지 확인
+- [ ] `requirements.txt` 설치가 완료됐는지 확인(`openai-agents`·`griffelib` 포함)
+- [ ] `AGENT_RUNTIME=openai`면 `AZURE_OPENAI_*` 게이트웨이 값을 채웠는지, Backend 시작 로그에
+  "채팅에 필요한 환경변수가 비어 있습니다"가 없는지 확인
 - [ ] production 서비스 원본과 운영 지식이 승인된 별도 경로에 준비됐는지 확인
 - [ ] 텍스트 지식 SQLite(`KNOWLEDGE_DB_PATH`)가 백업되는 영속 볼륨을 가리키는지 확인.
   `services/knowledge/documents.py`는 앱 import 경로에 포함되므로 코드는 반드시 반입하고,
@@ -169,7 +187,10 @@ PRIVATE_LLM_MODEL_KEY=
 
 - [ ] `pip install`이 특정 패키지에서 "no matching distribution" → Python
   버전과 Nexus의 해당 패키지·전이 의존성 등록 여부 확인
-- [ ] 서버는 뜨는데 `/api/chat` 호출 시 인증 오류 → `ANTHROPIC_API_KEY`/
+- [ ] `AGENT_RUNTIME=openai`에서 `/api/chat`이 "LLM API 서버 호출에 실패했습니다" → `AZURE_OPENAI_ENDPOINT`·
+  `AZURE_OPENAI_API_VERSION`·`AZURE_OPENAI_DEPLOYMENT`가 게이트웨이 경로(`/openai/deployments/{deployment}/chat/completions`)와
+  맞는지, 키가 유효한지 확인. "응답이 지연되고 있습니다"가 잦으면 게이트웨이 응답 시간과 `LLM_RESPONSE_TIMEOUT_SECONDS`를 확인
+- [ ] `AGENT_RUNTIME=claude`에서 서버는 뜨는데 `/api/chat` 호출 시 인증 오류 → `ANTHROPIC_API_KEY`/
   `OPENROUTER_API_KEY`가 폐쇄망에서 실제로 도달 가능한 엔드포인트를
   가리키는지 확인. 사내 LLM 게이트웨이가 CLI User-Agent를 차단하면
   `LLM_PROVIDER=local`과 `/anthropic` 프록시를 쓴다(위 "`LLM_PROVIDER=local`과
@@ -446,8 +467,8 @@ Agent가 SQL을 올바르게 생성하려면 실제 DB와 서비스에 맞는 �
 
 1. `backend/pntfp/`를 제외한 변경 파일에 비밀값과 사내 URL이 들어가지 않았는지
    확인한다.
-2. `backend/.env`에 `LLM_PROVIDER=local`, private LLM 및 production service에 필요한
-   환경변수가 모두 채워졌는지 확인한다.
+2. `backend/.env`에 Agent 실행부(기본 `AGENT_RUNTIME=openai`면 `AZURE_OPENAI_*`, `claude`면 `LLM_PROVIDER`와
+   provider 인증값) 및 production service에 필요한 환경변수가 모두 채워졌는지 확인한다.
 3. `ENV=prod`, `SERVICE_MODE=production`, `KNOWLEDGE_DIR`을 설정한다. 기본 반입
    위치를 쓸 경우 Windows에서는
    `KNOWLEDGE_DIR=<backend 절대경로>\\knowledge\\production`으로 지정한다.
@@ -505,7 +526,7 @@ python -m uvicorn main:app --port 8100
     Store 저장 필드)를 하나씩 대조한다. 응답 필드명이 다르면 이식 코드에서
     매핑하고, `KNOWLEDGE_DIR/simulations/*.yaml`의 `output_schema`를 실제 응답에
     맞게 갱신한다.
-12. 폐쇄망 프록시 구현을 반입한 뒤 `LLM_PROVIDER=local`을 쓴다면 `/anthropic`
+12. `AGENT_RUNTIME=claude`에서 폐쇄망 프록시 구현을 반입한 뒤 `LLM_PROVIDER=local`을 쓴다면 `/anthropic`
     경로를 별도로 검증한다: 서버를 이 설정으로 재기동한 뒤 실제 채팅 1건을 보내
     SSE 스트리밍이
     끊기지 않고 끝까지 도착하는지 확인하고, 사내 게이트웨이 접근 로그에서

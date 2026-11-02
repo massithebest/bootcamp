@@ -157,11 +157,12 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic").lower()
 #: error/done으로 종료해 브라우저가 무한 대기하지 않게 한다.
 LLM_RESPONSE_TIMEOUT_SECONDS = int(os.getenv("LLM_RESPONSE_TIMEOUT_SECONDS", "30"))
 
-#: Agent 실행부. claude(Claude Agent SDK, 기본) | openai(OpenAI Agents SDK, 게이트웨이
-#: `AZURE_OPENAI_*` 설정을 직접 사용).
-AGENT_RUNTIME = os.getenv("AGENT_RUNTIME", "").strip().lower() or "claude"
+#: Agent 실행부. openai(OpenAI Agents SDK, 기본: 게이트웨이 `AZURE_OPENAI_*` 설정으로 Chat Completions 를
+#: 직접 호출하며 `LLM_PROVIDER`·Claude CLI 를 쓰지 않는다) | claude(Claude Agent SDK + CLI, `LLM_PROVIDER` 사용).
+#: 2026-11-03 같은 게이트웨이 교차 비교에서 openai 가 정답률·응답 시간 기준을 충족해 기본값이 됐다.
+AGENT_RUNTIME = os.getenv("AGENT_RUNTIME", "").strip().lower() or "openai"
 if AGENT_RUNTIME not in ("claude", "openai"):
-    raise RuntimeError("AGENT_RUNTIME 은 claude 또는 openai 여야 합니다.")
+    raise RuntimeError("AGENT_RUNTIME 은 openai 또는 claude 여야 합니다.")
 
 #: OpenAI Agents SDK 실행부의 한 응답 최대 모델 호출 수. SDK 기본값(10)은 Tool 9회와
 #: 후속질문을 쓰는 응답에 부족하다.
@@ -173,9 +174,9 @@ PRIVATE_LLM_MODEL_NAME = os.getenv("PRIVATE_LLM_MODEL_NAME", "")
 PRIVATE_LLM_MODEL_ENDPOINT = os.getenv("PRIVATE_LLM_MODEL_ENDPOINT", "")
 PRIVATE_LLM_MODEL_KEY = os.getenv("PRIVATE_LLM_MODEL_KEY", "")
 
-#: LLM_PROVIDER=azure_openai(Azure OpenAI 호환 게이트웨이) 전용 설정. CLI 의 Anthropic
-#: 형식 요청을 백엔드 `/anthropic` 프록시가 chat completions 로 변환해 전달한다.
-#: 실제 endpoint·key 는 `backend/.env`에만 둔다.
+#: Azure OpenAI 호환 게이트웨이 설정. AGENT_RUNTIME=openai 가 직접 쓰고, AGENT_RUNTIME=claude 에서는
+#: LLM_PROVIDER=azure_openai 일 때 CLI 의 Anthropic 형식 요청을 백엔드 `/anthropic` 프록시가 chat completions 로
+#: 변환해 전달한다. 실제 endpoint·key 는 `backend/.env`에만 둔다.
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip().rstrip("/")
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY", "").strip()
 AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "").strip() or "2024-12-01-preview"
@@ -183,6 +184,23 @@ AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "").strip() or 
 AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "").strip()
 #: 모델별 최대 출력 토큰보다 CLI 요청값이 클 때 잘라 쓸 상한. 비우면 요청값 그대로.
 AZURE_OPENAI_MAX_TOKENS = int(os.getenv("AZURE_OPENAI_MAX_TOKENS") or 0) or None
+
+def missing_agent_runtime_settings() -> list[str]:
+    """현재 실행부에 필요한데 비어 있는 환경변수 이름(값은 다루지 않는다).
+
+    OpenAI 실행부는 게이트웨이 설정 없이 채팅할 수 없다. 지식·결과 API 는 계속 쓸 수 있도록 시작을
+    막지 않고 Backend 가 시작할 때 이 목록을 오류 로그로 알린다.
+    """
+
+    if AGENT_RUNTIME != "openai":
+        return []
+    required = {
+        "AZURE_OPENAI_ENDPOINT": AZURE_OPENAI_ENDPOINT,
+        "AZURE_OPENAI_API_KEY": AZURE_OPENAI_API_KEY,
+        "AZURE_OPENAI_DEPLOYMENT": AZURE_OPENAI_DEPLOYMENT,
+    }
+    return [name for name, value in required.items() if not value]
+
 
 #: CLI 만 백엔드 프록시를 쓰도록 프로세스마다 새로 만드는 토큰. 외부에 공개하지 않는다.
 LOCAL_PROXY_TOKEN = secrets.token_urlsafe(32)

@@ -18,6 +18,10 @@ from agent.agent import _build_options, _resolve_resume, run_agent
 from api.schemas import AgentEvent
 
 
+#: Claude Agent SDK 실행부 경로를 검증한다(기본 실행부는 openai).
+pytestmark = pytest.mark.usefixtures("claude_runtime")
+
+
 @pytest.fixture(autouse=True)
 def _clear_store():
     session_store.clear()

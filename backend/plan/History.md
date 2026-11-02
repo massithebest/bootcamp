@@ -2,6 +2,18 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-11-03 — 기본 실행부를 OpenAI Agents SDK로 전환(8단계)과 계획 종료
+
+- `AGENT_RUNTIME` 기본값을 `openai`로 바꿨다(`claude`로 되돌릴 수 있음). OpenAI 실행부는 `AZURE_OPENAI_*`만 쓰고 `LLM_PROVIDER`·
+  Node.js·Claude Code CLI 가 필요 없다. 게이트웨이 설정이 비면 Backend 시작 로그에 빈 변수 이름을 남기고(값은 기록하지 않음) 채팅만
+  실패한다(`config.missing_agent_runtime_settings`). Claude 실행부 경로를 검증하는 테스트는 `claude_runtime` fixture 로 고정했다.
+- 문서: 루트·Backend README와 AGENTS.md, `.env.example`(실행부·게이트웨이 절 재구성), `requirements.txt` 주석, 폐쇄망 가이드
+  (환경변수 표, "Agent 실행부와 LLM 연결" 절: 트레이싱 끔·429 재시도·메모리 기록 한계, 기동 전 확인·체크리스트·이식 후 검증)를 갱신했다.
+- 계획(`261102-openai-agents-sdk-plan.md`)의 핵심 결정을 이 이력과 InProgress "Agent 실행부" 계약으로 옮기고 계획 문서는 지웠다.
+  남은 일(Claude 실행부·프록시·CLI 제거, Nexus 패키지 확인)은 Todo 로 옮겼다. 계획에서 정한 원칙: Frontend·공개 API·`AgentEvent`
+  계약 불변, Responses API 대신 게이트웨이가 확인된 Chat Completions, 트레이싱 비활성 필수, 같은 gpt-5.4·같은 게이트웨이에서
+  정답률·데이터 정답률·p50·p90·규칙 지표·분기 동작이 Claude 실행부 이상일 때 전환.
+
 ## 2026-11-03 — 요청 제한(429) 원인 분석과 실행부 교차 재평가: 전환 기준 충족
 
 - 429 원인: 게이트웨이 응답 헤더 기준 한도는 분당 토큰 800만·요청 8만이고 우리 사용량은 분당 약 50만 토큰이라 자체 한도 초과가 아니다.
@@ -138,7 +150,7 @@
 
 - 0단계: `openai-agents==0.24.0`이 현재 requirements와 충돌 없이 설치되고(새 패키지는 `openai-agents`·`griffelib`), 기본 트레이싱은
   `api.openai.com`으로 전송을 시도하므로 비활성화가 필수이며, 게이트웨이 Chat Completions로 스트리밍·Tool 호출·기록 재전송이
-  동작함을 확인했다. 결과는 [계획](261102-openai-agents-sdk-plan.md)에 기록했다.
+  동작함을 확인했다.
 - 1단계: Tool 설명·입력 schema·handler·UI 출력 설명·화면 노출 여부를 `agent/tool_specs.py`의 `ToolSpec` 목록으로 옮겼다.
   `agent/sdk_tools.py`는 명세를 `access_scope`에 묶어 Claude MCP Tool로 감싸기만 하고, Tool 목록 API(`tool_catalog`)와
   프롬프트 정합성·SQL 방언 테스트는 공통 명세를 대상으로 동작한다. TypedDict로 만들던 선택 필드 schema는 같은 JSON schema로 직접 적었다.

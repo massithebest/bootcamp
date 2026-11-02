@@ -1,15 +1,16 @@
 # Backend 작업 지침
 
-Python 3.11 FastAPI 서비스다. `/api/chat`은 Claude Agent SDK 이벤트를
-`AgentEvent` SSE로 변환한다. 작업 전 `plan/Todo.md`, `plan/InProgress.md`와 대상 폴더의 더 가까운
+Python 3.11 FastAPI 서비스다. `/api/chat`은 `AGENT_RUNTIME`으로 고른 실행부(기본 OpenAI Agents SDK,
+선택 Claude Agent SDK)의 이벤트를 같은 `AgentEvent` SSE로 변환한다. 작업 전 `plan/Todo.md`, `plan/InProgress.md`와 대상 폴더의 더 가까운
 `AGENTS.md`를 확인한다.
 
 ## 경계
 
 - 흐름은 route → agent → SDK tool → tool → service → DB/provider 순서다.
   route에 SQL, provider 설정, 결과 검증과 업무 로직을 넣지 않는다.
-- API 계약은 `api/schemas.py`, 이벤트 변환은 `agent/event_adapter.py`, Tool 명세는
-  `agent/tool_specs.py`(Claude 등록은 `agent/sdk_tools.py`), 구조화 지식은 `knowledge/` YAML을 기준으로 한다.
+- API 계약은 `api/schemas.py`, 이벤트 변환은 `agent/openai_event_adapter.py`·`agent/event_adapter.py`(Claude),
+  Tool 명세는 `agent/tool_specs.py`(Claude 등록은 `agent/sdk_tools.py`), 구조화 지식은 `knowledge/` YAML을 기준으로 한다.
+  두 실행부는 같은 Tool 명세·런타임 지침·`AgentEvent` 계약을 쓰므로 한쪽만 바꾸지 않는다.
 - SQL은 `services/sql/guard.py`를 통과한 읽기 전용 쿼리만 허용한다.
   `services/mock`과 `services/production`의 공개 시그니처·반환 형태를 맞춘다.
 - 환경변수는 `core/config.py`에서 읽고 새 키는 비밀값 없이 `.env.example`에 추가한다.

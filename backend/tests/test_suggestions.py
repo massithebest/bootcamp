@@ -25,6 +25,10 @@ TOOL = "mcp__planning__suggest_follow_ups"
 QUESTIONS = ["GB1 영업배치별 달성률도 보여주세요.", "5월과 비교하면 어떤가요?"]
 
 
+#: run_agent 는 Claude Agent SDK 실행부의 가짜 query 로 검증한다(기본 실행부는 openai).
+pytestmark = pytest.mark.usefixtures("claude_runtime")
+
+
 @pytest.fixture(autouse=True)
 def _clear_store():
     session_store.clear()

@@ -1,7 +1,7 @@
 # Production Planning Agent 작업 지침
 
 폐쇄망에서 제조 생산계획 데이터를 조회·분석·시뮬레이션하는 애플리케이션이다.
-`backend/`는 FastAPI·Claude Agent SDK, `frontend/`는 Vite·React SPA다.
+`backend/`는 FastAPI·OpenAI Agents SDK(기본 실행부, Claude Agent SDK 실행부도 선택 가능), `frontend/`는 Vite·React SPA다.
 
 ## 작업 원칙
 

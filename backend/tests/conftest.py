@@ -36,3 +36,12 @@ def bundled_knowledge(monkeypatch: pytest.MonkeyPatch) -> Path:
     knowledge_service.reset_store()
     yield DEFAULT_KNOWLEDGE_DIR
     knowledge_service.reset_store()
+
+
+@pytest.fixture()
+def claude_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Claude Agent SDK 실행부 경로를 검증하는 테스트용. 기본 실행부(openai)와 무관하게 claude 로 고정한다."""
+
+    from core import config
+
+    monkeypatch.setattr(config, "AGENT_RUNTIME", "claude")

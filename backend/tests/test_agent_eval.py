@@ -233,6 +233,7 @@ def test_local_proxy_server_runs_only_for_proxy_providers(monkeypatch) -> None:
     from core import config
     from scripts.evaluate_agent import local_proxy_server
 
+    monkeypatch.setattr(config, "AGENT_RUNTIME", "claude")
     monkeypatch.setattr(config, "LLM_PROVIDER", "anthropic")
     with local_proxy_server() as port:
         assert port is None

@@ -15,6 +15,7 @@ from api.routes_chat import router as chat_router
 from api.routes_knowledge import router as knowledge_router
 from api.routes_me import router as me_router
 from api.routes_query_results import router as query_results_router
+from core import config
 from core.config import CORS_ALLOW_ORIGINS
 from services.results.store import cleanup_expired
 
@@ -36,8 +37,13 @@ async def _result_cleanup_loop() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    """조회 결과 정리 태스크의 시작과 종료를 관리한다."""
+    """실행부 설정 점검과 조회 결과 정리 태스크의 시작·종료를 관리한다."""
 
+    logger.info("Agent 실행부: %s", config.AGENT_RUNTIME)
+    missing = config.missing_agent_runtime_settings()
+    if missing:
+        logger.error("AGENT_RUNTIME=%s 채팅에 필요한 환경변수가 비어 있습니다: %s",
+                     config.AGENT_RUNTIME, ", ".join(missing))
     logger.info("조회 결과 정리 태스크를 시작합니다")
     cleanup_task = asyncio.create_task(_result_cleanup_loop())
     try:

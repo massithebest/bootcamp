@@ -1,6 +1,6 @@
 # Production Planning Agent Backend
 
-FastAPI와 Claude Agent SDK를 사용해 `AgentEvent`를 SSE로 전달하고 지식·SQL·
+FastAPI와 OpenAI Agents SDK(기본, Claude Agent SDK 선택 가능)를 사용해 `AgentEvent`를 SSE로 전달하고 지식·SQL·
 simulation·결과 저장·표·시각화 Tool을 제공한다. route는 요청 변환만 담당하며
 업무 로직은 agent → tool → service 계층으로 분리한다.
 
@@ -28,7 +28,9 @@ Windows PowerShell에서는 `py -3.11 -m venv .venv`와
 - `API_TIMEOUT_SECONDS=60`: 폐쇄망 production API 요청 timeout(초). production adapter에서 사용할 설정이며 현재는 미사용
 - 결과 표시는 bounded preview와 flat `present_sql_preview`·`present_chart`·
   `present_table`·`present_simulation` Tool, `/api/query-results/*`만 사용한다
-- `LLM_PROVIDER`, `AGENT_MODEL`, provider key: 실제 Agent SDK 설정
+- `AGENT_RUNTIME=openai|claude`(기본 `openai`): Agent 실행부. `openai`는 `AZURE_OPENAI_*` 게이트웨이를 직접 호출하고,
+  `claude`는 Claude Code CLI와 `LLM_PROVIDER`·`AGENT_MODEL`·provider key를 쓴다
+- `AGENT_MAX_TURNS`(기본 25), `LLM_RESPONSE_TIMEOUT_SECONDS`(기본 30): 한 응답의 최대 모델 호출 수와 응답 이벤트 대기 한도
 - `KNOWLEDGE_DIR`, `KNOWLEDGE_DB_PATH`: 구조화 YAML과 텍스트 지식 SQLite 위치. 개발 기본값은
   `knowledge/mock`, 폐쇄망 반입 YAML 기본 위치는 `knowledge/production`
 - `KNOWLEDGE_SEARCH_BACKEND=local|service`: `search_documents`가 로컬 SQLite 또는 사내 RAG 어댑터를 쓸지 선택.
@@ -81,13 +83,18 @@ SERVICE_MODE=mock uvicorn main:app --reload --port 8100
 curl http://localhost:8100/health
 ```
 
-`/api/chat`은 항상 실제 Claude Agent SDK를 호출하므로 `.env`에 provider와 CLI
-설정이 필요하다. `LLM_PROVIDER`는 `anthropic`, `openrouter`, `azure_openai`, `local`
+`/api/chat`은 항상 실제 Agent 실행부를 호출한다. 기본 실행부(`AGENT_RUNTIME=openai`)는 OpenAI Agents SDK로
+`AZURE_OPENAI_ENDPOINT`·`AZURE_OPENAI_API_KEY`·`AZURE_OPENAI_DEPLOYMENT` 게이트웨이를 직접 호출하며 Node.js와
+Claude Code CLI가 필요 없다. 값이 비어 있으면 Backend 시작 로그에 빈 변수 이름을 남기고 채팅만 실패한다.
+SDK 트레이싱은 외부(OpenAI)로 전송하므로 실행부가 항상 끈다. 대화 기록·편집 분기는 프로세스 메모리에 둔다.
+
+`AGENT_RUNTIME=claude`는 Claude Agent SDK와 Claude Code CLI를 쓰며 `.env`에 provider와 CLI 설정이 필요하다.
+`LLM_PROVIDER`는 `anthropic`, `openrouter`, `azure_openai`, `local`
 중 하나다. `azure_openai`는 Azure OpenAI 호환 게이트웨이(GPT 계열 deployment)를 쓰며,
 CLI의 Anthropic 형식 요청을 백엔드 `/anthropic` 프록시가 chat completions로 변환한다.
 프록시는 서버 프로세스마다 새로 만든 토큰을 가진 CLI 요청만 받으므로 `BACKEND_PORT`가
 `--port`와 같아야 한다. 설정 항목은 `.env.example`의 `AZURE_OPENAI_*`를 따른다. 지식·시각화 API와 `pytest`는 provider 없이 동작하며, 테스트는
-SDK `query`를 대체해 Agent 이벤트 흐름을 검증한다. `services/production`은 폐쇄망
+가짜 게이트웨이(OpenAI 실행부)와 SDK `query` 대체(Claude 실행부)로 Agent 이벤트 흐름을 검증한다. `services/production`은 폐쇄망
 사내 DB·RAG·simulation 구현으로 교체하는 경계이며 mock과 함수 시그니처·반환 형태를
 유지해야 한다.
 
@@ -153,14 +160,17 @@ E2E가 아닌 공통 테스트가 외부 provider나 인터넷에 의존하도�
 `evals/agent_eval_set.yaml`의 고정 질문으로 실제 Agent를 실행해 정답률·완료율·응답
 시간·조회 규칙 준수·출처 표기·쓰기 SQL 시도·후속질문 제공률·비용을 계산한다. 정답은
 질문마다 `truth_sql`로 합성 mock DB에서 다시 계산한다. LLM 인증이 필요하며 결과는
-저장소 루트 `artifacts/evals/`에 남는다(Git 제외). `LLM_PROVIDER=azure_openai`면 스크립트가
+저장소 루트 `artifacts/evals/`에 남는다(Git 제외). `--runtime openai|claude|both`로 실행부를 고르고(`both`는 질문마다
+두 실행부를 번갈아 실행해 공유 게이트웨이의 시간대별 요청 제한을 고르게 받게 한 뒤 비교표를 남긴다), `--repeat N`으로 반복한다.
+Claude 실행부를 `LLM_PROVIDER=azure_openai`로 평가하면 스크립트가
 `/anthropic` 프록시를 같은 프로세스 안에 빈 포트로 띄우므로 실행 중인 Backend가 없어도 된다.
 "조회 데이터 정답률"은 SQL 결과 행에 정답 값이 그대로 있는지 보는 보조 지표라, 세분화해 조회한
-뒤 답변에서 합산하면 최종 답변이 맞아도 불일치로 잡힐 수 있다. 질문당 비용은 CLI가 Claude 요금표로
-추정한 값이라 GPT 게이트웨이의 실제 과금과 다를 수 있다.
+뒤 답변에서 합산하면 최종 답변이 맞아도 불일치로 잡힐 수 있다. 비용은 두 실행부 공통으로 입력·출력 토큰과 모델 호출 수로
+남기고, USD는 Claude 요금표 추정이므로 `LLM_PROVIDER=anthropic`인 Claude 실행부에서만 기록한다.
 
 ```bash
 python -m scripts.evaluate_agent
+python -m scripts.evaluate_agent --runtime both --repeat 3  # 두 실행부 교차 비교
 python -m scripts.evaluate_agent --static-only  # 지식 검증률·SQL 가드 차단율만, LLM 불필요
 ```
 

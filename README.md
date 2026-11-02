@@ -7,7 +7,7 @@ production service만 사용한다.
 
 ## 주요 기능
 
-- Claude Agent SDK 기반 대화와 공개 업무 단계·Tool 실행 SSE 스트리밍
+- OpenAI Agents SDK 기반 대화(Claude Agent SDK 실행부 선택 가능)와 공개 업무 단계·Tool 실행 SSE 스트리밍
 - table·KPI·recipe·scenario YAML과 버전형 텍스트 지식 조회·관리
 - 카탈로그의 조회·집계 규칙을 적용한 읽기 전용 SQL
 - 최대 1,000행 Result Store, 결과 요약·구간 조회
@@ -17,7 +17,7 @@ production service만 사용한다.
 ```text
 Frontend (Vite 7 + React 18 + assistant-ui)
   └─ POST /api/chat (SSE AgentEvent)
-Backend (FastAPI + Claude Agent SDK)
+Backend (FastAPI + OpenAI Agents SDK → 사내 Azure OpenAI 호환 게이트웨이)
   ├─ Knowledge tools ─ YAML catalog / SQLite text knowledge
   ├─ SQL / Simulation ─ mock 또는 production service
   └─ Result Store ─ Table / Visualization
@@ -55,8 +55,8 @@ python -m scripts.generate_mock_documents
 SERVICE_MODE=mock uvicorn main:app --reload --port 8100
 ```
 
-`/api/chat`은 항상 실제 Claude Agent SDK 경로를 사용한다. 채팅을 확인하려면
-`.env`에 `LLM_PROVIDER`와 인증값을 설정한다. 지식·시각화 API와 `pytest`는
+`/api/chat`은 항상 실제 Agent 실행부를 호출한다. 기본 실행부(`AGENT_RUNTIME=openai`)로 채팅을 확인하려면
+`.env`에 `AZURE_OPENAI_*` 게이트웨이 설정을 채운다(`AGENT_RUNTIME=claude`면 `LLM_PROVIDER`와 인증값, Claude Code CLI 필요). 지식·시각화 API와 `pytest`는
 provider 없이 동작한다. 자세한 실행 방법은 [Backend 안내](backend/README.md)와
 [폐쇄망 배포 가이드](backend/docs/CLOSED_NETWORK_SETUP.md)를 따른다.
 

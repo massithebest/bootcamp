@@ -40,6 +40,9 @@ def clear_agent_sessions():
 def _install_sdk_stream(
     monkeypatch, messages: list[object], session_id: str, *, failed: bool = False
 ) -> None:
+    # 가짜 SDK 메시지는 Claude 실행부 경로로만 흐른다(기본 실행부는 openai).
+    monkeypatch.setattr("core.config.AGENT_RUNTIME", "claude")
+
     async def fake_query(**_):
         for message in messages:
             yield message

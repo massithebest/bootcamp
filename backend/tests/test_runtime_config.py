@@ -130,12 +130,26 @@ def test_real_service_mode_is_accepted_as_compatibility_alias(tmp_path: Path) ->
     assert result.stdout.strip() == "production services.production.sql_service"
 
 
-def test_agent_runtime_defaults_to_claude_and_rejects_unknown_values() -> None:
+def test_agent_runtime_defaults_to_openai_and_rejects_unknown_values() -> None:
     default = run_import(
         {"ENV": "dev", "SERVICE_MODE": "", "KNOWLEDGE_DIR": "", "AGENT_RUNTIME": ""},
         "import core.config as config; print(config.AGENT_RUNTIME)",
     )
     typo = run_import({"ENV": "dev", "SERVICE_MODE": "", "KNOWLEDGE_DIR": "", "AGENT_RUNTIME": "gpt"})
 
-    assert default.returncode == 0 and default.stdout.strip() == "claude"
+    assert default.returncode == 0 and default.stdout.strip() == "openai"
     assert typo.returncode != 0 and "AGENT_RUNTIME" in typo.stderr
+
+
+def test_openai_runtime_reports_missing_gateway_settings_by_name(monkeypatch) -> None:
+    from core import config
+
+    monkeypatch.setattr(config, "AGENT_RUNTIME", "openai")
+    monkeypatch.setattr(config, "AZURE_OPENAI_ENDPOINT", "")
+    monkeypatch.setattr(config, "AZURE_OPENAI_API_KEY", "secret-value")
+    monkeypatch.setattr(config, "AZURE_OPENAI_DEPLOYMENT", "")
+
+    assert config.missing_agent_runtime_settings() == ["AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_DEPLOYMENT"]
+
+    monkeypatch.setattr(config, "AGENT_RUNTIME", "claude")
+    assert config.missing_agent_runtime_settings() == []

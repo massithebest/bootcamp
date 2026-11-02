@@ -4,33 +4,11 @@
 
 ## 진행 중인 작업
 
-### OpenAI Agents SDK 실행부 추가([계획](261102-openai-agents-sdk-plan.md))
-
-- 범위: Claude 실행부 옆에 `AGENT_RUNTIME=openai` 실행부를 추가하고 같은 평가 세트로 비교해 기본값 전환을 정한다.
-  Frontend·공개 API·`AgentEvent` 계약은 바꾸지 않는다.
-- 현재 단계: 0~7단계 완료. 재판정(2026-11-03, 질문마다 번갈아 15문항 × 3회): 전환 기준 충족. 기본값 전환은 사용자 확인 후 진행한다.
-  - Tool 이름·설명·입력 schema·handler·화면 노출 여부의 단일 출처는 `agent/tool_specs.py::tool_specs()`이고,
-    `agent/sdk_tools.py`는 이를 Claude MCP Tool로 감싸기만 한다.
-  - `agent/openai_runtime.py`: 지침(`SYSTEM_PROMPT` + `agent_sdk/CLAUDE.md` + Skill 목록), 공통 명세 FunctionTool(전부 non-strict)과
-    `load_skill`, 게이트웨이 Chat Completions 모델(`parallel_tool_calls=False`·`include_usage=True`·상한은 `max_completion_tokens`),
-    트레이싱 off(import·실행마다), `AGENT_MAX_TURNS`(기본 25). Skill 읽기는 `agent/skills.py`로 지식 API와 공유한다.
-  - `AGENT_RUNTIME=claude|openai`(기본 claude, 그 밖의 값은 시작 오류)로 `run_agent`가 실행부를 고른다. OpenAI 스트림은
-    `agent/openai_event_adapter.py`가 Claude 어댑터와 같은 `AgentEvent`로 바꾸며, Tool 이벤트 조립은 `agent/tool_events.py`를 함께 쓴다.
-  - 대화 기록·분기: `agent/openai_session_store.py`가 성공한 턴의 `to_input_list()`를 conversation 최신 기록과 turn_id 분기 지점으로
-    프로세스 메모리에 둔다(대화당 분기 지점 50개, 넘치면 오래된 것부터 삭제). 분기 규칙과 경고 문구는 Claude 실행부와 같다.
-  - 오류: 이벤트 대기 초과·max_turns 초과·게이트웨이 오류·모델 응답 오류는 `agent/public_messages.py`의 공개 문구로 `error` → `done`
-    (turn_id 없음)으로 끝나고, 완료 전 종료(오류·연결 종료)는 SDK 실행을 취소하며 기록하지 않는다. 설정 누락 등 그 밖의 예외는 라우트가 처리한다.
-  - 재시도: OpenAI 클라이언트 재시도는 끄고(`max_retries=0`) `RetryWait` 정책이 429·5xx·네트워크 오류를 1~32초 backoff로 재시도하며,
-    재시도 대기 중에는 응답 지연 한도를 세지 않는다.
-  - 지침 배치: system 에는 `SYSTEM_PROMPT` + Skill 목록만 두고, `agent_sdk/CLAUDE.md` 본문은 Claude CLI 처럼 대화 첫 user 메시지의
-    질문 바로 앞(`with_guide`)에 둔다. 이후 턴은 기록에 남은 그 메시지를 이어 쓴다.
-- 다음 행동: 기본값을 `openai`로 바꾸고 8단계 문서(README·폐쇄망 반입·`.env.example`·AGENTS.md)를 갱신한다(사용자 확인 후).
-  Claude 실행부·`/anthropic` 프록시·CLI 의존 제거는 전환 뒤 별도 작업으로 Todo 에 등록한다.
-- 선행 확인: 폐쇄망 Nexus에 `openai-agents==0.24.0`·`griffelib` 등록 여부(반입 전).
+현재 착수 상태로 기록된 작업은 없다. 착수 시 담당 범위, 현재 단계, 다음 행동, 검증 상태를 이곳에 기록한다.
 
 ## 목표와 책임
 
-FastAPI와 Claude Agent SDK를 사용해 생산계획 데이터를 자연어로 조회·분석하고,
+FastAPI와 OpenAI Agents SDK(기본 실행부, Claude Agent SDK 실행부 선택 가능)를 사용해 생산계획 데이터를 자연어로 조회·분석하고,
 읽기 전용 SQL·입력 검증 simulation·지식 검색·표·차트 결과를 안정적인
 `AgentEvent` SSE로 제공한다.
 
@@ -50,6 +28,7 @@ Backend가 소유하는 범위는 다음과 같다.
 | 영역 | 상태 | 현재 기준 |
 | --- | --- | --- |
 | 채팅·Agent SSE | 완료 | `text`, `status`, `tool_call`, `tool_result`, `error`, `done`; delta 중복 제거, 안전한 종료·취소·포크 |
+| Agent 실행부 | 완료 | `AGENT_RUNTIME=openai`(기본, OpenAI Agents SDK로 게이트웨이 직접 호출)·`claude`(Claude Agent SDK + CLI). 아래 "Agent 실행부" 계약 |
 | Tool trace | 완료 | 동일 호출의 `tool_call_id`, 공개 가능한 args와 결과 연결 |
 | 구조화 지식 | 완료 | table·KPI·recipe·scenario·simulation·glossary YAML 검증과 조회 Tool |
 | 텍스트 지식 | 완료 | SQLite 버전·revision 충돌·검토·활성화·보관·local 검색 |
@@ -60,8 +39,23 @@ Backend가 소유하는 범위는 다음과 같다.
 | 결과 API·표·시각화 | 완료 | `/api/query-results/{id}/preview|table|chart`, `present_sql_preview`·`present_chart`·`present_table`·`present_simulation` flat Tool·검증(유일한 결과 표시 경로, 최대 500 points·8 series), `present_chart.bar_mode=grouped|stacked` |
 | RAG | Local 완료 / Vector 미구현 | 활성 검토 문서 local 검색; Milvus·문서 색인 후속 |
 | 실행 환경 | 완료 | Python 3.11 `.venv`, Backend 기본 포트 8100 |
-| LLM provider | 완료 | `anthropic`·`openrouter`·`azure_openai`(백엔드 `/anthropic` 프록시가 Anthropic Messages↔Azure OpenAI chat completions 변환, 프로세스별 토큰 인증)·`local`(폐쇄망 구현 반입 전 501) |
+| LLM provider(claude 실행부) | 완료 | `anthropic`·`openrouter`·`azure_openai`(백엔드 `/anthropic` 프록시가 Anthropic Messages↔Azure OpenAI chat completions 변환, 프로세스별 토큰 인증)·`local`(폐쇄망 구현 반입 전 501) |
 | Service logging | 완료 | 공개 작업 시작·완료·실패, 소요 시간, 중첩 DEBUG와 민감정보 비노출 |
+
+### Agent 실행부
+
+- 공통: Tool 이름·설명·입력 schema·handler·화면 노출 여부는 `agent/tool_specs.py::tool_specs()` 하나에서 만들고(설명 2,048자 이하),
+  공개 오류 문구는 `agent/public_messages.py`, Tool 이벤트 조립은 `agent/tool_events.py`를 두 실행부가 함께 쓴다.
+- `openai`(`agent/openai_runtime.py`): system 에는 `SYSTEM_PROMPT` + Skill 목록, `agent_sdk/CLAUDE.md` 본문은 대화 첫 user 메시지의
+  질문 바로 앞(`with_guide`). Skill 본문은 숨김 Tool `load_skill`. Tool 은 전부 non-strict, `parallel_tool_calls=False`,
+  `include_usage=True`, 출력 상한은 `max_completion_tokens`. 트레이싱은 import 시점과 실행마다 끈다. `AGENT_MAX_TURNS`(기본 25).
+  클라이언트 재시도는 끄고 `RetryWait`가 408·409·429·5xx·네트워크 오류를 1~32초 backoff로 재시도하며 대기 중에는 응답 지연 한도를
+  세지 않는다. 이벤트 대기 초과·최대 호출 수 초과·게이트웨이 오류·모델 응답 오류는 공개 문구로 `error` → `done`(turn_id 없음),
+  완료 전 종료는 SDK 실행을 취소하고 기록하지 않는다. 스트림 변환은 `agent/openai_event_adapter.py`.
+- `openai` 대화 기록(`agent/openai_session_store.py`): 성공한 턴의 `to_input_list()`를 conversation 최신 기록과 turn_id 분기 지점으로
+  프로세스 메모리에 둔다(대화당 분기 지점 50개). 분기 규칙과 경고 문구는 Claude 실행부와 같다.
+- `claude`(`agent/agent.py`): `strict_mcp_config=True`로 `planning` MCP 서버만 쓴다(실행 PC 의 사용자 MCP 미노출).
+  Claude CLI 는 저장소 상위 폴더의 개발용 CLAUDE.md(`@AGENTS.md` 한 줄)도 함께 읽는다.
 
 ## 외부에 제공하는 안정 계약
 
