@@ -94,6 +94,9 @@ Claude Agent SDK로 구현한 Agent 실행부 옆에 OpenAI Agents SDK 실행부
 ### 7. 타임아웃·오류·비용
 
 - `LLM_RESPONSE_TIMEOUT_SECONDS`(기본 30초) 동안 스트림 이벤트가 없으면 실행을 취소하고 기존 공개 문구로 `error` → `done`.
+- 재시도(7단계 반영): 게이트웨이는 요청 제한 시 429와 `Retry-After: 60`을 준다. OpenAI 클라이언트 재시도(`max_retries=0`)는 끄고
+  runner 재시도 정책(`RetryWait`)이 408·409·429·5xx·네트워크 오류를 1·2·4·8·16·32초 지수 backoff로 다시 보낸다. 재시도를 기다리는
+  동안은 응답 지연으로 세지 않고, 대기가 끝난 뒤부터 한도를 센다(Claude 실행부는 SDK 재시도 진행 이벤트로 같은 효과를 얻는다).
 - 비용: SDK가 USD 비용을 주지 않으므로 평가 스크립트는 토큰 사용량(입력·출력)을 기록하고, 단가 설정이 있을 때만 USD로 환산한다.
   지금 0.48 USD처럼 Claude 요금표로 잘못 추정된 값을 쓰지 않는다.
 

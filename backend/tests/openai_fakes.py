@@ -66,7 +66,10 @@ class FakeGateway:
         self.bodies.append(json.loads(request.content))
         chunks = self.turns.pop(0)
         if isinstance(chunks, int):
-            return httpx2.Response(chunks, json={"error": {"message": GATEWAY_ERROR_DETAIL}})
+            # 실제 게이트웨이처럼 오류 응답에 60초 재시도 대기를 싣는다.
+            return httpx2.Response(
+                chunks, headers={"retry-after": "60"}, json={"error": {"message": GATEWAY_ERROR_DETAIL}}
+            )
         body = "".join(f"data: {json.dumps(c, ensure_ascii=False)}\n\n" for c in chunks) + "data: [DONE]\n\n"
         return httpx2.Response(200, headers={"content-type": "text/event-stream"}, content=body.encode())
 

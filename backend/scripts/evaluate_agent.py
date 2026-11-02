@@ -5,11 +5,16 @@
     python -m scripts.evaluate_agent                 # 전체 질문
     python -m scripts.evaluate_agent --cases jun_plan_total,doc_wip
     python -m scripts.evaluate_agent --static-only   # LLM 없이 정적 지표만
+    python -m scripts.evaluate_agent --runtime openai --repeat 2   # 실행부 지정, 같은 질문 반복
+
+`--runtime` 을 생략하면 `AGENT_RUNTIME` 설정(기본 claude)을 쓴다. 비용은 실행부마다 같은 기준으로 비교할 수 있게
+입력·출력 토큰과 모델 호출 수로 남긴다. Claude SDK 의 USD 비용은 Claude 요금표 추정이므로 `LLM_PROVIDER=anthropic` 일
+때만 기록한다.
 
 정답은 `evals/agent_eval_set.yaml` 의 truth_sql 로 mock DB 에서 다시 계산한다.
 결과는 저장소 루트 `artifacts/evals/` 에 JSON·Markdown 으로 남긴다(Git 제외 경로).
 채점 함수는 LLM 없이 단위 테스트한다(`tests/test_agent_eval.py`).
-`LLM_PROVIDER=azure_openai` 면 CLI 가 거칠 `/anthropic` 프록시를 이 프로세스 안에 빈 포트로 띄우므로
+Claude 실행부에서 `LLM_PROVIDER=azure_openai` 면 CLI 가 거칠 `/anthropic` 프록시를 이 프로세스 안에 빈 포트로 띄우므로
 실행 중인 Backend 가 없어도 된다(프록시 토큰이 프로세스마다 다르기 때문).
 """
 
@@ -176,6 +181,11 @@ def _percentile(values: list[float], q: float) -> float | None:
     return round(ordered[index], 1)
 
 
+def _mean_of(rows: list[dict], key: str, digits: int = 0) -> float | None:
+    values = [row[key] for row in rows if row.get(key) is not None]
+    return round(statistics.mean(values), digits) if values else None
+
+
 def aggregate(records: list[dict]) -> dict[str, Any]:
     """질문별 결과를 KPI 로 집계한다."""
 
@@ -186,6 +196,7 @@ def aggregate(records: list[dict]) -> dict[str, Any]:
     totals = [r["total_s"] for r in records if r["total_s"] is not None]
     firsts = [r["first_text_s"] for r in records if r["first_text_s"] is not None]
     costs = [r["cost_usd"] for r in records if r.get("cost_usd") is not None]
+    usages = [r["usage"] for r in records if r.get("usage")]
     sql_calls = sum(r["sql_calls"] for r in records)
     return {
         "cases": len(records),
@@ -204,6 +215,9 @@ def aggregate(records: list[dict]) -> dict[str, Any]:
                                  sum(1 for r in answerable if r["completed"])),
         "avg_tool_calls": round(statistics.mean(len(r["tools"]) for r in records), 1) if records else None,
         "avg_cost_usd": round(statistics.mean(costs), 4) if costs else None,
+        "avg_input_tokens": _mean_of(usages, "input_tokens"),
+        "avg_output_tokens": _mean_of(usages, "output_tokens"),
+        "avg_model_calls": _mean_of(usages, "model_calls", digits=1),
     }
 
 
@@ -281,36 +295,68 @@ async def run_case(case: dict, meter: dict) -> dict[str, Any]:
         "timed_out": timed_out,
         "error": error,
         "cost_usd": meter.get("cost_usd"),
-        "usage": meter.get("usage"),
+        "usage": _metered_usage(meter),
     }
 
 
 def _install_meter() -> dict:
-    """SDK ResultMessage 의 비용·토큰을 엿본다. 공개 AgentEvent 계약은 바꾸지 않는다."""
+    """실행부 SDK 결과의 토큰·모델 호출 수(와 Claude 비용)를 엿본다. 공개 AgentEvent 계약은 바꾸지 않는다."""
+
+    from core import config
+
+    meter: dict = {}
+    if config.AGENT_RUNTIME == "openai":
+        from agent import openai_runtime
+
+        original_run = openai_runtime.run_streamed
+
+        def metered_run(*args, **kwargs):
+            meter["result"] = original_run(*args, **kwargs)
+            return meter["result"]
+
+        openai_runtime.run_streamed = metered_run
+        return meter
 
     import agent.agent as agent_module
     from claude_agent_sdk import ResultMessage
 
-    meter: dict = {}
     original = agent_module.query
 
     async def metered(*, prompt, options):
         async for message in original(prompt=prompt, options=options):
             if isinstance(message, ResultMessage):
-                meter["cost_usd"] = message.total_cost_usd
-                meter["usage"] = message.usage
+                usage = message.usage or {}
+                meter["usage"] = {
+                    "input_tokens": sum(int(usage.get(key) or 0) for key in (
+                        "input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")),
+                    "output_tokens": int(usage.get("output_tokens") or 0),
+                    "model_calls": message.num_turns,
+                }
+                # SDK 비용은 Claude 요금표 추정이라 다른 모델(게이트웨이)에는 맞지 않는다.
+                meter["cost_usd"] = message.total_cost_usd if config.LLM_PROVIDER == "anthropic" else None
             yield message
 
     agent_module.query = metered
     return meter
 
 
+def _metered_usage(meter: dict) -> dict | None:
+    result = meter.get("result")
+    if result is None:
+        return meter.get("usage")
+    usage = result.context_wrapper.usage
+    return {"input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens, "model_calls": usage.requests}
+
+
 def needs_local_proxy() -> bool:
-    """CLI 가 백엔드 `/anthropic` 프록시를 거쳐야 하는 provider 인지(현재 azure_openai)."""
+    """Claude 실행부의 CLI 가 백엔드 `/anthropic` 프록시를 거쳐야 하는 provider 인지(현재 azure_openai).
+
+    OpenAI 실행부는 게이트웨이를 직접 호출하므로 프록시가 필요 없다.
+    """
 
     from core import config
 
-    return config.LLM_PROVIDER == "azure_openai"
+    return config.AGENT_RUNTIME == "claude" and config.LLM_PROVIDER == "azure_openai"
 
 
 @contextmanager
@@ -370,14 +416,14 @@ async def evaluate(cases: list[dict], db_path: Path) -> tuple[list[dict], list[s
     meter = _install_meter()
     records = []
     for index, case in enumerate(cases, 1):
-        print(f"[{index}/{len(cases)}] {case['id']} ...", flush=True)
+        print(f"[{index}/{len(cases)}] {case['id']} (회차 {case.get('run', 1)}) ...", flush=True)
         expected = expected_numbers(case, db_path)
         run = await run_case(case, meter)
         summary = summarize_events(run["events"])
         score = score_case(case, summary, expected)
         failed = run["timed_out"] or run["error"] is not None
         record = {
-            "id": case["id"], "category": case["category"], "question": case["question"],
+            "id": case["id"], "run": case.get("run", 1), "category": case["category"], "question": case["question"],
             "expected": expected, **score,
             "answer_correct": score["answer_correct"] and not failed,
             "completed": summary["completed"] and not failed,
@@ -409,9 +455,10 @@ def _fmt(value: Any, percent: bool = False) -> str:
 
 
 def render_markdown(kpi: dict, static: dict, records: list[dict], started_at: str,
-                    skipped: list[str] | None = None) -> str:
+                    skipped: list[str] | None = None, runtime: str = "", repeat: int = 1) -> str:
+    title = ", ".join(part for part in (started_at, runtime and f"실행부 {runtime}", repeat > 1 and f"반복 {repeat}회") if part)
     lines = [
-        f"# Agent 정량 평가 결과 ({started_at})", "",
+        f"# Agent 정량 평가 결과 ({title})", "",
         "## 운영 지표 (실제 Agent 실행)", "",
         "| 지표 | 값 |", "| --- | --- |",
         f"| 질문 수 | {kpi.get('cases', 0)} |",
@@ -426,6 +473,8 @@ def render_markdown(kpi: dict, static: dict, records: list[dict], started_at: st
         f"| 문서 출처 표기율 | {_fmt(kpi.get('citation_rate'), True)} |",
         f"| 후속질문 제공률 | {_fmt(kpi.get('suggestion_rate'), True)} |",
         f"| 평균 Tool 호출 | {_fmt(kpi.get('avg_tool_calls'))}회 |",
+        f"| 질문당 평균 모델 호출 | {_fmt(kpi.get('avg_model_calls'))}회 |",
+        f"| 질문당 평균 토큰 (입력 / 출력) | {_fmt(kpi.get('avg_input_tokens'))} / {_fmt(kpi.get('avg_output_tokens'))} |",
         f"| 질문당 평균 비용 | {_fmt(kpi.get('avg_cost_usd'))} USD |", "",
         "## 정적 지표 (LLM 불필요)", "",
         "| 지표 | 값 |", "| --- | --- |",
@@ -436,11 +485,11 @@ def render_markdown(kpi: dict, static: dict, records: list[dict], started_at: st
         lines += ["", f"> 실행 환경 오류로 {len(skipped)}건을 실행하지 못했습니다: {', '.join(skipped)}. "
                   "위 운영 지표는 실행한 질문만 집계했습니다."]
     if records:
-        lines += ["", "## 질문별 결과", "", "| ID | 분류 | 정답 | 시간 | Tool | 규칙 | 후속질문 |",
-                  "| --- | --- | --- | --- | --- | --- | --- |"]
+        lines += ["", "## 질문별 결과", "", "| ID | 회차 | 분류 | 정답 | 시간 | Tool | 규칙 | 후속질문 |",
+                  "| --- | --- | --- | --- | --- | --- | --- | --- |"]
         for r in records:
             rule = "—" if r["describe_before_sql"] is None else ("O" if r["describe_before_sql"] else "X")
-            lines.append(f"| {r['id']} | {r['category']} | {'O' if r['answer_correct'] else 'X'} | "
+            lines.append(f"| {r['id']} | {r.get('run', 1)} | {r['category']} | {'O' if r['answer_correct'] else 'X'} | "
                          f"{r['total_s']}s | {len(r['tools'])} | {rule} | {len(r['suggestions'] or [])} |")
     return "\n".join(lines) + "\n"
 
@@ -450,18 +499,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cases", help="쉼표로 구분한 case id (생략 시 전체)")
     parser.add_argument("--static-only", action="store_true", help="LLM 없이 정적 지표만 계산")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    parser.add_argument("--runtime", choices=("claude", "openai"), help="Agent 실행부 (생략 시 AGENT_RUNTIME)")
+    parser.add_argument("--repeat", type=int, default=1, help="같은 질문 세트를 반복 실행할 횟수")
     args = parser.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
     from core import config
 
+    if args.runtime:
+        config.AGENT_RUNTIME = args.runtime
     started_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     static = static_metrics()
     records: list[dict] = []
     skipped: list[str] = []
     if not args.static_only:
         cases = load_cases(set(args.cases.split(",")) if args.cases else None)
+        cases = [{**case, "run": run} for run in range(1, max(args.repeat, 1) + 1) for case in cases]
         with local_proxy_server() as proxy_port:
             if proxy_port:
                 print(f"{config.LLM_PROVIDER}: 평가용 로컬 프록시를 127.0.0.1:{proxy_port} 에 띄웠습니다.", flush=True)
@@ -470,10 +524,11 @@ def main(argv: list[str] | None = None) -> int:
 
     args.out.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    report = {"started_at": started_at, "kpi": kpi, "static": static, "records": records, "skipped": skipped}
-    (args.out / f"agent-eval-{stamp}.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    markdown = render_markdown(kpi, static, records, started_at, skipped)
-    (args.out / f"agent-eval-{stamp}.md").write_text(markdown, encoding="utf-8")
+    report = {"started_at": started_at, "runtime": config.AGENT_RUNTIME, "repeat": args.repeat,
+              "kpi": kpi, "static": static, "records": records, "skipped": skipped}
+    (args.out / f"agent-eval-{config.AGENT_RUNTIME}-{stamp}.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    markdown = render_markdown(kpi, static, records, started_at, skipped, config.AGENT_RUNTIME, args.repeat)
+    (args.out / f"agent-eval-{config.AGENT_RUNTIME}-{stamp}.md").write_text(markdown, encoding="utf-8")
     print(markdown)
     return 0
 

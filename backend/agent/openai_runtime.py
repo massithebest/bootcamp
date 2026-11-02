@@ -13,6 +13,7 @@
 import asyncio
 import json
 import logging
+import time
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
@@ -22,6 +23,7 @@ from agents import (
     AgentsException,
     FunctionTool,
     MaxTurnsExceeded,
+    ModelRetrySettings,
     ModelSettings,
     OpenAIChatCompletionsModel,
     RunConfig,
@@ -29,6 +31,7 @@ from agents import (
     set_tracing_disabled,
 )
 from agents.result import RunResultStreaming
+from agents.retry import RetryDecision, RetryPolicyContext
 from openai import APIError, AsyncAzureOpenAI, AsyncOpenAI
 
 from agent import openai_session_store as session_store
@@ -149,27 +152,66 @@ def build_model(client: AsyncOpenAI | None = None) -> OpenAIChatCompletionsModel
             azure_endpoint=config.AZURE_OPENAI_ENDPOINT,
             api_key=config.AZURE_OPENAI_API_KEY,
             api_version=config.AZURE_OPENAI_API_VERSION,
+            # 재시도는 runner 의 `RetryWait` 정책만 한다. SDK 는 첫 요청에 클라이언트 재시도를 그대로
+            # 두는데, 클라이언트는 응답 없이 게이트웨이의 Retry-After(60초)를 기다려 이벤트 대기 한도를 넘긴다.
+            max_retries=0,
         )
     return OpenAIChatCompletionsModel(model=config.AZURE_OPENAI_DEPLOYMENT, openai_client=client)
 
 
-def model_settings() -> ModelSettings:
+_RETRY_STATUSES = frozenset({408, 409, 429, 500, 502, 503, 504})
+#: 재시도 회차별 대기(초). Claude CLI 와 비슷한 지수 backoff 이고, 게이트웨이의 Retry-After 는 쓰지 않는다.
+RETRY_DELAYS = (1.0, 2.0, 4.0, 8.0, 16.0, 32.0)
+
+
+class RetryWait:
+    """한 턴의 모델 호출 재시도 정책과, 예약한 재시도 대기가 끝나는 시각.
+
+    게이트웨이는 요청 제한(429)·일시 오류에 응답은 하므로 멈춘 것이 아니다. 재시도를 기다리는 동안에는
+    스트림 이벤트가 없어도 응답 지연으로 끊지 않도록, 실행부가 `until` 뒤부터 대기 한도를 센다
+    (Claude 실행부는 SDK 의 재시도 진행 이벤트로 같은 효과를 얻는다).
+    """
+
+    def __init__(self) -> None:
+        self.until = 0.0
+
+    def policy(self, context: RetryPolicyContext) -> bool | RetryDecision:
+        error = context.normalized
+        if not (error.is_network_error or error.is_timeout or error.status_code in _RETRY_STATUSES):
+            return False
+        delay = RETRY_DELAYS[min(max(context.attempt, 1), len(RETRY_DELAYS)) - 1]
+        logger.warning("LLM API 재시도 예약: status=%s attempt=%s delay=%ss",
+                       error.status_code, context.attempt, delay)
+        self.until = time.monotonic() + delay
+        # delay 를 결정에 직접 넣어야 SDK 가 응답의 Retry-After 를 쓰지 않는다.
+        return RetryDecision(retry=True, delay=delay)
+
+    def settings(self) -> ModelRetrySettings:
+        return ModelRetrySettings(max_retries=len(RETRY_DELAYS), policy=self.policy)
+
+
+def model_settings(retry_wait: RetryWait | None = None) -> ModelSettings:
     # temperature·top_p 는 reasoning 계열이 거부할 수 있어 지정하지 않는다. max_tokens 대신
     # max_completion_tokens 를 써야 하는 것도 같은 이유다(프록시와 같은 상한 설정 사용).
     cap = config.AZURE_OPENAI_MAX_TOKENS
     return ModelSettings(
         parallel_tool_calls=False,
         include_usage=True,
+        retry=(retry_wait or RetryWait()).settings(),
         extra_args={"max_completion_tokens": cap} if cap else None,
     )
 
 
-def build_agent(access_scope: str | None, model: OpenAIChatCompletionsModel) -> Agent:
+def build_agent(
+    access_scope: str | None,
+    model: OpenAIChatCompletionsModel,
+    retry_wait: RetryWait | None = None,
+) -> Agent:
     return Agent(
         name=AGENT_NAME,
         instructions=build_instructions(),
         model=model,
-        model_settings=model_settings(),
+        model_settings=model_settings(retry_wait),
         tools=[*(_function_tool(spec, access_scope) for spec in tool_specs()), _load_skill_tool()],
     )
 
@@ -179,10 +221,11 @@ def run_streamed(
     *,
     access_scope: str | None,
     model: OpenAIChatCompletionsModel | None = None,
+    retry_wait: RetryWait | None = None,
 ) -> RunResultStreaming:
     """한 턴을 스트리밍 실행한다. `input_items`는 새 메시지 또는 이전 기록 + 새 메시지."""
 
-    agent = build_agent(access_scope, model or build_model())
+    agent = build_agent(access_scope, model or build_model(), retry_wait)
     return Runner.run_streamed(
         agent,
         input_items,
@@ -204,6 +247,31 @@ def _resolve_history(
     if history is None:
         return [], AgentEvent(type="error", content=FORK_FALLBACK_MESSAGE)
     return history, None
+
+
+_END = object()
+
+
+async def _next_event(raw_events: AsyncIterator[Any], retry_wait: RetryWait) -> Any:
+    """다음 스트림 이벤트(끝이면 `_END`). 재시도 대기가 끝난 뒤에도 한도만큼 이벤트가 없으면 TimeoutError."""
+
+    started = time.monotonic()
+    pending = asyncio.ensure_future(anext(raw_events))
+    try:
+        while True:
+            deadline = max(started, retry_wait.until) + config.LLM_RESPONSE_TIMEOUT_SECONDS
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise asyncio.TimeoutError
+            done, _ = await asyncio.wait({pending}, timeout=remaining)
+            if done:
+                try:
+                    return pending.result()
+                except StopAsyncIteration:
+                    return _END
+    finally:
+        if not pending.done():
+            pending.cancel()
 
 
 def _failure_message(exc: Exception) -> str | None:
@@ -237,8 +305,9 @@ async def run_openai_agent(
     `fork_from_turn_id`가 None 이면 대화의 최신 기록에 이어 쓰고, 빈 문자열이면 처음부터,
     알 수 없는 값이면 경고 `error` 후 처음부터 실행한다. 성공한 턴만 기록·분기 지점으로 남긴다.
 
-    `LLM_RESPONSE_TIMEOUT_SECONDS` 동안 다음 스트림 이벤트가 없거나, 최대 호출 수 초과·게이트웨이
-    오류·모델 응답 오류가 나면 공개 문구로 `error` → `done`(turn_id 없음)으로 끝낸다. 완료 전에
+    `LLM_RESPONSE_TIMEOUT_SECONDS` 동안 다음 스트림 이벤트가 없거나(요청 제한 재시도 대기 시간은 빼고 센다),
+    최대 호출 수 초과·재시도 뒤 게이트웨이 오류·모델 응답 오류가 나면 공개 문구로 `error` → `done`
+    (turn_id 없음)으로 끝낸다. 완료 전에
     끝나면(오류·클라이언트 연결 종료 포함) 실행 중인 SDK 작업을 취소한다. 그 밖의 예외는 라우트가
     공개 `error` → `done`으로 바꾼다.
     """
@@ -249,18 +318,17 @@ async def run_openai_agent(
         yield warning
 
     adapter = OpenAIEventAdapter()
+    retry_wait = RetryWait()
     result = run_streamed(
-        [*history, {"role": "user", "content": message}], access_scope=access_scope, model=model
+        [*history, {"role": "user", "content": message}],
+        access_scope=access_scope, model=model, retry_wait=retry_wait,
     )
     raw_events = result.stream_events()
     completed = False
     try:
         while True:
-            try:
-                raw_event = await asyncio.wait_for(
-                    anext(raw_events), timeout=config.LLM_RESPONSE_TIMEOUT_SECONDS
-                )
-            except StopAsyncIteration:
+            raw_event = await _next_event(raw_events, retry_wait)
+            if raw_event is _END:
                 break
             for event in adapter.convert(raw_event):
                 yield event

@@ -168,3 +168,17 @@ def test_tool_exception_returns_the_public_failure_payload(monkeypatch, caplog) 
     content = tool_messages(gateway.bodies[1])[0]["content"]
     assert json.loads(content) == TOOL_FAILURE_PAYLOAD
     assert "internal" not in caplog.text and "OSError" in caplog.text
+
+
+def test_gateway_client_leaves_retries_to_the_runner_policy(monkeypatch) -> None:
+    monkeypatch.setattr(config, "AZURE_OPENAI_ENDPOINT", "https://gateway.test")
+    monkeypatch.setattr(config, "AZURE_OPENAI_API_KEY", "test-key")
+
+    model = openai_runtime.build_model()
+
+    # 클라이언트 재시도는 이벤트 없이 게이트웨이의 Retry-After(60초)를 기다려 대기 한도를 넘긴다.
+    assert model._client.max_retries == 0
+    retry_wait = openai_runtime.RetryWait()
+    retry = openai_runtime.model_settings(retry_wait).retry
+    assert retry.max_retries == len(openai_runtime.RETRY_DELAYS)
+    assert retry.policy == retry_wait.policy

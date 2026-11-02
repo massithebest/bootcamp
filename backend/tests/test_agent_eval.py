@@ -5,11 +5,13 @@ from pathlib import Path
 import pytest
 
 from scripts.evaluate_agent import (
+    _metered_usage,
     aggregate,
     all_matched,
     expected_numbers,
     extract_numbers,
     load_cases,
+    render_markdown,
     score_case,
     static_metrics,
     summarize_events,
@@ -105,9 +107,11 @@ def test_aggregate_computes_rates_and_percentiles() -> None:
             "cited": None, "first_text_s": 5.0, "cost_usd": 0.1}
     records = [
         {**base, "category": "sql", "answer_correct": True, "data_correct": True, "completed": True,
-         "describe_before_sql": True, "suggestions": ["a", "b"], "total_s": 10.0},
+         "describe_before_sql": True, "suggestions": ["a", "b"], "total_s": 10.0,
+         "usage": {"input_tokens": 1000, "output_tokens": 100, "model_calls": 4}},
         {**base, "category": "sql", "answer_correct": False, "data_correct": True, "completed": True,
-         "describe_before_sql": False, "suggestions": None, "total_s": 30.0},
+         "describe_before_sql": False, "suggestions": None, "total_s": 30.0,
+         "usage": {"input_tokens": 3000, "output_tokens": 300, "model_calls": 5}},
     ]
     kpi = aggregate(records)
 
@@ -117,6 +121,35 @@ def test_aggregate_computes_rates_and_percentiles() -> None:
     assert kpi["suggestion_rate"] == 0.5
     assert kpi["latency_p50_s"] in (10.0, 30.0)
     assert kpi["avg_cost_usd"] == 0.1
+    assert (kpi["avg_input_tokens"], kpi["avg_output_tokens"], kpi["avg_model_calls"]) == (2000, 200, 4.5)
+
+
+def test_openai_runtime_usage_comes_from_the_run_result() -> None:
+    class _Usage:
+        input_tokens, output_tokens, requests = 1200, 80, 6
+
+    class _Wrapper:
+        usage = _Usage()
+
+    class _Result:
+        context_wrapper = _Wrapper()
+
+    assert _metered_usage({"result": _Result()}) == {"input_tokens": 1200, "output_tokens": 80, "model_calls": 6}
+    assert _metered_usage({"usage": {"input_tokens": 1}}) == {"input_tokens": 1}
+    assert _metered_usage({}) is None
+
+
+def test_report_names_the_runtime_and_repeat_count() -> None:
+    record = {"id": "c1", "run": 2, "category": "sql", "answer_correct": True, "total_s": 3.0,
+              "tools": ["execute_sql"], "describe_before_sql": True, "suggestions": None}
+    static = {"knowledge_verified_rate": None, "knowledge_items": 0, "guard_block_rate": 1.0, "guard_attacks": 12}
+
+    markdown = render_markdown({"avg_input_tokens": 2000, "avg_output_tokens": 200}, static, [record],
+                               "2026-11-02 10:00", runtime="openai", repeat=2)
+
+    assert markdown.startswith("# Agent 정량 평가 결과 (2026-11-02 10:00, 실행부 openai, 반복 2회)")
+    assert "| 질문당 평균 토큰 (입력 / 출력) | 2000 / 200 |" in markdown
+    assert "| c1 | 2 | sql | O |" in markdown
 
 
 def test_eval_set_is_well_formed() -> None:
@@ -206,6 +239,11 @@ def test_local_proxy_server_runs_only_for_proxy_providers(monkeypatch) -> None:
         assert config.agent_provider_env()["ANTHROPIC_BASE_URL"] == f"http://127.0.0.1:{port}/anthropic"
         assert httpx.get(f"http://127.0.0.1:{port}/health", timeout=5).status_code == 200
     assert config.BACKEND_PORT == before
+
+    # OpenAI 실행부는 게이트웨이를 직접 부르므로 같은 provider 라도 프록시를 띄우지 않는다.
+    monkeypatch.setattr(config, "AGENT_RUNTIME", "openai")
+    with local_proxy_server() as port:
+        assert port is None
 
 
 def test_clarify_case_fails_when_the_agent_assumes_a_column() -> None:

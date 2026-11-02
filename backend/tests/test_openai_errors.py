@@ -2,9 +2,11 @@
 
 import asyncio
 import logging
+import time
 
 import pytest
 
+from agent import openai_runtime
 from agent import openai_session_store as session_store
 from agent.openai_runtime import run_openai_agent
 from agent.public_messages import (
@@ -82,12 +84,38 @@ def test_max_turns_ends_with_a_public_message(monkeypatch) -> None:
     _assert_failed_with(_collect(gateway), MAX_TURNS_MESSAGE)
 
 
-def test_gateway_error_is_reported_without_upstream_details(caplog) -> None:
-    caplog.set_level(logging.ERROR, logger="agent.openai_runtime")
-    gateway = FakeGateway(500)
+def test_rate_limit_uses_backoff_instead_of_the_gateway_retry_after() -> None:
+    gateway = FakeGateway(429, text_turn("끝"))
+
+    started = time.perf_counter()
+    events = _collect(gateway)
+
+    # 게이트웨이의 Retry-After(60초)가 아니라 첫 backoff(1초) 뒤에 다시 보낸다.
+    assert time.perf_counter() - started < 6
+    assert events[-1].type == "done" and events[-1].data["turn_id"]
+    assert len(gateway.bodies) == 2
+
+
+def test_retry_waits_do_not_count_toward_the_response_timeout(monkeypatch) -> None:
+    monkeypatch.setattr(openai_runtime, "RETRY_DELAYS", (0.4, 0.4))
+    monkeypatch.setattr(config, "LLM_RESPONSE_TIMEOUT_SECONDS", 0.3)
+    gateway = FakeGateway(429, 429, text_turn("끝"))
 
     events = _collect(gateway)
 
+    # 재시도 대기(0.4초 ×2)가 대기 한도(0.3초)보다 길어도 요청 제한은 응답 지연이 아니다.
+    assert events[-1].type == "done" and events[-1].data["turn_id"]
+    assert len(gateway.bodies) == 3
+
+
+def test_gateway_error_is_reported_without_upstream_details(monkeypatch, caplog) -> None:
+    monkeypatch.setattr(openai_runtime, "RETRY_DELAYS", (0.0, 0.0, 0.0))
+    caplog.set_level(logging.ERROR, logger="agent.openai_runtime")
+    gateway = FakeGateway(500, 500, 500, 500)
+
+    events = _collect(gateway)
+
+    assert len(gateway.bodies) == 4  # 처음 요청 + 재시도 3회(RETRY_DELAYS 개수)
     _assert_failed_with(events, LLM_API_FAILURE_MESSAGE)
     assert "InternalServerError" in caplog.text and "status=500" in caplog.text
     assert GATEWAY_ERROR_DETAIL not in caplog.text
