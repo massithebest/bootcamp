@@ -162,6 +162,23 @@ def test_mock_input_validation(mock_db, dataset: str, expected: tuple[int, ...])
         check["일치 건수"] + check["미일치 건수"] == check["원본 건수"]
         for check in checks
     )
+    # 모델이 보는 미리보기에는 미일치 관계만 남긴다(모두 통과하면 관계 이름이 없다). 전체 표는 위처럼 Result Store 에 있다.
+    assert result["sample_rows"] == []
+    assert result["check_summary"] == {"checked": 5, "failed": 0}
+    assert "점검 관계" not in result["top_groups"]
+    assert "연결" not in str({k: v for k, v in result.items() if k != "columns"})
+
+
+def test_mock_input_validation_preview_keeps_only_failed_checks() -> None:
+    columns = ["점검 관계", "원본 건수", "일치 건수", "미일치 건수"]
+    rows = [["Part→Route 연결", 2, 2, 0], ["초기 재공 Lot→Part 연결", 10, 7, 3]]
+    preview = {"status": "ok", "sample_rows": [], "top_groups": {"점검 관계": [{"value": "Part→Route 연결", "count": 1}]}}
+
+    result = mock_simulation_service._only_failed_checks(preview, columns, rows)
+
+    assert result["sample_rows"] == [{"점검 관계": "초기 재공 Lot→Part 연결", "원본 건수": 10, "일치 건수": 7, "미일치 건수": 3}]
+    assert result["check_summary"] == {"checked": 2, "failed": 1}
+    assert result["top_groups"] == {}
 
 
 def test_mock_input_validation_rejects_invalid_dataset(mock_db) -> None:

@@ -28,6 +28,8 @@ class ProductionSimulationService:
         # services/production/simulation_api_client.py::SimulationApiClient.run으로
         # 실제 Simulation API 호출 (simulation_type 별 분기).
         # 결과를 Result Store에 저장할 때 mock과 동일하게 access_scope를 채운다.
+        # 입력 검증류 결과는 mock(`_only_failed_checks`)처럼 미리보기 sample_rows 에 미일치 항목만 남기고
+        # check_summary(checked·failed)를 붙인다. 전체 점검 표는 present_table 이 Result Store 에서 읽는다.
         # docs/CLOSED_NETWORK_SETUP.md §2-4 참고.
 
         raise NotImplementedError(

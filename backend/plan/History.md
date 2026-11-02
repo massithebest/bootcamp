@@ -2,6 +2,18 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-11-03 — 입력 검증 미리보기에서 통과한 관계 이름 제외
+
+- 지침 강화 뒤에도 앱에서 "Part와 Route 연결, …"처럼 표기만 바꿔 통과한 관계 5개를 나열했다. 앞선 측정은 `→` 표기만 찾아 과소
+  집계였고, "연결" 3회 이상으로 넓혀 다시 재니 OpenAI 실행부 4/6이었다.
+- 모델이 보는 `run_simulation`(입력_정합성_검증) 미리보기에서 `sample_rows`는 미일치가 있는 관계만, `top_groups`에서 점검 관계 값 목록을
+  빼고 `check_summary`(`checked`·`failed`)를 붙였다(`mock_simulation_service._only_failed_checks`). 전체 점검 표는 `present_table`이 Result
+  Store 에서 읽으므로 화면 표는 그대로 5행이고, 도구 기록 카드는 "샘플 0행"·고유값 5개로 표시된다. `run_simulation` 설명에 새 미리보기를
+  적고 production 서비스 TODO 에 같은 계약을 남겼다. 서비스 테스트 1건 추가·1건 보강, Backend 492건 통과.
+- 결과(넓힌 판정): OpenAI 실행부 4/6 → 0/6, Claude 실행부 1/8. 남은 경로는 `list_simulation`이 돌려주는 지식 YAML
+  (`simulations/입력_정합성_검증.yaml`)의 출력 설명에 관계 이름 5개가 적혀 있는 것으로, 구조화 지식은 변경 요청 승인 경로로만 바꾸므로
+  이번에 고치지 않았다.
+
 ## 2026-11-03 — 평가 채점 기준을 런타임 지침에 맞춤
 
 - 비교 문항(`jun_plan_by_fac`·`may_plan_by_grade`)은 지침대로 핵심 수치(최대·최소)만 본문에 쓰고 나머지를 표·차트로 보여도 본문에

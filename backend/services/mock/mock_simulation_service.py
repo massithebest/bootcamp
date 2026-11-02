@@ -10,7 +10,7 @@ import pandas as pd
 
 from services.mock._sqlite import MISSING_DB_MESSAGE, MockDbMissingError, connect
 from services.mock.mock_pkt_swap import PKT_SWAP_SIMULATION_TYPE, generate_pkt_swap_response
-from services.results.query import tool_preview
+from services.results.query import PREVIEW_SAMPLE_ROWS, tool_preview
 from services.results.store import get_result_store
 from services.service_logging import logged_service_operation
 from services.simulation.registry import list_simulation_types, validate_simulation_request
@@ -217,6 +217,25 @@ _CHECK_LABELS = {
 }
 
 
+def _only_failed_checks(preview: dict, columns: list[str], rows: list[list]) -> dict:
+    """모델에 돌려주는 미리보기에는 미일치가 있는 점검 관계만 남긴다.
+
+    관계 이름이 미리보기에 있으면 모두 통과해도 모델이 근거에 이름을 늘어놓았다(지침으로는 6회 중 4회).
+    전체 점검 표는 `present_table`이 Result Store 에서 읽어 보여 주므로 화면에는 그대로 나온다.
+    """
+
+    unmatched = columns.index(_CHECK_COLUMNS["unmatched_rows"])
+    failed = [dict(zip(columns, row)) for row in rows if row[unmatched]]
+    return {
+        **preview,
+        "sample_rows": failed[:PREVIEW_SAMPLE_ROWS],
+        "top_groups": {
+            name: groups for name, groups in preview["top_groups"].items() if name != _CHECK_COLUMNS["check"]
+        },
+        "check_summary": {"checked": len(rows), "failed": len(failed)},
+    }
+
+
 class MockSimulationService:
     """ProductionSimulationService와 동일한 public interface를 갖는 mock."""
 
@@ -280,7 +299,7 @@ class MockSimulationService:
             conversation_id=None,
             access_scope=access_scope,
         )
-        return tool_preview(
+        preview = tool_preview(
             meta,
             pd.DataFrame(rows, columns=columns),
             kind="simulation",
@@ -290,6 +309,7 @@ class MockSimulationService:
             summary=result["summary"],
             kpis=result["kpis"],
         )
+        return _only_failed_checks(preview, columns, rows)
 
 
 _service = MockSimulationService()
