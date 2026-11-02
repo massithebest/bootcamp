@@ -369,3 +369,16 @@ def test_clarifying_answers_end_without_tool_calls() -> None:
     assert "caveats 가 다른 컬럼으로 대신하지 말라고 하면" in tools["describe_table"].description
     assert "되묻고 멈추는 응답에서는 호출하지 않는다" in tools["suggest_follow_ups"].description
     assert "Tool 호출 없이 텍스트로만 끝낸다" in claude
+
+
+def test_evidence_avoids_sql_expressions_and_passed_relation_lists() -> None:
+    tools = {t.name: t for t in tool_specs()}
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+
+    # 근거에 `WORK_YM = '202605'`·`SUM(PLAN_QTY)`를 그대로 쓴 답이 6회 중 5회였다(OpenAI 실행부, 2026-11-03).
+    for text in (SYSTEM_PROMPT, claude, tools["present_sql_preview"].description):
+        assert "WORK_YM = '202605'" in text and "SUM(PLAN_QTY)" in text
+    assert "SUM() 등)이 아니라" in tools["execute_sql"].description
+    # 통과한 점검 관계 5개를 "표 기준으로 …에서 모두 미일치가 없었습니다"로 이어 쓴 답이 6회 중 4회였다.
+    assert "관계 이름을 이어 쓰면 나열" in tools["present_simulation"].description
+    assert "행 이름을 한 문장에 이어 쓰는 것도" in tools["present_table"].description

@@ -119,7 +119,7 @@ def _execute_sql_description() -> str:
         "질문이나 query_rules에 없는 필터(예: GRADE_CD IS NOT NULL)를 덧붙이지 않으며, 답변에서 '규칙에 따라'라고 밝히는 조건은 "
         "describe_table의 query_rules에 실제로 있는 것만이다. "
         "질문에 기간이 없어 전체 기간을 조회했으면 그 기간 범위(예: 2026년 1월~6월)를 기간 컬럼 MIN·MAX로 확인해 답변에 밝힌다. "
-        "답변에 적용 조건을 밝힐 때는 SQL 식(PLAN_QTY > 0, IS NULL, <> 등)이 아니라 "
+        "답변에 적용 조건을 밝힐 때는 SQL 식(WORK_YM = '202605', SUM() 등)이 아니라 "
         "'계획수량이 0보다 큰 행'처럼 말로 쓴다. "
         "반환된 result_id 는 Tool 인자로만 쓰고 답변 본문에 적지 않는다. "
         "결과 요약 필드 이름(row_count·distinct_counts·top_groups 등)도 '고유 Part 10개'처럼 풀어 쓴다. "
@@ -392,7 +392,10 @@ def tool_specs() -> list[ToolSpec]:
         ToolSpec(
             "present_sql_preview",
             "실행한 SQL 원문을 사용자에게 보여 준다(기본 접힘). "
-            "sql에는 실제로 실행한 SQL을 그대로 넣는다.",
+            "sql에는 실제로 실행한 SQL을 그대로 넣는다. "
+            "SQL 식은 이 미리보기로만 보여 주므로 답변 근거에는 WORK_YM = '202605', SUM(PLAN_QTY), PLAN_QTY > 0 같은 "
+            "컬럼=값·비교·집계 식을 옮겨 쓰지 않고 '2026년 5월 행의 계획수량 합계', '계획수량이 0보다 큰 행'처럼 말로 쓴다. "
+            "사용한 컬럼은 '월 기준 WORK_YM(제품 계획 년월)'처럼 이름과 뜻만 밝힌다.",
             present_sql_preview_input_schema(),
             _present_sql_preview,
             "SQL 표시 설정 검증 결과(빈 객체 또는 안전한 오류)",
@@ -434,7 +437,8 @@ def tool_specs() -> list[ToolSpec]:
             "모든 행에서 같은 값인 컬럼(예: 20행 모두 등급 개수 3)은 columns에서 빼고 그 값은 결론 한 문장으로 쓴다. "
             "남는 컬럼까지 모든 행이 같으면(예: 모든 제품이 등급 A·B·C) 표를 띄우지 않는다. "
             "결론 문장에도 표의 모든 행 값을 나열하지 않고 질문에 답하는 핵심 수치 한두 개만 쓴다. "
-            "표의 행을 본문에 한 줄씩 다시 나열하지 않고('계산에 사용한 값은 다음과 같습니다'도 같다), 결과 컬럼 이름·영문 코드 값(예: source_rows, "
+            "표의 행을 본문에 한 줄씩 다시 나열하지 않고('계산에 사용한 값은 다음과 같습니다'도 같다), 행 이름을 한 문장에 이어 쓰는 것도 "
+            "나열이다(예: '표 기준으로 Part→Route 연결, Route Step→설비 Family 연결, …에서 모두 미일치가 없었습니다'). 결과 컬럼 이름·영문 코드 값(예: source_rows, "
             "part_to_route_step)은 지식에 적힌 한국어 뜻으로 풀어 쓴다.",
             present_table_input_schema(),
             _present_table,
@@ -445,7 +449,9 @@ def tool_specs() -> list[ToolSpec]:
             "시뮬레이션 시나리오·요약·KPI를 보여준다. "
             "같은 결과의 차트·표를 함께 보여줘야 하면 같은 응답에서 present_chart·present_table을 "
             "result_id를 공유해 별도로 호출하고 텍스트로 그 연결을 설명한다. "
-            "성공한 호출을 Markdown 표나 코드 펜스로 반복하지 않는다.",
+            "성공한 호출을 Markdown 표나 코드 펜스로 반복하지 않는다. "
+            "검증이 모두 통과했으면 결론·근거 어디에서도 점검 관계 이름을 다시 나열하지 않고 '5개 관계 모두 미일치 0건'처럼 한 번만 쓴다"
+            "(어떤 문장 형태로든 관계 이름을 이어 쓰면 나열이며, 이름은 표에 있다). 요약 카드의 지표 값도 근거에 다시 쓰지 않는다.",
             present_simulation_input_schema(),
             _present_simulation,
             "시뮬레이션 요약 표시 설정 검증 결과(빈 객체 또는 안전한 오류)",
