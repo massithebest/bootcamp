@@ -141,6 +141,17 @@ def test_cleanup_expired_removes_only_expired(tmp_path, monkeypatch) -> None:
 
 
 def test_cleanup_respects_max_bytes(tmp_path, monkeypatch) -> None:
+    # Windows 시계 해상도에서는 연달아 저장한 두 결과의 created_at 이 같아 정리 순서가 무작위 result_id 로
+    # 갈렸다. 저장마다 1초씩 늘어나는 시계로 "먼저 저장한 것부터 지운다"만 검증한다.
+    base = datetime.now(timezone.utc)
+    ticks = iter(range(100))
+
+    class _Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return base + timedelta(seconds=next(ticks))
+
+    monkeypatch.setattr(result_store, "datetime", _Clock)
     store = LocalParquetResultStore(tmp_path)
     monkeypatch.setattr(result_store, "_store", store)
     oldest = _save(store, [["A", 1]])

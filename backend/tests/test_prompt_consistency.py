@@ -382,3 +382,13 @@ def test_evidence_avoids_sql_expressions_and_passed_relation_lists() -> None:
     # 통과한 점검 관계 5개를 "표 기준으로 …에서 모두 미일치가 없었습니다"로 이어 쓴 답이 6회 중 4회였다.
     assert "관계 이름을 이어 쓰면 나열" in tools["present_simulation"].description
     assert "행 이름을 한 문장에 이어 쓰는 것도" in tools["present_table"].description
+
+
+def test_no_data_answers_end_with_the_period_question() -> None:
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+
+    # "데이터가 없으면 알리고 멈춘다"·"본문은 결론과 근거에서 끝낸다"만 있어, 범위만 알리고 어느 기간으로 볼지
+    # 묻지 않고 근거에서 끝난 답이 두 실행부 모두 간헐적으로 나왔다(2026-11-03).
+    assert "어느 기간·대상으로 볼지 묻는 문장으로 끝내고 멈춘다" in SYSTEM_PROMPT
+    assert "데이터가 없거나 Tool 이 오류를 내면 그대로 알리고 멈춘다" not in SYSTEM_PROMPT
+    assert "근거 뒤 마지막 문장을 그 질문" in claude
