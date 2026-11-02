@@ -4,6 +4,7 @@ pydantic==2.13.5
 python-dotenv==1.2.3
 PyYAML==6.0.2
 claude-agent-sdk==0.2.152
+openai-agents==0.24.0
 langchain==1.4.0
 langchain-openai==1.6.1
 pymilvus==3.0.1

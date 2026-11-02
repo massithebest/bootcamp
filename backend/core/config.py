@@ -157,6 +157,10 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic").lower()
 #: error/done으로 종료해 브라우저가 무한 대기하지 않게 한다.
 LLM_RESPONSE_TIMEOUT_SECONDS = int(os.getenv("LLM_RESPONSE_TIMEOUT_SECONDS", "30"))
 
+#: OpenAI Agents SDK 실행부의 한 응답 최대 모델 호출 수. SDK 기본값(10)은 Tool 9회와
+#: 후속질문을 쓰는 응답에 부족하다.
+AGENT_MAX_TURNS = int(os.getenv("AGENT_MAX_TURNS") or 25)
+
 #: LLM_PROVIDER=local(사내 LLM 게이트웨이) 전용 설정. 값은 `backend/.env`에만
 #: 두고 코드·문서에 실제 모델명·endpoint·key를 남기지 않는다.
 PRIVATE_LLM_MODEL_NAME = os.getenv("PRIVATE_LLM_MODEL_NAME", "")

@@ -37,8 +37,9 @@ Claude Agent SDK로 구현한 Agent 실행부 옆에 OpenAI Agents SDK 실행부
   - Claude 실행부: `ToolSpec` → `@tool`/`create_sdk_mcp_server`(동작 변화 없음).
   - OpenAI 실행부: `ToolSpec` → `FunctionTool(name, description, params_json_schema, on_invoke_tool)`.
 - `access_scope`는 지금처럼 Tool 생성 시 클로저로 묶고 모델 입력 schema에는 넣지 않는다.
-- 엄격 schema 모드: OpenAI strict 모드는 선택 필드를 허용하지 않는다. 선택 필드가 있는 Tool(`present_chart.bar_mode`,
-  `aggregate_result.labels` 등)은 `strict_json_schema=False`로 등록하고, 서버 쪽 검증(present·aggregate 서비스)을 그대로 쓴다.
+- 엄격 schema 모드: OpenAI strict 모드는 선택 필드·자유 객체를 허용하지 않는다. 선택 필드(`present_chart.bar_mode`,
+  `aggregate_result.labels`, `list_tables.keyword` 등)나 자유 객체(`run_simulation.params`)가 대부분 Tool에 있으므로 모든 Tool을
+  `strict_json_schema=False`로 등록하고, 서버 쪽 검증(present·aggregate 서비스)을 그대로 쓴다(2단계 구현).
 - `tool_names()`·`TOOL_NAMES`와 Tool 목록 API(`/api/...` UI discovery)는 공통 명세에서 만든다. 공개 이름은 짧은 이름
   (`execute_sql` 등) 그대로다.
 

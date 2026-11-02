@@ -2,6 +2,21 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-11-02 — OpenAI Agents SDK 실행부 2단계: 실행부 모듈
+
+- `agent/openai_runtime.py`를 추가했다. 지침은 `SYSTEM_PROMPT` + `agent_sdk/CLAUDE.md` 본문 + Skill 목록이고, Skill 본문은 내부 Tool
+  `load_skill(name)`로 읽는다(frontmatter 제외, 등록 이름만 허용). Tool은 공통 명세에서 FunctionTool로 만들며 선택 필드·자유 객체가
+  많아 전부 `strict_json_schema=False`다. JSON이 아닌 인자·필수 인자 누락은 안전한 오류 payload로 돌려준다.
+- 모델은 `AsyncAzureOpenAI` + `OpenAIChatCompletionsModel(AZURE_OPENAI_DEPLOYMENT)`, `parallel_tool_calls=False`·`include_usage=True`,
+  출력 상한은 reasoning 계열이 받는 `max_completion_tokens`로 보낸다. 트레이싱은 import 시점과 실행마다 끄고, `AGENT_MAX_TURNS`(기본 25)를
+  설정에 추가했다. `requirements.txt`에 `openai-agents==0.24.0`을 고정했다. Skill frontmatter 파서는 `agent/skills.py`로 옮겨 지식 API와 공유한다.
+- 검증: 가짜 게이트웨이(실제 클라이언트 + mock HTTP transport로 Chat Completions SSE 재생) 단위 테스트 12건 — 요청 설정·지침·Tool 목록,
+  Tool 결과와 후속질문의 재전달, `access_scope` 전달, `load_skill`, 오류 인자, `max_turns`, 출력 상한, 설정 누락. Backend 457건 통과.
+- 실제 게이트웨이(gpt-5.4, mock DB) 한 턴: `load_skill` → `list_tables` → `describe_table` → `execute_sql` → `present_table` →
+  `suggest_follow_ups` → 답변 순서로 동작했고 공장별 합계가 Claude 실행부와 같았다(FAC002 79,243 / FAC003 47,071, 합계 191,366).
+  16.5초, 모델 호출 7회, 입력 토큰 약 10만(매 호출 지침·기록 재전송)이며 접속 호스트는 게이트웨이뿐이었다. `present_sql_preview`를
+  호출하지 않았고 근거에 `WORK_YM = 202605` 식을 그대로 쓴 차이는 7단계 비교 평가에서 본다.
+
 ## 2026-11-02 — OpenAI Agents SDK 실행부 0·1단계: 사전 확인과 Tool 명세 공통화
 
 - 0단계: `openai-agents==0.24.0`이 현재 requirements와 충돌 없이 설치되고(새 패키지는 `openai-agents`·`griffelib`), 기본 트레이싱은

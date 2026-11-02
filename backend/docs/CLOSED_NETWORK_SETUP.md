@@ -61,6 +61,8 @@ Part 1. 폐쇄망 인프라 구축        Part 2. pntfp 서비스 로직 이식�
   - `langchain`, `langchain-openai` (LLM 연동 방식이 사내 표준과 다르면 교체)
   - `pymilvus` (사내 Milvus 서버 버전과 클라이언트 버전이 맞아야 함)
   - `httpx` (폐쇄망에서 반입할 HTTP 연동 코드의 의존성으로 사용 예정)
+  - `openai-agents` (OpenAI Agents SDK 실행부. 현재 개발 환경에 없던 전이 의존성은
+    `griffelib`뿐이며, 나머지는 기존 패키지 버전 범위로 충족된다)
 
 ## 1-2. 폐쇄망 PC로 이전
 

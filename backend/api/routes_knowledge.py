@@ -1,12 +1,10 @@
 """Knowledge discovery and internal text management."""
 
-import re
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, Query
 from pydantic_core import to_jsonable_python
 from typing import Literal
 
+from agent.skills import get_skill, list_skills as list_agent_skills
 from agent.tool_specs import tool_catalog
 from api.schemas import (KnowledgeDocumentInput, KnowledgeDocumentUpdate, KnowledgeActionInput,
     KnowledgeDocumentResponse, KnowledgeVersion, KnowledgeEntryResponse, KnowledgeEntryDetail, KnowledgeToolResponse,
@@ -22,45 +20,20 @@ from services.knowledge.changes import get_change_store
 from services.knowledge.guides import guide
 from services.knowledge.yaml_codec import model_to_data
 
-from agent.agent import AGENT_SDK_CWD
 from services.knowledge.catalog import get_store
 
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
-
-SKILLS_DIR = Path(AGENT_SDK_CWD) / ".claude" / "skills"
-
-_FRONTMATTER = re.compile(r"^---\n(.*?)\n---", re.S)
-
-
-def _parse_frontmatter(text: str) -> dict[str, str]:
-    match = _FRONTMATTER.match(text)
-    if not match:
-        return {}
-
-    fields: dict[str, str] = {}
-    for line in match.group(1).splitlines():
-        if ": " in line:
-            key, value = line.split(": ", 1)
-            fields[key.strip()] = value.strip()
-    return fields
 
 
 @router.get("/skills")
 async def list_skills() -> list[dict]:
     """에이전트가 선택할 수 있는 Skill 목록."""
 
-    skills = []
-    for skill_path in sorted(SKILLS_DIR.glob("*/SKILL.md")):
-        frontmatter = _parse_frontmatter(skill_path.read_text(encoding="utf-8"))
-        skills.append(
-            {
-                "name": frontmatter.get("name", skill_path.parent.name),
-                "description": frontmatter.get("description", ""),
-                "status": "active",
-            }
-        )
-    return skills
+    return [
+        {"name": skill.name, "description": skill.description, "status": "active"}
+        for skill in list_agent_skills()
+    ]
 
 
 @router.get("/catalog")
@@ -85,13 +58,11 @@ async def tools_catalog():
 @router.get("/skills/{name}")
 def skill_detail(name: str):
     # Resolve by discovered identifier; never turn caller input into a path.
-    for path in sorted(SKILLS_DIR.glob("*/SKILL.md")):
-        text = path.read_text(encoding="utf-8")
-        meta = _parse_frontmatter(text)
-        if meta.get("name", path.parent.name) == name:
-            return {"name": name, "description": meta.get("description", ""),
-                    "status": "active", "content": _FRONTMATTER.sub("", text, count=1).strip()}
-    raise KnowledgeError(404, "Skill을 찾을 수 없습니다.")
+    skill = get_skill(name)
+    if skill is None:
+        raise KnowledgeError(404, "Skill을 찾을 수 없습니다.")
+    return {"name": skill.name, "description": skill.description,
+            "status": "active", "content": skill.content}
 
 
 @router.get("/entries", response_model=list[KnowledgeEntryResponse])

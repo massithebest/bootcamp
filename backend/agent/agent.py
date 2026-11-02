@@ -3,12 +3,12 @@
 import asyncio
 import uuid
 from collections.abc import AsyncIterator
-from pathlib import Path
 
 from claude_agent_sdk import ClaudeAgentOptions, query
 
 from agent.event_adapter import AgentEventAdapter
 from agent.sdk_tools import build_planning_mcp_server, tool_names
+from agent.skills import AGENT_SDK_DIR
 from agent.session_store import (
     bind_session_id,
     get_session_id,
@@ -26,7 +26,7 @@ from core.config import (
 
 
 #: `agent/agent_sdk/` — CLAUDE.md 와 .claude/skills 가 위치한 Agent 작업 디렉터리.
-AGENT_SDK_CWD = str((Path(__file__).parent / "agent_sdk").resolve())
+AGENT_SDK_CWD = str(AGENT_SDK_DIR)
 LLM_RESPONSE_TIMEOUT_MESSAGE = (
     "LLM API 서버 응답이 지연되고 있습니다. 잠시 후에 다시 시도해 주세요."
 )
