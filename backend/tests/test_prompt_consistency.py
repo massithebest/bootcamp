@@ -231,6 +231,10 @@ def test_data_tool_descriptions_distinguish_sql_simulation_and_documents() -> No
     assert "이어 붙여 흐름을 만들지 말고" in tools["search_documents"].description
     assert "한 줄씩 다시 나열하지 않고" in tools["present_table"].description
     assert "문제(미일치 등)가 있는 항목만 짚는다" in tools["run_simulation"].description
+    # 입력 검증 답변이 통과한 5개 관계 이름을 모두 나열하고 요약 카드의 입력 규모 4개 값을 근거에서 다시 썼다.
+    assert "통과한 관계 이름을" in tools["run_simulation"].description
+    assert "점검한 관계는 Part→Route 연결" in tools["run_simulation"].description
+    assert "요약 카드에 보인 지표 값" in tools["run_simulation"].description
     assert "해당 기간 데이터가 없다" in tools["execute_sql"].description
     # "이번 달" 0행에 기준 월·데이터가 있는 범위를 알리지 않고 묻지도 않은 채 끝났다.
     assert "해석한 실제 월" in tools["execute_sql"].description and "MIN·MAX" in tools["execute_sql"].description

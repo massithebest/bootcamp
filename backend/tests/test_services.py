@@ -154,9 +154,12 @@ def test_mock_input_validation(mock_db, dataset: str, expected: tuple[int, ...])
     )
     columns = [column["name"] for column in result["columns"]]
     checks = [dict(zip(columns, row)) for row in page["rows"]]
-    assert all(check["unmatched_rows"] == 0 for check in checks)
+    # 표 머리글·행으로 그대로 보이므로 한국어 이름으로 저장한다.
+    assert columns == ["점검 관계", "원본 건수", "일치 건수", "미일치 건수"]
+    assert "Part→Route 연결" in {check["점검 관계"] for check in checks}
+    assert all(check["미일치 건수"] == 0 for check in checks)
     assert all(
-        check["matched_rows"] + check["unmatched_rows"] == check["source_rows"]
+        check["일치 건수"] + check["미일치 건수"] == check["원본 건수"]
         for check in checks
     )
 

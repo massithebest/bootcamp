@@ -201,6 +201,22 @@ def _input_validation(dataset: str) -> dict:
     }
 
 
+#: 입력 검증 결과는 그대로 표 머리글·행이 되므로 한국어 이름으로 저장한다(뜻은 시뮬레이션 output_schema와 같다).
+_CHECK_COLUMNS = {
+    "check": "점검 관계",
+    "source_rows": "원본 건수",
+    "matched_rows": "일치 건수",
+    "unmatched_rows": "미일치 건수",
+}
+_CHECK_LABELS = {
+    "part_to_route_step": "Part→Route 연결",
+    "route_step_to_tool": "Route Step→설비 Family 연결",
+    "wip_to_part": "초기 재공 Lot→Part 연결",
+    "orders_to_part": "신규 투입 Lot→Part 연결",
+    "wip_curstep_to_route_step": "재공 Lot 현재 Step→Route Step 연결",
+}
+
+
 class MockSimulationService:
     """ProductionSimulationService와 동일한 public interface를 갖는 mock."""
 
@@ -251,8 +267,12 @@ class MockSimulationService:
             return {"status": "error", "message": MISSING_DB_MESSAGE}
 
         records = result["results"]
-        columns = list(records[0].keys())
-        rows = [[record[column] for column in columns] for record in records]
+        keys = list(records[0].keys())
+        columns = [_CHECK_COLUMNS.get(key, key) for key in keys]
+        rows = [
+            [_CHECK_LABELS.get(record[key], record[key]) if key == "check" else record[key] for key in keys]
+            for record in records
+        ]
         meta = get_result_store().save(
             columns,
             rows,
