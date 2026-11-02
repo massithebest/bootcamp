@@ -2,6 +2,19 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-11-02 — OpenAI Agents SDK 실행부 3단계: 이벤트 변환과 실행부 선택
+
+- `agent/openai_event_adapter.py`: 텍스트는 `response.output_text.delta`로만 보내고 최종 메시지 item은 delta가 없을 때만 보낸다.
+  `tool_called`·`tool_output` item은 call id로 이름을 이어 `tool_call`·`tool_result`와 `status`로 바꾸며, `load_skill`·reasoning은
+  내보내지 않고 `suggest_follow_ups`는 입력을 검증해 `done.data.suggestions`에만 싣는다.
+- Tool 이벤트 조립·결과 정규화·SDK 실패 문구를 `agent/tool_events.py`로 옮겨 Claude 어댑터와 함께 쓴다(Claude 동작 변화 없음).
+  OpenAI Tool handler 예외는 오류 종류만 기록하고 같은 공개 실패 payload를 모델·화면에 보낸다.
+- `AGENT_RUNTIME=claude|openai`(기본 claude, 잘못된 값은 시작 오류)를 추가했고 `run_agent`는 시그니처를 유지한 채 실행부를 고른다.
+- 검증: 같은 시나리오(Skill 로딩 → 도입 문장 + SQL → 후속질문 → 답변)를 Claude 어댑터와 가짜 게이트웨이 OpenAI 실행부에 넣어 같은
+  `AgentEvent` 목록·후속질문이 나오는 비교 테스트 등 6건과 설정·Tool 예외 테스트를 더해 Backend 463건 통과. 앱을 `AGENT_RUNTIME=openai`로
+  띄워 "2026년 월별 계획수량 추이를 차트로" 질문에 Tool 3개·선 차트·후속질문 3개가 나왔고 월별 합계가 mock DB와 같았다(3월 257,072 최대,
+  6월 139,953 최소). 결론 뒤에 "차트로 보여드렸습니다" 문장을 쓰고 `present_sql_preview`를 생략한 점은 7단계 비교 대상이다.
+
 ## 2026-11-02 — OpenAI Agents SDK 실행부 2단계: 실행부 모듈
 
 - `agent/openai_runtime.py`를 추가했다. 지침은 `SYSTEM_PROMPT` + `agent_sdk/CLAUDE.md` 본문 + Skill 목록이고, Skill 본문은 내부 Tool

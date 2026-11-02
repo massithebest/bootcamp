@@ -128,3 +128,14 @@ def test_real_service_mode_is_accepted_as_compatibility_alias(tmp_path: Path) ->
 
     assert result.returncode == 0
     assert result.stdout.strip() == "production services.production.sql_service"
+
+
+def test_agent_runtime_defaults_to_claude_and_rejects_unknown_values() -> None:
+    default = run_import(
+        {"ENV": "dev", "SERVICE_MODE": "", "KNOWLEDGE_DIR": "", "AGENT_RUNTIME": ""},
+        "import core.config as config; print(config.AGENT_RUNTIME)",
+    )
+    typo = run_import({"ENV": "dev", "SERVICE_MODE": "", "KNOWLEDGE_DIR": "", "AGENT_RUNTIME": "gpt"})
+
+    assert default.returncode == 0 and default.stdout.strip() == "claude"
+    assert typo.returncode != 0 and "AGENT_RUNTIME" in typo.stderr

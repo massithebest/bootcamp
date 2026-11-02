@@ -1,87 +1,25 @@
 """OpenAI Agents SDK 실행부: 지침 조합·Tool 등록·모델 연결·트레이싱·max_turns.
 
-실제 `AsyncAzureOpenAI` 클라이언트를 가짜 HTTP transport 에 연결해, 게이트웨이가
-돌려줄 Chat Completions 스트리밍(SSE) 응답을 턴마다 재생한다. 모델 품질이 아니라
-"어떤 요청을 보냈고 Tool 결과를 어떻게 이어 붙였는가"를 검증한다.
+가짜 게이트웨이(`tests/openai_fakes.py`)로 모델 품질이 아니라 "어떤 요청을 보냈고
+Tool 결과를 어떻게 이어 붙였는가"를 검증한다.
 """
 
 import asyncio
 import json
 from typing import Any
 
-import httpx2
 import pytest
 from agents import MaxTurnsExceeded
 from agents.tracing import trace
 from agents.tracing.traces import NoOpTrace
-from openai import AsyncAzureOpenAI
 
 from agent import openai_runtime
 from agent.skills import get_skill, list_skills
 from agent.system_prompt import SYSTEM_PROMPT
+from agent.tool_events import TOOL_FAILURE_PAYLOAD
 from agent.tool_specs import tool_specs
 from core import config
-
-
-DEPLOYMENT = "test-deployment"
-
-
-def _chunk(delta: dict | None = None, finish: str | None = None, usage: dict | None = None) -> dict:
-    choices = [] if delta is None else [{"index": 0, "delta": delta, "finish_reason": finish}]
-    chunk: dict[str, Any] = {
-        "id": "chatcmpl-test", "object": "chat.completion.chunk", "created": 0,
-        "model": DEPLOYMENT, "choices": choices,
-    }
-    if usage:
-        chunk["usage"] = usage
-    return chunk
-
-
-_USAGE = {"prompt_tokens": 100, "completion_tokens": 10, "total_tokens": 110}
-
-
-def text_turn(*pieces: str) -> list[dict]:
-    chunks = [_chunk({"role": "assistant", "content": ""})]
-    chunks += [_chunk({"content": piece}) for piece in pieces]
-    return chunks + [_chunk({}, "stop"), _chunk(usage=_USAGE)]
-
-
-def tool_turn(name: str, args: dict, call_id: str = "call_1") -> list[dict]:
-    call = {
-        "index": 0, "id": call_id, "type": "function",
-        "function": {"name": name, "arguments": json.dumps(args, ensure_ascii=False)},
-    }
-    return [
-        _chunk({"role": "assistant", "tool_calls": [call]}),
-        _chunk({}, "tool_calls"),
-        _chunk(usage=_USAGE),
-    ]
-
-
-class FakeGateway:
-    """턴마다 준비한 SSE 응답을 순서대로 돌려주고 받은 요청을 기록한다."""
-
-    def __init__(self, *turns: list[dict]) -> None:
-        self.turns = list(turns)
-        self.requests: list[httpx2.Request] = []
-        self.bodies: list[dict] = []
-
-    def handler(self, request: httpx2.Request) -> httpx2.Response:
-        self.requests.append(request)
-        self.bodies.append(json.loads(request.content))
-        chunks = self.turns.pop(0)
-        body = "".join(f"data: {json.dumps(c, ensure_ascii=False)}\n\n" for c in chunks) + "data: [DONE]\n\n"
-        return httpx2.Response(200, headers={"content-type": "text/event-stream"}, content=body.encode())
-
-    def model(self):
-        client = AsyncAzureOpenAI(
-            azure_endpoint="https://gateway.test",
-            api_key="test-key",
-            api_version="2024-12-01-preview",
-            http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(self.handler)),
-            max_retries=0,
-        )
-        return openai_runtime.build_model(client)
+from tests.openai_fakes import DEPLOYMENT, FakeGateway, text_turn, tool_messages, tool_turn
 
 
 @pytest.fixture(autouse=True)
@@ -100,10 +38,6 @@ def _run(gateway: FakeGateway, input_items: Any, access_scope: str | None = "sco
     return asyncio.run(go())
 
 
-def _tool_messages(body: dict) -> list[dict]:
-    return [m for m in body["messages"] if m.get("role") == "tool"]
-
-
 def test_tracing_is_disabled_on_import() -> None:
     assert isinstance(trace("probe"), NoOpTrace)
 
@@ -116,10 +50,6 @@ def test_instructions_combine_system_prompt_runtime_guide_and_skill_index() -> N
     assert "load_skill(name)" in instructions
     for skill in list_skills():
         assert f"`{skill.name}`: {skill.description}" in instructions
-
-
-def test_hidden_tools_are_skill_loading_and_follow_ups() -> None:
-    assert openai_runtime.HIDDEN_TOOL_NAMES == {"load_skill", "suggest_follow_ups"}
 
 
 def test_text_turn_calls_the_gateway_deployment_with_runtime_settings() -> None:
@@ -162,10 +92,10 @@ def test_tool_results_and_follow_ups_flow_back_to_the_model(monkeypatch) -> None
 
     assert result.final_output == "FAC002가 가장 큽니다."
     assert seen == {"sql": "SELECT 1", "purpose": "공장별 합계", "access_scope": "scope-x"}
-    sql_output = _tool_messages(gateway.bodies[1])[0]
+    sql_output = tool_messages(gateway.bodies[1])[0]
     assert sql_output["tool_call_id"] == "call_sql"
     assert json.loads(sql_output["content"]) == {"status": "success", "result_id": "a" * 32, "row_count": 3}
-    follow_up = _tool_messages(gateway.bodies[2])[-1]
+    follow_up = tool_messages(gateway.bodies[2])[-1]
     assert follow_up["tool_call_id"] == "call_next"
     assert json.loads(follow_up["content"]).get("status") != "error"
     assert len(gateway.bodies) == 3
@@ -176,7 +106,7 @@ def test_load_skill_returns_the_skill_body_without_frontmatter() -> None:
 
     _run(gateway, "DB에서 조회해 주세요.")
 
-    content = _tool_messages(gateway.bodies[1])[0]["content"]
+    content = tool_messages(gateway.bodies[1])[0]["content"]
     assert content == get_skill("sql-analysis").content
     assert not content.startswith("---")
 
@@ -221,3 +151,20 @@ def test_build_model_requires_gateway_settings(monkeypatch, name: str) -> None:
 
     with pytest.raises(RuntimeError, match=name):
         openai_runtime.build_model()
+
+
+def test_tool_exception_returns_the_public_failure_payload(monkeypatch, caplog) -> None:
+    async def broken_execute_sql(**_kwargs) -> dict:
+        raise OSError(r"C:\internal\path\db.sqlite locked")
+
+    monkeypatch.setattr("agent.tool_specs.execute_sql", broken_execute_sql)
+    gateway = FakeGateway(
+        tool_turn("execute_sql", {"sql": "SELECT 1", "purpose": "확인"}),
+        text_turn("조회에 실패했습니다."),
+    )
+
+    _run(gateway, "조회")
+
+    content = tool_messages(gateway.bodies[1])[0]["content"]
+    assert json.loads(content) == TOOL_FAILURE_PAYLOAD
+    assert "internal" not in caplog.text and "OSError" in caplog.text

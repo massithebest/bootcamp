@@ -8,14 +8,16 @@
 
 - 범위: Claude 실행부 옆에 `AGENT_RUNTIME=openai` 실행부를 추가하고 같은 평가 세트로 비교해 기본값 전환을 정한다.
   Frontend·공개 API·`AgentEvent` 계약은 바꾸지 않는다.
-- 현재 단계: 0~2단계 완료(2026-11-02).
+- 현재 단계: 0~3단계 완료(2026-11-02).
   - Tool 이름·설명·입력 schema·handler·화면 노출 여부의 단일 출처는 `agent/tool_specs.py::tool_specs()`이고,
     `agent/sdk_tools.py`는 이를 Claude MCP Tool로 감싸기만 한다.
   - `agent/openai_runtime.py`: 지침(`SYSTEM_PROMPT` + `agent_sdk/CLAUDE.md` + Skill 목록), 공통 명세 FunctionTool(전부 non-strict)과
     `load_skill`, 게이트웨이 Chat Completions 모델(`parallel_tool_calls=False`·`include_usage=True`·상한은 `max_completion_tokens`),
     트레이싱 off(import·실행마다), `AGENT_MAX_TURNS`(기본 25). Skill 읽기는 `agent/skills.py`로 지식 API와 공유한다.
-  - 아직 `run_agent`에 연결하지 않았다(화면 이벤트 변환이 3단계).
-- 다음 행동: 3단계 이벤트 어댑터(스트림 → `AgentEvent`)와 `AGENT_RUNTIME` 분기를 두 어댑터 동일 시나리오 비교 테스트와 함께 만든다.
+  - `AGENT_RUNTIME=claude|openai`(기본 claude, 그 밖의 값은 시작 오류)로 `run_agent`가 실행부를 고른다. OpenAI 스트림은
+    `agent/openai_event_adapter.py`가 Claude 어댑터와 같은 `AgentEvent`로 바꾸며, Tool 이벤트 조립은 `agent/tool_events.py`를 함께 쓴다.
+  - 한계: OpenAI 실행부는 아직 대화 기록·분기를 쓰지 않아 매 턴이 새 대화이고, 타임아웃·max_turns 초과는 라우트의 일반 오류 문구로 끝난다.
+- 다음 행동: 4단계 대화 기록·분기(`to_input_list` 스냅샷, 다음 턴·편집·재생성·알 수 없는 turn_id·상한).
 - 선행 확인: 폐쇄망 Nexus에 `openai-agents==0.24.0`·`griffelib` 등록 여부(반입 전).
 
 ## 목표와 책임

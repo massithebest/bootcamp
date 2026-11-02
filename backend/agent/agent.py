@@ -17,6 +17,7 @@ from agent.session_store import (
 )
 from agent.system_prompt import SYSTEM_PROMPT
 from api.schemas import AgentEvent
+from core import config
 from core.config import (
     AGENT_MODEL,
     CLAUDE_CLI_PATH,
@@ -143,7 +144,18 @@ async def run_agent(
         - Claude Agent SDK original events must be converted into AgentEvent.
         - SSE serialization must not be handled in this layer.
         - Internal chain-of-thought must never be exposed.
+        - `AGENT_RUNTIME=openai` 이면 같은 인자로 OpenAI Agents SDK 실행부를 쓴다.
     """
+
+    if config.AGENT_RUNTIME == "openai":
+        # Claude 실행부만 쓸 때 OpenAI SDK 를 import 하지 않도록 필요할 때 불러온다.
+        from agent.openai_runtime import run_openai_agent
+
+        async for event in run_openai_agent(
+            message, conversation_id, fork_from_turn_id, access_scope
+        ):
+            yield event
+        return
 
     turn_id = str(uuid.uuid4())
     resume_session_id, resume_session_at, warning = _resolve_resume(

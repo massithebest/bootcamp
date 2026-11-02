@@ -157,6 +157,12 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic").lower()
 #: error/done으로 종료해 브라우저가 무한 대기하지 않게 한다.
 LLM_RESPONSE_TIMEOUT_SECONDS = int(os.getenv("LLM_RESPONSE_TIMEOUT_SECONDS", "30"))
 
+#: Agent 실행부. claude(Claude Agent SDK, 기본) | openai(OpenAI Agents SDK, 게이트웨이
+#: `AZURE_OPENAI_*` 설정을 직접 사용).
+AGENT_RUNTIME = os.getenv("AGENT_RUNTIME", "").strip().lower() or "claude"
+if AGENT_RUNTIME not in ("claude", "openai"):
+    raise RuntimeError("AGENT_RUNTIME 은 claude 또는 openai 여야 합니다.")
+
 #: OpenAI Agents SDK 실행부의 한 응답 최대 모델 호출 수. SDK 기본값(10)은 Tool 9회와
 #: 후속질문을 쓰는 응답에 부족하다.
 AGENT_MAX_TURNS = int(os.getenv("AGENT_MAX_TURNS") or 25)

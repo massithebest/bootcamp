@@ -3,7 +3,7 @@
 `agent/tool_specs.py` 의 공통 Tool 명세와 Claude 실행부와 같은 런타임 지침
 (`system_prompt.py` + `agent_sdk/CLAUDE.md` + Skills)으로 Agent 를 만들고,
 사내 게이트웨이의 Chat Completions 를 직접 호출해 한 턴을 스트리밍 실행한다.
-이벤트 변환·대화 기록은 이 모듈이 아니라 어댑터·기록 계층이 맡는다.
+`AgentEvent` 변환은 `openai_event_adapter`가 맡는다.
 
 - 트레이싱은 기본값이 외부(OpenAI)로 전송하므로 import 시점과 실행마다 끈다.
 - Tool 은 순서대로 하나씩 호출하게 해 화면 순서 규칙을 유지한다.
@@ -11,6 +11,9 @@
 """
 
 import json
+import logging
+import uuid
+from collections.abc import AsyncIterator
 from typing import Any
 
 from agents import (
@@ -25,20 +28,21 @@ from agents import (
 from agents.result import RunResultStreaming
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 
+from agent.openai_event_adapter import OpenAIEventAdapter
 from agent.skills import AGENT_SDK_DIR, get_skill, list_skills
 from agent.system_prompt import SYSTEM_PROMPT
+from agent.tool_events import TOOL_FAILURE_PAYLOAD
 from agent.tool_specs import ToolSpec, tool_specs
+from api.schemas import AgentEvent
 from core import config
 
 
 set_tracing_disabled(True)
 
+logger = logging.getLogger(__name__)
+
 AGENT_NAME = "production-planning-agent"
 LOAD_SKILL_TOOL_NAME = "load_skill"
-#: 화면 Tool 사용 기록에 내보내지 않는 Tool(Skill 로딩·후속질문).
-HIDDEN_TOOL_NAMES = frozenset(
-    {LOAD_SKILL_TOOL_NAME} | {spec.name for spec in tool_specs() if not spec.visible}
-)
 INSTRUCTIONS_PATH = AGENT_SDK_DIR / "CLAUDE.md"
 
 
@@ -77,6 +81,10 @@ def _function_tool(spec: ToolSpec, access_scope: str | None) -> FunctionTool:
             payload = await spec.handler(args, access_scope)
         except KeyError as exc:
             return _error(f"필수 인자가 없습니다: {exc.args[0]}")
+        except Exception as exc:
+            # 예외 원문에는 내부 경로·SQL 이 들어갈 수 있어 모델·화면에는 공개 문구만 보낸다.
+            logger.error("Tool 실행 실패: tool=%s error_type=%s", spec.name, type(exc).__name__)
+            return json.dumps(TOOL_FAILURE_PAYLOAD, ensure_ascii=False)
         return json.dumps(payload, ensure_ascii=False)
 
     # 선택 필드·자유 객체(params 등)가 있는 schema 는 strict 모드가 거부하므로 끄고,
@@ -170,3 +178,30 @@ def run_streamed(
         max_turns=config.AGENT_MAX_TURNS,
         run_config=RunConfig(tracing_disabled=True),
     )
+
+
+async def run_openai_agent(
+    message: str,
+    conversation_id: str | None = None,
+    fork_from_turn_id: str | None = None,
+    access_scope: str | None = None,
+    *,
+    model: OpenAIChatCompletionsModel | None = None,
+) -> AsyncIterator[AgentEvent]:
+    """`agent.run_agent`의 OpenAI 실행부. 같은 인자와 `AgentEvent` 계약을 따른다.
+
+    대화 기록·분기(`conversation_id`·`fork_from_turn_id`)는 4단계에서 연결한다. 지금은 매 턴을
+    새 대화로 실행한다. 예상하지 못한 예외는 라우트가 공개 `error` → `done`으로 바꾼다.
+    """
+
+    turn_id = str(uuid.uuid4())
+    adapter = OpenAIEventAdapter()
+    result = run_streamed(message, access_scope=access_scope, model=model)
+    async for raw_event in result.stream_events():
+        for event in adapter.convert(raw_event):
+            yield event
+
+    done_data: dict[str, object] = {"turn_id": turn_id}
+    if adapter.suggestions:
+        done_data["suggestions"] = adapter.suggestions
+    yield AgentEvent(type="done", data=done_data)

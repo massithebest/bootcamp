@@ -1,8 +1,5 @@
 """Convert Claude Agent SDK events into common AgentEvent objects."""
 
-import json
-from typing import Any
-
 from claude_agent_sdk import (
     AssistantMessage,
     ResultMessage,
@@ -16,6 +13,12 @@ from claude_agent_sdk import (
 
 from api.schemas import AgentEvent
 from agent.sdk_tools import MCP_SERVER_NAME
+from agent.tool_events import (
+    TOOL_FAILURE_PAYLOAD,
+    coerce_tool_result,
+    tool_call_events,
+    tool_result_events,
+)
 from agent.tool_specs import SUGGESTION_TOOL_NAME
 from tools.suggestion_tool import normalize_suggestions
 
@@ -42,32 +45,6 @@ def _short_tool_name(name: str | None) -> str | None:
     if name and name.startswith(_MCP_PREFIX):
         return name[len(_MCP_PREFIX):]
     return name
-
-
-def _coerce_tool_result(content: Any) -> dict[str, Any]:
-    """ToolResultBlock 의 content 를 Frontend 용 dict 로 정규화한다."""
-
-    text: str | None = None
-
-    if isinstance(content, str):
-        text = content
-    elif isinstance(content, list):
-        parts = [
-            part.get("text", "")
-            for part in content
-            if isinstance(part, dict) and part.get("type") == "text"
-        ]
-        text = "".join(parts) if parts else None
-
-    if text is None:
-        return {"raw": content}
-
-    try:
-        parsed = json.loads(text)
-    except (ValueError, TypeError):
-        return {"text": text}
-
-    return parsed if isinstance(parsed, dict) else {"result": parsed}
 
 
 class AgentEventAdapter:
@@ -223,27 +200,8 @@ class AgentEventAdapter:
                 if not _is_business_tool(block.name):
                     # 내장 Tool(Skill/Read/Bash 등)은 Frontend 로 전달하지 않는다.
                     continue
-                short = _short_tool_name(block.name)
-                public_args = block.input
-                events.append(
-                    AgentEvent(
-                        type="tool_call",
-                        tool_name=short,
-                        tool_call_id=block.id,
-                        data={"args": public_args},
-                    )
-                )
-                events.append(
-                    AgentEvent(
-                        type="status",
-                        tool_name=short,
-                        tool_call_id=block.id,
-                        data={
-                            "step": block.id,
-                            "status": "running",
-                            "label": f"{short} 실행",
-                        },
-                    )
+                events.extend(
+                    tool_call_events(_short_tool_name(block.name), block.id, block.input)
                 )
 
             # ThinkingBlock(모델 chain-of-thought)은 항상 무시한다 — 내부 추론을
@@ -272,36 +230,15 @@ class AgentEventAdapter:
             if not _is_business_tool(raw_name):
                 continue
 
-            tool_name = _short_tool_name(raw_name)
             # SDK 실행 실패에는 내부 예외/경로가 들어갈 수 있다. 업무 함수가
             # 반환한 안전한 status:error payload와 구분해 원문을 공개하지 않는다.
             data = (
-                {"status": "error", "message": "도구 실행 중 오류가 발생했습니다."}
+                dict(TOOL_FAILURE_PAYLOAD)
                 if block.is_error
-                else _coerce_tool_result(block.content)
+                else coerce_tool_result(block.content)
             )
-            failed = data.get("status") == "error" or bool(data.get("error"))
-            status = "error" if failed else "completed"
-
-            events.append(
-                AgentEvent(
-                    type="tool_result",
-                    tool_name=tool_name,
-                    tool_call_id=block.tool_use_id,
-                    data=data,
-                )
-            )
-            events.append(
-                AgentEvent(
-                    type="status",
-                    tool_name=tool_name,
-                    tool_call_id=block.tool_use_id,
-                    data={
-                        "step": block.tool_use_id,
-                        "status": status,
-                        "label": f"{tool_name} {'실패' if failed else '완료'}",
-                    },
-                )
+            events.extend(
+                tool_result_events(_short_tool_name(raw_name), block.tool_use_id, data)
             )
 
         return events
