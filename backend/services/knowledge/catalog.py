@@ -170,6 +170,9 @@ class KnowledgeStore:
                 table.description,
                 table.tags,
                 [column.name for column in table.columns],
+                # 업무 용어(예: "미수립계획")는 컬럼 설명·코드값 뜻에만 적혀 있는 경우가 많다.
+                [column.desc for column in table.columns],
+                [label for column in table.columns for label in (column.codes or {}).values()],
             ):
                 continue
             if tag and not _contains(tag, table.tags):

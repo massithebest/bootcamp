@@ -333,6 +333,10 @@ def test_keyword_search_ignores_spacing_and_matches_any_word() -> None:
     for keyword in ("계획 실적", "계획·실적", "계획실적", "plan actual"):
         assert "FP_TARGET" in {t["table"] for t in store.list_tables(keyword=keyword)}, keyword
     assert store.list_tables(keyword="존재하지않는 단어들") == []
+    # "계획수립옵션이 뭔가요? 미수립계획은 어떻게 판단하나요?"에 PLAN_OPT_CD(계획옵션코드, X=미수립계획)를 못 찾고
+    # 카탈로그에 근거가 없다고 답했다. 컬럼 설명과 코드값 뜻도 검색한다.
+    for keyword in ("미수립계획", "계획옵션", "계획 옵션"):
+        assert "FP_TARGET" in {t["table"] for t in store.list_tables(keyword=keyword)}, keyword
 
 
 @pytest.mark.usefixtures("bundled_knowledge")

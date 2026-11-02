@@ -247,7 +247,7 @@ def test_presented_results_use_readable_labels_and_are_not_repeated() -> None:
     skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
 
     # 공장별 비교 답변이 표·차트의 6개 값을 "공장별 월 계획수량 합계는 다음 값입니다"로 다시 나열했다.
-    assert "근거에서 다시 나열하지 않는다" in SYSTEM_PROMPT
+    assert "근거에서 다시 나열하지 않" in SYSTEM_PROMPT
     assert "계산에 사용한 값은 다음과 같습니다" in claude
     assert "계산에 사용한 값은 다음과 같습니다" in tools["present_chart"].description
     assert "계산에 사용한 값은 다음과 같습니다" in tools["present_table"].description
@@ -309,6 +309,18 @@ def test_single_value_columns_are_dropped_and_distributions_show_shares() -> Non
     for text in (claude, skill, tools["execute_sql"].description):
         assert "비중(%)" in text
     assert "차이만 쓰고 나머지 대상을 빠뜨리지 않는다" in claude
+
+
+def test_catalog_name_matches_are_hedged_and_conclusions_are_not_repeated() -> None:
+    tools = {t.name: t for t in planning_tools(access_scope="scope-a")}
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+
+    # "계획수립옵션 = 계획옵션코드"라고 단정했고, 끝의 "정리하면"이 결론을 되풀이했다.
+    assert "같은 뜻인지는 확인되지 않았다" in claude and "같은 뜻인지는 확인되지 않았다" in tools["search_documents"].description
+    assert "정리하면" in claude and "정리하면" in tools["search_documents"].description
+    assert "결론을 다시 요약하지 않는다" in SYSTEM_PROMPT
+    # "정리하면"을 막자 "즉, 질문하신 ~에 대한 기준은 ~입니다"로 결론을 되풀이했다.
+    assert "즉, 질문하신" in claude and "즉, 질문하신" in tools["search_documents"].description
 
 
 def test_rag_final_answers_require_a_source_or_url() -> None:
