@@ -15,7 +15,8 @@ from claude_agent_sdk import (
 )
 
 from api.schemas import AgentEvent
-from agent.sdk_tools import MCP_SERVER_NAME, SUGGESTION_TOOL_NAME
+from agent.sdk_tools import MCP_SERVER_NAME
+from agent.tool_specs import SUGGESTION_TOOL_NAME
 from tools.suggestion_tool import normalize_suggestions
 
 

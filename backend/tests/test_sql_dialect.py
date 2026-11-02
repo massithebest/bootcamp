@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from agent.sdk_tools import planning_tools, sql_dialect_note
+from agent.tool_specs import sql_dialect_note, tool_specs
 from services.mock import mock_sql_service
 from services.production import sql_service as production_sql_service
 from services.results import store as result_store
@@ -18,7 +18,7 @@ def test_mock_and_production_services_expose_the_same_dialect_attribute() -> Non
 
 def test_execute_sql_description_names_the_dialect_and_sqlite_equivalents(monkeypatch) -> None:
     monkeypatch.setattr("services.sql_service.SQL_DIALECT", "SQLite", raising=False)
-    description = next(t for t in planning_tools("scope") if t.name == "execute_sql").description
+    description = next(t for t in tool_specs() if t.name == "execute_sql").description
 
     assert "SQL 방언은 SQLite" in description
     assert "NVL→COALESCE" in description and "strftime('%Y%m', 'now', 'localtime')" in description

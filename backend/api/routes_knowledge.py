@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic_core import to_jsonable_python
 from typing import Literal
 
-from agent.sdk_tools import tool_catalog
+from agent.tool_specs import tool_catalog
 from api.schemas import (KnowledgeDocumentInput, KnowledgeDocumentUpdate, KnowledgeActionInput,
     KnowledgeDocumentResponse, KnowledgeVersion, KnowledgeEntryResponse, KnowledgeEntryDetail, KnowledgeToolResponse,
     ChangeStateName, KnowledgeChangeAction, KnowledgeChangeDetail, KnowledgeChangeInput, KnowledgeChangeSummary,

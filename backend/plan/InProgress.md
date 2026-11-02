@@ -4,7 +4,14 @@
 
 ## 진행 중인 작업
 
-현재 착수 상태로 기록된 작업은 없다. 착수 시 담당 범위, 현재 단계, 다음 행동, 검증 상태를 이곳에 기록한다.
+### OpenAI Agents SDK 실행부 추가([계획](261102-openai-agents-sdk-plan.md))
+
+- 범위: Claude 실행부 옆에 `AGENT_RUNTIME=openai` 실행부를 추가하고 같은 평가 세트로 비교해 기본값 전환을 정한다.
+  Frontend·공개 API·`AgentEvent` 계약은 바꾸지 않는다.
+- 현재 단계: 0단계 사전 확인, 1단계 Tool 명세 공통화 완료(2026-11-02). Tool 이름·설명·입력 schema·handler·화면 노출 여부의
+  단일 출처는 `agent/tool_specs.py::tool_specs()`이고, `agent/sdk_tools.py`는 이를 Claude MCP Tool로 감싸기만 한다.
+- 다음 행동: 2단계 OpenAI 실행부(지침 조합·`load_skill`·모델 연결·트레이싱 off·`max_turns`)를 가짜 모델 단위 테스트와 함께 만든다.
+- 선행 확인: 폐쇄망 Nexus에 `openai-agents==0.24.0`·`griffelib` 등록 여부(반입 전).
 
 ## 목표와 책임
 

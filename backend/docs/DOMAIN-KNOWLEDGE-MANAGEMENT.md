@@ -481,7 +481,7 @@ python -m pytest -q \
 - 지식 tool: list는 요약, describe/get은 상세를 반환한다.
 - RAG: 출처가 있는 비정형 산문만 검색한다.
 
-`agent/sdk_tools.py::TOOL_NAMES`, 런타임 CLAUDE의 tool 표, Skill의 tool 이름이
+`agent/tool_specs.py::tool_specs()`, 런타임 CLAUDE의 tool 표, Skill의 tool 이름이
 어긋나지 않게 prompt 정합성 테스트를 유지한다. Agent가 SQL을
 작성하기 전 `describe_table`을 호출하고 `query_rules`의 기본 조건을 반영하며,
 `draft` 지식을 사용한 계산은 답변에 미검증 기준임을 표시한다.

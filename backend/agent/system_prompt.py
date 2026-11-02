@@ -2,7 +2,7 @@
 
 역할·응답 원칙·금지사항만 둔다 (설계 §2). 도구 목록과 업무 절차는 각각
 `agent_sdk/CLAUDE.md` 와 Skills 가 담당한다 — 여기에 도구 이름을 적으면
-`sdk_tools.TOOL_NAMES` 와 드리프트가 생긴다.
+`tool_specs.tool_specs()` 와 드리프트가 생긴다.
 """
 
 

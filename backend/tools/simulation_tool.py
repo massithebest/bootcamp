@@ -24,7 +24,7 @@ async def run_simulation(
 
     Args:
         access_scope: 요청 브라우저 세션의 불투명 scope. 모델에게 노출하지
-            않고 `agent/sdk_tools.py`의 tool wrapper가 내부에서 채운다.
+            않고 `agent/tool_specs.py`의 handler가 내부에서 채운다.
     """
 
     return await simulation_service.run_simulation(

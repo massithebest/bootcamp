@@ -20,9 +20,6 @@
 
 ### P3
 
-- [ ] OpenAI Agents SDK 실행부를 추가하고 Claude 실행부와 비교해 전환을 결정한다
-  ([계획](261102-openai-agents-sdk-plan.md)). 0단계 사전 확인(2026-11-02)은 통과했고 다음은 1단계(Tool 명세 공통화)다.
-  폐쇄망 Nexus에 `openai-agents`·`griffelib` 등록 여부는 반입 전에 확인한다.
 - [ ] PoC 해싱 임베딩 검색(2026-10-24)을 의미 검색이 되는 임베딩으로 바꾼다. 사내 임베딩 모델·반입 가능
   런타임(예: ONNX)을 정하고 `services/knowledge/embedding.py`의 `get_embedder()`를 교체한다. 문서가 수천 건을
   넘으면 SQLite 전수 비교 대신 vector DB(Milvus 등) 색인을 검토한다.

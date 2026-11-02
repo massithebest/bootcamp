@@ -6,7 +6,7 @@
  *   list_tables/describe_table/list_kpis/get_kpi → 참조한 지식 (기본 접힘)
  *
  * 구분은 카드가 아니라 얇은 좌측 룰 + 헤더 한 줄로 만든다.
- * 도구 목록은 Backend `agent/sdk_tools.py` 의 `TOOL_NAMES`를 기준으로 유지한다.
+ * 도구 목록은 Backend `agent/tool_specs.py` 의 `tool_specs()`를 기준으로 유지한다.
  */
 
 import type { ReactNode } from "react";

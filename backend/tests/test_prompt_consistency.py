@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from agent.agent import AGENT_SDK_CWD
-from agent.sdk_tools import TOOL_NAMES, planning_tools
+from agent.tool_specs import tool_specs
 from agent.system_prompt import SYSTEM_PROMPT
 from services.knowledge.catalog import get_store
 
@@ -21,7 +21,7 @@ SKILLS = sorted((Path(AGENT_SDK_CWD) / ".claude" / "skills").glob("*/SKILL.md"))
 
 EXPECTED_SKILLS = {"sql-analysis", "simulation"}
 
-SHORT_TOOL_NAMES = {name.rsplit("__", 1)[-1] for name in TOOL_NAMES}
+SHORT_TOOL_NAMES = {spec.name for spec in tool_specs()}
 
 #: 결과 표시가 `present_*` Tool로 통일되기 전에 쓰던 legacy 전용 용어.
 #: 되살아나면 지침이 삭제된 legacy mode 를 다시 안내하는 회귀다.
@@ -128,7 +128,7 @@ def test_present_procedure_is_documented_in_every_presenting_file() -> None:
 
 
 def test_present_tool_descriptions_forbid_position_words_and_raw_tree() -> None:
-    tools = {t.name: t for t in planning_tools(access_scope="scope-a")}
+    tools = {t.name: t for t in tool_specs()}
 
     chart = tools["present_chart"].description
     table = tools["present_table"].description
@@ -220,7 +220,7 @@ def test_routing_policy_uses_requested_operation_and_evidence() -> None:
 
 
 def test_data_tool_descriptions_distinguish_sql_simulation_and_documents() -> None:
-    tools = {t.name: t for t in planning_tools(access_scope="scope-a")}
+    tools = {t.name: t for t in tool_specs()}
 
     assert "DB/데이터베이스/SQL 조회" in tools["execute_sql"].description
     assert "등록 simulation" in tools["run_simulation"].description
@@ -249,7 +249,7 @@ def test_data_tool_descriptions_distinguish_sql_simulation_and_documents() -> No
 
 
 def test_presented_results_use_readable_labels_and_are_not_repeated() -> None:
-    tools = {t.name: t for t in planning_tools(access_scope="scope-a")}
+    tools = {t.name: t for t in tool_specs()}
     claude = CLAUDE_MD.read_text(encoding="utf-8")
     skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
 
@@ -271,7 +271,7 @@ def test_presented_results_use_readable_labels_and_are_not_repeated() -> None:
 
 
 def test_grouped_comparisons_of_stored_results_are_aggregated_on_the_server() -> None:
-    tools = {t.name: t for t in planning_tools(access_scope="scope-a")}
+    tools = {t.name: t for t in tool_specs()}
     claude = CLAUDE_MD.read_text(encoding="utf-8")
     simulation = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "simulation" / "SKILL.md").read_text(encoding="utf-8")
 
@@ -305,7 +305,7 @@ def test_grouped_comparisons_of_stored_results_are_aggregated_on_the_server() ->
 
 
 def test_single_value_columns_are_dropped_and_distributions_show_shares() -> None:
-    tools = {t.name: t for t in planning_tools(access_scope="scope-a")}
+    tools = {t.name: t for t in tool_specs()}
     claude = CLAUDE_MD.read_text(encoding="utf-8")
     skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
 
@@ -319,7 +319,7 @@ def test_single_value_columns_are_dropped_and_distributions_show_shares() -> Non
 
 
 def test_catalog_name_matches_are_hedged_and_conclusions_are_not_repeated() -> None:
-    tools = {t.name: t for t in planning_tools(access_scope="scope-a")}
+    tools = {t.name: t for t in tool_specs()}
     claude = CLAUDE_MD.read_text(encoding="utf-8")
 
     # "계획수립옵션 = 계획옵션코드"라고 단정했고, 끝의 "정리하면"이 결론을 되풀이했다.
@@ -334,7 +334,7 @@ def test_catalog_name_matches_are_hedged_and_conclusions_are_not_repeated() -> N
 
 
 def test_multi_value_questions_list_values_and_state_the_period() -> None:
-    tools = {t.name: t for t in planning_tools(access_scope="scope-a")}
+    tools = {t.name: t for t in tool_specs()}
     claude = CLAUDE_MD.read_text(encoding="utf-8")
     skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
 

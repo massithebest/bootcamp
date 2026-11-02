@@ -17,7 +17,7 @@ import agent.agent as agent_module
 from agent import session_store
 from agent.agent import run_agent
 from agent.event_adapter import AgentEventAdapter
-from agent.sdk_tools import tool_catalog
+from agent.tool_specs import tool_catalog
 from api.schemas import AgentEvent
 from tools.suggestion_tool import normalize_suggestions, suggest_follow_ups
 

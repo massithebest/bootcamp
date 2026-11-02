@@ -8,8 +8,8 @@ Python 3.11 FastAPI 서비스다. `/api/chat`은 Claude Agent SDK 이벤트를
 
 - 흐름은 route → agent → SDK tool → tool → service → DB/provider 순서다.
   route에 SQL, provider 설정, 결과 검증과 업무 로직을 넣지 않는다.
-- API 계약은 `api/schemas.py`, 이벤트 변환은 `agent/event_adapter.py`, 등록 Tool은
-  `agent/sdk_tools.py`, 구조화 지식은 `knowledge/` YAML을 기준으로 한다.
+- API 계약은 `api/schemas.py`, 이벤트 변환은 `agent/event_adapter.py`, Tool 명세는
+  `agent/tool_specs.py`(Claude 등록은 `agent/sdk_tools.py`), 구조화 지식은 `knowledge/` YAML을 기준으로 한다.
 - SQL은 `services/sql/guard.py`를 통과한 읽기 전용 쿼리만 허용한다.
   `services/mock`과 `services/production`의 공개 시그니처·반환 형태를 맞춘다.
 - 환경변수는 `core/config.py`에서 읽고 새 키는 비밀값 없이 `.env.example`에 추가한다.

@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from agent.sdk_tools import tool_catalog
+from agent.tool_specs import tool_catalog
 from services.results import store as result_store
 from services.results.present import (
     PresentError,

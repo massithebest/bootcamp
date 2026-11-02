@@ -433,7 +433,7 @@ Agent가 SQL을 올바르게 생성하려면 실제 DB와 서비스에 맞는 �
   정의를 검토하고 근거·담당자·갱신일을 기록한 경우에만 `verified`로 바꾼다.
 - 기존 `KnowledgeStore` 모델로 표현할 수 없는 필드가 꼭 필요할 때만
   `services/knowledge/catalog.py`, 관련 Tool payload와 테스트를 함께 변경한다.
-- Agent 지침의 Tool 이름과 실행 순서는 `backend/agent/sdk_tools.py`,
+- Agent 지침의 Tool 이름과 실행 순서는 `backend/agent/tool_specs.py`,
   `backend/agent/agent_sdk/CLAUDE.md`, `.claude/skills/` 및 knowledge 내용이 서로
   일치하도록 확인한다.
 

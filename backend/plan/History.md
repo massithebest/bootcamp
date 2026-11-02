@@ -2,6 +2,17 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-11-02 — OpenAI Agents SDK 실행부 0·1단계: 사전 확인과 Tool 명세 공통화
+
+- 0단계: `openai-agents==0.24.0`이 현재 requirements와 충돌 없이 설치되고(새 패키지는 `openai-agents`·`griffelib`), 기본 트레이싱은
+  `api.openai.com`으로 전송을 시도하므로 비활성화가 필수이며, 게이트웨이 Chat Completions로 스트리밍·Tool 호출·기록 재전송이
+  동작함을 확인했다. 결과는 [계획](261102-openai-agents-sdk-plan.md)에 기록했다.
+- 1단계: Tool 설명·입력 schema·handler·UI 출력 설명·화면 노출 여부를 `agent/tool_specs.py`의 `ToolSpec` 목록으로 옮겼다.
+  `agent/sdk_tools.py`는 명세를 `access_scope`에 묶어 Claude MCP Tool로 감싸기만 하고, Tool 목록 API(`tool_catalog`)와
+  프롬프트 정합성·SQL 방언 테스트는 공통 명세를 대상으로 동작한다. TypedDict로 만들던 선택 필드 schema는 같은 JSON schema로 직접 적었다.
+- 검증: 리팩터 전 스냅샷과 Tool 이름·설명·입력 schema·출력 설명, Claude MCP 서버가 광고하는 schema가 모두 같았다.
+  명세 단위 테스트 4건(이름 유일·schema 형식·숨김 Tool·scope 전달)을 더해 Backend 445건 통과.
+
 ## 2026-11-02 — 결론 반복 금지 문구로 빠진 후속질문 복구
 
 - "WIP(재공)는 어떻게 관리되나요?"는 출처를 포함해 맞게 답했지만 `suggest_follow_ups`를 호출하지 않아 후속질문이 없었다. 직전에
