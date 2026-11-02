@@ -28,6 +28,7 @@ from agents import (
 from agents.result import RunResultStreaming
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 
+from agent import openai_session_store as session_store
 from agent.openai_event_adapter import OpenAIEventAdapter
 from agent.skills import AGENT_SDK_DIR, get_skill, list_skills
 from agent.system_prompt import SYSTEM_PROMPT
@@ -180,6 +181,21 @@ def run_streamed(
     )
 
 
+def _resolve_history(
+    conversation_id: str | None, fork_from_turn_id: str | None
+) -> tuple[list[Any], AgentEvent | None]:
+    """이번 턴 앞에 붙일 기록과, 분기 지점을 찾지 못했을 때의 경고 이벤트."""
+
+    if fork_from_turn_id is None:
+        return session_store.latest_history(conversation_id), None
+    if fork_from_turn_id == "":
+        return [], None
+    history = session_store.turn_history(fork_from_turn_id)
+    if history is None:
+        return [], AgentEvent(type="error", content=session_store.FORK_FALLBACK_MESSAGE)
+    return history, None
+
+
 async def run_openai_agent(
     message: str,
     conversation_id: str | None = None,
@@ -190,17 +206,25 @@ async def run_openai_agent(
 ) -> AsyncIterator[AgentEvent]:
     """`agent.run_agent`의 OpenAI 실행부. 같은 인자와 `AgentEvent` 계약을 따른다.
 
-    대화 기록·분기(`conversation_id`·`fork_from_turn_id`)는 4단계에서 연결한다. 지금은 매 턴을
-    새 대화로 실행한다. 예상하지 못한 예외는 라우트가 공개 `error` → `done`으로 바꾼다.
+    `fork_from_turn_id`가 None 이면 대화의 최신 기록에 이어 쓰고, 빈 문자열이면 처음부터,
+    알 수 없는 값이면 경고 `error` 후 처음부터 실행한다. 성공한 턴만 기록·분기 지점으로 남긴다.
+    예상하지 못한 예외는 라우트가 공개 `error` → `done`으로 바꾼다.
     """
 
     turn_id = str(uuid.uuid4())
+    history, warning = _resolve_history(conversation_id, fork_from_turn_id)
+    if warning is not None:
+        yield warning
+
     adapter = OpenAIEventAdapter()
-    result = run_streamed(message, access_scope=access_scope, model=model)
+    result = run_streamed(
+        [*history, {"role": "user", "content": message}], access_scope=access_scope, model=model
+    )
     async for raw_event in result.stream_events():
         for event in adapter.convert(raw_event):
             yield event
 
+    session_store.record_turn(conversation_id, turn_id, result.to_input_list())
     done_data: dict[str, object] = {"turn_id": turn_id}
     if adapter.suggestions:
         done_data["suggestions"] = adapter.suggestions

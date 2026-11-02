@@ -2,6 +2,16 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-11-02 — OpenAI Agents SDK 실행부 4단계: 대화 기록과 편집·재생성 분기
+
+- `agent/openai_session_store.py`: 성공한 턴의 `RunResult.to_input_list()`를 conversation_id 최신 기록과 turn_id 분기 지점으로 보관한다.
+  다음 턴은 최신 기록 + 새 질문, `fork_from_turn_id`는 그 턴 직후 기록 + 새 질문(원본 갈래 유지, 분기 턴이 최신 갈래가 됨), 빈 문자열은
+  처음부터, 알 수 없거나 상한(대화당 50개)으로 지운 turn_id는 Claude 실행부와 같은 경고 `error` 후 처음부터 실행한다. 실패한 턴은 기록하지 않는다.
+- 검증: 기록·분기 테스트 7건(Tool 결과를 포함한 다음 턴, 편집 분기와 원본 보존, 재생성·처음부터, 알 수 없는 turn_id, 상한, 실패 턴,
+  conversation_id 없는 턴)으로 Backend 470건 통과. 앱을 `AGENT_RUNTIME=openai`로 띄워 "2026년 5월 공장별 계획수량 합계" → "그중 가장 큰
+  공장의 6월 값"이 앞 턴의 FAC002와 조건을 이어 45,995로 답했고, 두 번째 질문을 "가장 작은 공장"으로 편집하자 버린 갈래 내용 없이 FAC003
+  50,799, 재생성도 같은 값으로 답했다(mock DB와 일치, 서버 오류 없음).
+
 ## 2026-11-02 — OpenAI Agents SDK 실행부 3단계: 이벤트 변환과 실행부 선택
 
 - `agent/openai_event_adapter.py`: 텍스트는 `response.output_text.delta`로만 보내고 최종 메시지 item은 delta가 없을 때만 보낸다.
