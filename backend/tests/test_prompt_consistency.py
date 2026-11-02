@@ -328,6 +328,9 @@ def test_catalog_name_matches_are_hedged_and_conclusions_are_not_repeated() -> N
     assert "결론을 다시 요약하지 않는다" in SYSTEM_PROMPT
     # "정리하면"을 막자 "즉, 질문하신 ~에 대한 기준은 ~입니다"로 결론을 되풀이했다.
     assert "즉, 질문하신" in claude and "즉, 질문하신" in tools["search_documents"].description
+    # "답변은 결론과 근거에서 끝낸다"를 넣은 뒤 문서 답변이 suggest_follow_ups를 호출하지 않았다.
+    assert "suggest_follow_ups는 그대로 호출한다" in tools["search_documents"].description
+    assert "`suggest_follow_ups`는 그대로 호출한다" in claude
 
 
 def test_multi_value_questions_list_values_and_state_the_period() -> None:
