@@ -56,7 +56,7 @@ Claude Agent SDK로 구현한 Agent 실행부 옆에 OpenAI Agents SDK 실행부
   Chat Completions + Tool 호출 + 스트리밍을 지원함은 기존 프록시로 확인했다. Responses API는 게이트웨이 지원 여부를 확인하지
   않았으므로 쓰지 않는다.
 - `ModelSettings`: `parallel_tool_calls=False`(현재처럼 Tool을 순서대로 호출해 화면 순서·`도입 → present → 해석` 규칙을 유지),
-  추론 계열이 거부하는 temperature 등은 지정하지 않는다.
+  `include_usage=True`(스트리밍에서 토큰 사용량을 받으려면 필요, 0단계 확인), 추론 계열이 거부하는 temperature 등은 지정하지 않는다.
 - **트레이싱 비활성화 필수**: `set_tracing_disabled(True)`. 기본값은 트레이스를 외부(OpenAI)로 보내므로 폐쇄망·보안 원칙에 어긋난다.
   테스트로 비활성화 상태를 단정한다.
 - `max_turns`: SDK 기본값(10)은 Tool 9회 + 후속질문을 쓰는 현재 응답에 부족하다. 설정값(`AGENT_MAX_TURNS`, 기본 25)으로 둔다.
@@ -109,6 +109,21 @@ Claude Agent SDK로 구현한 Agent 실행부 옆에 OpenAI Agents SDK 실행부
 | 6. 앱 검증 | `AGENT_RUNTIME=openai`로 Backend 실행, 브라우저에서 SQL·차트·문서·시뮬레이션·데이터 없음·삭제 요청·질문 편집·재생성·후속질문 클릭 확인 | Frontend 테스트·빌드 변경 없이 통과, 화면 동작이 Claude 실행부와 같음 |
 | 7. 비교 평가 | 같은 gpt-5.4로 평가 세트 15문항을 두 실행부에서 각 2회 실행 | 아래 전환 기준 판정과 결과를 History에 기록 |
 | 8. 문서 | README·`docs/CLOSED_NETWORK_SETUP.md`(반입 패키지, Node/CLI 불필요 조건)·`AGENTS.md`·`.env.example`·`requirements.txt` | 링크·명령 확인, `git diff --check` |
+
+## 0단계 확인 결과(2026-11-02)
+
+임시 venv(Python 3.11, Windows)와 1회용 확인 스크립트로 확인했다. 스크립트는 저장소에 넣지 않았다.
+
+| 항목 | 결과 |
+| --- | --- |
+| 패키지 | `openai-agents==0.24.0`(2026-10-15 배포, 순수 Python wheel, Python ≥3.10)으로 고정한다. `requirements.txt` 전체와 함께 설치해도 `pip check` 충돌이 없다. 현재 개발 venv에 없는 패키지는 `openai-agents`, `griffelib` 2개뿐이고 나머지 의존성(`openai<4,>=3`, `httpx2`, `mcp`, `starlette`, `websockets` 등)은 이미 설치된 버전 범위로 충족된다. 폐쇄망은 사내 Nexus로 설치하므로 이 2개 패키지의 Nexus 등록 여부를 반입 전에 확인해야 한다(여기서는 확인 불가). |
+| 트레이싱 | `set_tracing_disabled(True)`이면 실행 중 DNS 조회 호스트가 게이트웨이 하나뿐이다. 대조군(기본값, 더미 `OPENAI_API_KEY`)은 `api.openai.com`(트레이스 수집 endpoint)으로 접속을 시도했다(확인 스크립트가 DNS 단계에서 차단). 기본값이 외부 전송이므로 비활성화는 필수이며, 실행부 import 시점에 끄고 테스트로 단정한다. |
+| 게이트웨이 호환 | `AsyncAzureOpenAI(azure_endpoint, api_key, api_version)` + `OpenAIChatCompletionsModel(deployment)`가 기존 `AZURE_OPENAI_*` 설정 그대로 동작한다. 스트리밍 텍스트 delta, Tool 호출(call id·인자 dict), `parallel_tool_calls=False`, `strict_json_schema=False` raw schema의 선택 필드 생략 호출 모두 거부 없이 처리됐다. SDK 기본 User-Agent는 차단되지 않았다. |
+| 다음 턴 기록 | `result.to_input_list()`(user → function_call → function_call_output → message 4항목)에 새 사용자 메시지를 붙여 실행하면 직전 Tool 결과 값을 이어서 답한다. 6절 스냅샷 분기 방식이 가능하다. |
+| 토큰 사용량 | 스트리밍은 `include_usage=True`를 줘야 `usage.input_tokens/output_tokens`가 채워진다(없으면 0). 4절에 반영했다. |
+| 이벤트 순서 | `tool_called` → `tool_output` → 텍스트 delta 순서로 나와 5절 대응표대로 변환할 수 있다. Chat Completions 경로라 reasoning item은 나오지 않았다. |
+
+결론: 막힌 항목이 없어 1단계(Tool 명세 공통화)로 진행할 수 있다. 남은 선행 확인은 폐쇄망 Nexus의 2개 패키지 등록 여부다.
 
 ## 전환 기준(7단계)
 
