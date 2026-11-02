@@ -8,7 +8,7 @@
 
 - 범위: Claude 실행부 옆에 `AGENT_RUNTIME=openai` 실행부를 추가하고 같은 평가 세트로 비교해 기본값 전환을 정한다.
   Frontend·공개 API·`AgentEvent` 계약은 바꾸지 않는다.
-- 현재 단계: 0~7단계 완료(2026-11-02). 7단계 판정: 전환 기준 미충족으로 기본값은 `claude` 유지.
+- 현재 단계: 0~7단계 완료. 재판정(2026-11-03, 질문마다 번갈아 15문항 × 3회): 전환 기준 충족. 기본값 전환은 사용자 확인 후 진행한다.
   - Tool 이름·설명·입력 schema·handler·화면 노출 여부의 단일 출처는 `agent/tool_specs.py::tool_specs()`이고,
     `agent/sdk_tools.py`는 이를 Claude MCP Tool로 감싸기만 한다.
   - `agent/openai_runtime.py`: 지침(`SYSTEM_PROMPT` + `agent_sdk/CLAUDE.md` + Skill 목록), 공통 명세 FunctionTool(전부 non-strict)과
@@ -24,8 +24,8 @@
     재시도 대기 중에는 응답 지연 한도를 세지 않는다.
   - 지침 배치: system 에는 `SYSTEM_PROMPT` + Skill 목록만 두고, `agent_sdk/CLAUDE.md` 본문은 Claude CLI 처럼 대화 첫 user 메시지의
     질문 바로 앞(`with_guide`)에 둔다. 이후 턴은 기록에 남은 그 메시지를 이어 쓴다.
-- 다음 행동: (1) p90을 늘리는 요청 제한(429) 대응 검토, (2) 두 실행부를 같은 방식(15문항 × 3회)으로 재평가해 전환 여부를 다시 판정.
-  8단계 문서는 전환 결정 뒤에 한다.
+- 다음 행동: 기본값을 `openai`로 바꾸고 8단계 문서(README·폐쇄망 반입·`.env.example`·AGENTS.md)를 갱신한다(사용자 확인 후).
+  Claude 실행부·`/anthropic` 프록시·CLI 의존 제거는 전환 뒤 별도 작업으로 Todo 에 등록한다.
 - 선행 확인: 폐쇄망 Nexus에 `openai-agents==0.24.0`·`griffelib` 등록 여부(반입 전).
 
 ## 목표와 책임

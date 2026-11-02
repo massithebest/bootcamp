@@ -6,8 +6,10 @@
     python -m scripts.evaluate_agent --cases jun_plan_total,doc_wip
     python -m scripts.evaluate_agent --static-only   # LLM 없이 정적 지표만
     python -m scripts.evaluate_agent --runtime openai --repeat 2   # 실행부 지정, 같은 질문 반복
+    python -m scripts.evaluate_agent --runtime both --repeat 3     # 두 실행부를 질문마다 번갈아 비교
 
-`--runtime` 을 생략하면 `AGENT_RUNTIME` 설정(기본 claude)을 쓴다. 비용은 실행부마다 같은 기준으로 비교할 수 있게
+`--runtime` 을 생략하면 `AGENT_RUNTIME` 설정(기본 claude)을 쓴다. `both` 는 같은 질문을 두 실행부로 연달아 실행해
+공유 게이트웨이의 시간대별 요청 제한(429)이 한쪽에만 몰리지 않게 하고, 실행부별 보고서와 비교표를 남긴다. 비용은 실행부마다 같은 기준으로 비교할 수 있게
 입력·출력 토큰과 모델 호출 수로 남긴다. Claude SDK 의 USD 비용은 Claude 요금표 추정이므로 `LLM_PROVIDER=anthropic` 일
 때만 기록한다.
 
@@ -197,6 +199,7 @@ def aggregate(records: list[dict]) -> dict[str, Any]:
     firsts = [r["first_text_s"] for r in records if r["first_text_s"] is not None]
     costs = [r["cost_usd"] for r in records if r.get("cost_usd") is not None]
     usages = [r["usage"] for r in records if r.get("usage")]
+    waits = [u for u in usages if u.get("retry_wait_s") is not None]
     sql_calls = sum(r["sql_calls"] for r in records)
     return {
         "cases": len(records),
@@ -218,6 +221,7 @@ def aggregate(records: list[dict]) -> dict[str, Any]:
         "avg_input_tokens": _mean_of(usages, "input_tokens"),
         "avg_output_tokens": _mean_of(usages, "output_tokens"),
         "avg_model_calls": _mean_of(usages, "model_calls", digits=1),
+        "avg_retry_wait_s": _mean_of(waits, "retry_wait_s", digits=1),
     }
 
 
@@ -303,19 +307,17 @@ def _install_meter() -> dict:
     """실행부 SDK 결과의 토큰·모델 호출 수(와 Claude 비용)를 엿본다. 공개 AgentEvent 계약은 바꾸지 않는다."""
 
     from core import config
+    from agent import openai_runtime
 
     meter: dict = {}
-    if config.AGENT_RUNTIME == "openai":
-        from agent import openai_runtime
+    original_run = openai_runtime.run_streamed
 
-        original_run = openai_runtime.run_streamed
+    def metered_run(*args, **kwargs):
+        meter["result"] = original_run(*args, **kwargs)
+        meter["retry_wait"] = kwargs.get("retry_wait")
+        return meter["result"]
 
-        def metered_run(*args, **kwargs):
-            meter["result"] = original_run(*args, **kwargs)
-            return meter["result"]
-
-        openai_runtime.run_streamed = metered_run
-        return meter
+    openai_runtime.run_streamed = metered_run
 
     import agent.agent as agent_module
     from claude_agent_sdk import ResultMessage
@@ -345,10 +347,12 @@ def _metered_usage(meter: dict) -> dict | None:
     if result is None:
         return meter.get("usage")
     usage = result.context_wrapper.usage
-    return {"input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens, "model_calls": usage.requests}
+    retry_wait = meter.get("retry_wait")
+    return {"input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens, "model_calls": usage.requests,
+            "retry_wait_s": round(retry_wait.total, 1) if retry_wait is not None else None}
 
 
-def needs_local_proxy() -> bool:
+def needs_local_proxy(runtimes: list[str] | None = None) -> bool:
     """Claude 실행부의 CLI 가 백엔드 `/anthropic` 프록시를 거쳐야 하는 provider 인지(현재 azure_openai).
 
     OpenAI 실행부는 게이트웨이를 직접 호출하므로 프록시가 필요 없다.
@@ -356,11 +360,11 @@ def needs_local_proxy() -> bool:
 
     from core import config
 
-    return config.AGENT_RUNTIME == "claude" and config.LLM_PROVIDER == "azure_openai"
+    return "claude" in (runtimes or [config.AGENT_RUNTIME]) and config.LLM_PROVIDER == "azure_openai"
 
 
 @contextmanager
-def local_proxy_server():
+def local_proxy_server(runtimes: list[str] | None = None):
     """프록시가 필요한 provider 면 이 프로세스 안에 앱을 빈 포트로 띄운다.
 
     프록시는 서버 프로세스마다 만든 토큰(`LOCAL_PROXY_TOKEN`)만 받으므로, 평가 프로세스가 띄운 CLI 는
@@ -368,7 +372,7 @@ def local_proxy_server():
     호출 시점의 `config.BACKEND_PORT` 를 읽으므로 그 값을 임시 포트로 바꾼다.
     """
 
-    if not needs_local_proxy():
+    if not needs_local_proxy(runtimes):
         yield None
         return
 
@@ -413,17 +417,22 @@ def is_fatal_error(error: str | None) -> bool:
 async def evaluate(cases: list[dict], db_path: Path) -> tuple[list[dict], list[str]]:
     """질문별 결과와, 치명적 오류로 실행하지 못한 case id 목록을 돌려준다."""
 
+    from core import config
+
     meter = _install_meter()
     records = []
     for index, case in enumerate(cases, 1):
-        print(f"[{index}/{len(cases)}] {case['id']} (회차 {case.get('run', 1)}) ...", flush=True)
+        if case.get("runtime"):
+            config.AGENT_RUNTIME = case["runtime"]
+        print(f"[{index}/{len(cases)}] {case['id']} (회차 {case.get('run', 1)}, {config.AGENT_RUNTIME}) ...", flush=True)
         expected = expected_numbers(case, db_path)
         run = await run_case(case, meter)
         summary = summarize_events(run["events"])
         score = score_case(case, summary, expected)
         failed = run["timed_out"] or run["error"] is not None
         record = {
-            "id": case["id"], "run": case.get("run", 1), "category": case["category"], "question": case["question"],
+            "id": case["id"], "run": case.get("run", 1), "runtime": config.AGENT_RUNTIME,
+            "category": case["category"], "question": case["question"],
             "expected": expected, **score,
             "answer_correct": score["answer_correct"] and not failed,
             "completed": summary["completed"] and not failed,
@@ -475,6 +484,7 @@ def render_markdown(kpi: dict, static: dict, records: list[dict], started_at: st
         f"| 평균 Tool 호출 | {_fmt(kpi.get('avg_tool_calls'))}회 |",
         f"| 질문당 평균 모델 호출 | {_fmt(kpi.get('avg_model_calls'))}회 |",
         f"| 질문당 평균 토큰 (입력 / 출력) | {_fmt(kpi.get('avg_input_tokens'))} / {_fmt(kpi.get('avg_output_tokens'))} |",
+        f"| 질문당 평균 요청 제한 재시도 대기 (OpenAI 실행부만 측정) | {_fmt(kpi.get('avg_retry_wait_s'))}s |",
         f"| 질문당 평균 비용 | {_fmt(kpi.get('avg_cost_usd'))} USD |", "",
         "## 정적 지표 (LLM 불필요)", "",
         "| 지표 | 값 |", "| --- | --- |",
@@ -494,12 +504,45 @@ def render_markdown(kpi: dict, static: dict, records: list[dict], started_at: st
     return "\n".join(lines) + "\n"
 
 
+#: 비교표에 싣는 지표(이름, KPI 키, 백분율 여부).
+_COMPARE_ROWS = [
+    ("최종 답변 정답률", "answer_accuracy", True),
+    ("SQL 조회 데이터 정답률", "sql_data_accuracy", True),
+    ("응답 완료율", "completion_rate", True),
+    ("응답 시간 p50 (초)", "latency_p50_s", False),
+    ("응답 시간 p90 (초)", "latency_p90_s", False),
+    ("첫 응답 p50 (초)", "first_text_p50_s", False),
+    ("조회 규칙 준수율", "rule_adherence_rate", True),
+    ("SQL 오류율", "sql_error_rate", True),
+    ("쓰기 SQL 시도 (건)", "write_sql_attempts", False),
+    ("문서 출처 표기율", "citation_rate", True),
+    ("후속질문 제공률", "suggestion_rate", True),
+    ("질문당 모델 호출", "avg_model_calls", False),
+    ("질문당 입력 토큰", "avg_input_tokens", False),
+    ("질문당 요청 제한 재시도 대기 (초)", "avg_retry_wait_s", False),
+]
+
+
+def render_comparison(kpis: dict[str, dict], started_at: str, repeat: int = 1) -> str:
+    """실행부별 KPI 를 한 표로 비교한다(`--runtime both`)."""
+
+    runtimes = list(kpis)
+    lines = [
+        f"# 실행부 비교 ({started_at}, 질문마다 번갈아 실행, 반복 {repeat}회)", "",
+        "| 지표 | " + " | ".join(runtimes) + " |", "| --- |" + " --- |" * len(runtimes),
+    ]
+    for label, key, percent in _COMPARE_ROWS:
+        lines.append(f"| {label} | " + " | ".join(_fmt(kpis[r].get(key), percent) for r in runtimes) + " |")
+    return "\n".join(lines) + "\n"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Agent 정량 평가")
     parser.add_argument("--cases", help="쉼표로 구분한 case id (생략 시 전체)")
     parser.add_argument("--static-only", action="store_true", help="LLM 없이 정적 지표만 계산")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    parser.add_argument("--runtime", choices=("claude", "openai"), help="Agent 실행부 (생략 시 AGENT_RUNTIME)")
+    parser.add_argument("--runtime", choices=("claude", "openai", "both"),
+                        help="Agent 실행부 (생략 시 AGENT_RUNTIME, both 는 질문마다 두 실행부를 번갈아 실행)")
     parser.add_argument("--repeat", type=int, default=1, help="같은 질문 세트를 반복 실행할 횟수")
     args = parser.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
@@ -507,29 +550,37 @@ def main(argv: list[str] | None = None) -> int:
 
     from core import config
 
-    if args.runtime:
-        config.AGENT_RUNTIME = args.runtime
+    runtimes = ["claude", "openai"] if args.runtime == "both" else [args.runtime or config.AGENT_RUNTIME]
+    config.AGENT_RUNTIME = runtimes[0]
     started_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     static = static_metrics()
     records: list[dict] = []
     skipped: list[str] = []
     if not args.static_only:
         cases = load_cases(set(args.cases.split(",")) if args.cases else None)
-        cases = [{**case, "run": run} for run in range(1, max(args.repeat, 1) + 1) for case in cases]
-        with local_proxy_server() as proxy_port:
+        cases = [{**case, "run": run, "runtime": runtime}
+                 for run in range(1, max(args.repeat, 1) + 1) for case in cases for runtime in runtimes]
+        with local_proxy_server(runtimes) as proxy_port:
             if proxy_port:
                 print(f"{config.LLM_PROVIDER}: 평가용 로컬 프록시를 127.0.0.1:{proxy_port} 에 띄웠습니다.", flush=True)
             records, skipped = asyncio.run(evaluate(cases, Path(config.MOCK_DB_PATH)))
-    kpi = aggregate(records) if records else {}
-
     args.out.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    report = {"started_at": started_at, "runtime": config.AGENT_RUNTIME, "repeat": args.repeat,
-              "kpi": kpi, "static": static, "records": records, "skipped": skipped}
-    (args.out / f"agent-eval-{config.AGENT_RUNTIME}-{stamp}.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    markdown = render_markdown(kpi, static, records, started_at, skipped, config.AGENT_RUNTIME, args.repeat)
-    (args.out / f"agent-eval-{config.AGENT_RUNTIME}-{stamp}.md").write_text(markdown, encoding="utf-8")
-    print(markdown)
+    kpis: dict[str, dict] = {}
+    for runtime in runtimes:
+        own = [r for r in records if r.get("runtime", runtime) == runtime]
+        kpi = kpis[runtime] = aggregate(own) if own else {}
+        report = {"started_at": started_at, "runtime": runtime, "repeat": args.repeat,
+                  "kpi": kpi, "static": static, "records": own, "skipped": skipped}
+        (args.out / f"agent-eval-{runtime}-{stamp}.json").write_text(
+            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        markdown = render_markdown(kpi, static, own, started_at, skipped, runtime, args.repeat)
+        (args.out / f"agent-eval-{runtime}-{stamp}.md").write_text(markdown, encoding="utf-8")
+        print(markdown)
+    if len(runtimes) > 1:
+        comparison = render_comparison(kpis, started_at, args.repeat)
+        (args.out / f"agent-eval-compare-{stamp}.md").write_text(comparison, encoding="utf-8")
+        print(comparison)
     return 0
 
 

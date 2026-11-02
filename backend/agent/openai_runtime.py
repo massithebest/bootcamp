@@ -188,6 +188,8 @@ class RetryWait:
 
     def __init__(self) -> None:
         self.until = 0.0
+        #: 이 턴에서 재시도로 기다린 시간 합계(초). 평가에서 요청 제한 영향을 따로 보려고 남긴다.
+        self.total = 0.0
 
     def policy(self, context: RetryPolicyContext) -> bool | RetryDecision:
         error = context.normalized
@@ -197,6 +199,7 @@ class RetryWait:
         logger.warning("LLM API 재시도 예약: status=%s attempt=%s delay=%ss",
                        error.status_code, context.attempt, delay)
         self.until = time.monotonic() + delay
+        self.total += delay
         # delay 를 결정에 직접 넣어야 SDK 가 응답의 Retry-After 를 쓰지 않는다.
         return RetryDecision(retry=True, delay=delay)
 

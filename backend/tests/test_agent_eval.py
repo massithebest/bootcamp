@@ -134,7 +134,12 @@ def test_openai_runtime_usage_comes_from_the_run_result() -> None:
     class _Result:
         context_wrapper = _Wrapper()
 
-    assert _metered_usage({"result": _Result()}) == {"input_tokens": 1200, "output_tokens": 80, "model_calls": 6}
+    class _RetryWait:
+        total = 7.0
+
+    assert _metered_usage({"result": _Result()}) == {
+        "input_tokens": 1200, "output_tokens": 80, "model_calls": 6, "retry_wait_s": None}
+    assert _metered_usage({"result": _Result(), "retry_wait": _RetryWait()})["retry_wait_s"] == 7.0
     assert _metered_usage({"usage": {"input_tokens": 1}}) == {"input_tokens": 1}
     assert _metered_usage({}) is None
 
@@ -244,6 +249,50 @@ def test_local_proxy_server_runs_only_for_proxy_providers(monkeypatch) -> None:
     monkeypatch.setattr(config, "AGENT_RUNTIME", "openai")
     with local_proxy_server() as port:
         assert port is None
+    # 두 실행부를 번갈아 평가하면 Claude 실행부 때문에 프록시가 필요하다.
+    from scripts.evaluate_agent import needs_local_proxy
+
+    assert needs_local_proxy(["claude", "openai"]) is True
+
+
+def test_evaluate_switches_the_runtime_for_each_interleaved_case(monkeypatch, tmp_path: Path) -> None:
+    import asyncio
+
+    from core import config
+    from scripts import evaluate_agent
+
+    seen: list[str] = []
+
+    async def fake_run_case(case, meter):
+        seen.append(config.AGENT_RUNTIME)
+        return {"events": _events("2026년 6월 계획은 139,953입니다.", tools=["describe_table", "execute_sql"]),
+                "first_text_s": 1.0, "total_s": 2.0, "timed_out": False, "error": None, "cost_usd": None, "usage": None}
+
+    monkeypatch.setattr(config, "AGENT_RUNTIME", "claude")
+    monkeypatch.setattr(evaluate_agent, "_install_meter", lambda: {})
+    monkeypatch.setattr(evaluate_agent, "run_case", fake_run_case)
+    monkeypatch.setattr(evaluate_agent, "expected_numbers", lambda case, db: [139953.0])
+    cases = [{"id": "c0", "category": "sql", "question": "q", "runtime": runtime} for runtime in ("claude", "openai")]
+
+    records, _ = asyncio.run(evaluate_agent.evaluate(cases, tmp_path / "unused.db"))
+
+    assert seen == ["claude", "openai"]
+    assert [r["runtime"] for r in records] == ["claude", "openai"]
+
+
+def test_comparison_report_puts_runtimes_side_by_side() -> None:
+    from scripts.evaluate_agent import render_comparison
+
+    markdown = render_comparison(
+        {"claude": {"answer_accuracy": 0.8, "latency_p90_s": 30.1},
+         "openai": {"answer_accuracy": 0.9, "latency_p90_s": 25.0, "avg_retry_wait_s": 3.0}},
+        "2026-11-02 21:00", repeat=3,
+    )
+
+    assert "| 지표 | claude | openai |" in markdown
+    assert "| 최종 답변 정답률 | 80.0% | 90.0% |" in markdown
+    assert "| 응답 시간 p90 (초) | 30.1 | 25.0 |" in markdown
+    assert "| 질문당 요청 제한 재시도 대기 (초) | — | 3.0 |" in markdown
 
 
 def test_clarify_case_fails_when_the_agent_assumes_a_column() -> None:
