@@ -91,7 +91,7 @@ def test_incomplete_run_is_never_correct() -> None:
 
 def test_no_data_requires_available_range_and_a_question() -> None:
     case = {"id": "n", "category": "no_data", "phrases_any": ["없"],
-            "phrase_groups": [["2026년 6월", "6월"], ["볼지", "알려주시면"]]}
+            "phrase_groups": [["2026년 6월", "6월"]], "ask_phrases": ["볼지", "알려주시면"]}
 
     stops_short = summarize_events(_events("해당 기간 데이터가 없습니다."))
     full = summarize_events(_events("해당 기간 데이터가 없습니다. 2026년 1월~6월 데이터만 있습니다. 어느 달로 볼지 알려주시면 조회하겠습니다."))
@@ -100,6 +100,11 @@ def test_no_data_requires_available_range_and_a_question() -> None:
     assert score_case(case, stops_short, None)["answer_correct"] is False
     assert score_case(case, full, None)["answer_correct"] is True
     assert score_case(case, with_suggestions, None)["answer_correct"] is False
+    # 표현 목록에 없어도 마지막 문장이 질문이면 물은 것이다.
+    question = summarize_events(_events("해당 기간 데이터가 없습니다. 2026년 1월~6월만 있습니다.\n\n어느 달로 확인하시겠어요?"))
+    assert score_case(case, question, None)["answer_correct"] is True
+    no_question = summarize_events(_events("해당 기간 데이터가 없습니다.\n\n근거:\n- 2026년 1월~6월만 있습니다."))
+    assert score_case(case, no_question, None)["answer_correct"] is False
 
 
 def test_aggregate_computes_rates_and_percentiles() -> None:
@@ -302,6 +307,9 @@ def test_clarify_case_fails_when_the_agent_assumes_a_column() -> None:
     assert score_case(case, base, None)["answer_correct"] is True
     assert score_case(case, {**base, "text": "MP_202605 세그먼트 합계는 191,366입니다. 어떤 기준"}, None)["answer_correct"] is False
     assert score_case(case, {**base, "suggestions": ["a", "b"]}, None)["answer_correct"] is False
+    # "알려 주시겠어요?"처럼 표현 목록 밖의 질문으로 끝나도 되묻기로 본다(2026-11-03 두 실행부 모두 이 표현으로 오답 처리).
+    asked = {**base, "text": "세그먼트 컬럼이 없습니다.\n\n세그먼트가 어떤 테이블에서 관리되는지 알려 주시겠어요?"}
+    assert score_case(case, asked, None)["answer_correct"] is True
 
 
 def test_summary_keeps_the_agent_error_message() -> None:
