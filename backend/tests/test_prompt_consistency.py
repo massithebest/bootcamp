@@ -278,6 +278,18 @@ def test_grouped_comparisons_of_stored_results_are_aggregated_on_the_server() ->
     assert "이 예외는 SQL의 테이블·컬럼에만 해당" in claude
     assert "근거 문장에도 쓰지 않고" in tools["run_simulation"].description
     assert "'swap_direction을 방향으로 사용' 같은 문장도 쓰지 않는다" in tools["aggregate_result"].description
+    # 사이트·방향별 비교에서 결론이 표의 4개 값을 모두 나열했고, 이미 답한 순유입을 다시 묻는 후속질문이 나왔고,
+    # 비교 질문인데 표만 보여 줬다.
+    assert "모든 행 값을 나열하지 않고" in tools["present_table"].description
+    assert "결론·근거에서 모두 나열하지 않고" in tools["present_chart"].description
+    assert "행 값(예: 사이트·방향별 4개 값)을 결론에 나열하지 않는다" in claude
+    assert "이미 해석한 파생 값" in tools["suggest_follow_ups"].description and "이미 해석한 파생 값" in claude
+    assert "빼거나 더하면 바로 나오는 값" in tools["suggest_follow_ups"].description and "빼거나 더하면 바로 나오는 값" in claude
+    assert "한 문장에 이어 쓰는 것도 나열이다" in tools["aggregate_result"].description
+    # 나열 금지를 넣자 결론이 "가장 큰 합계는 SITE_A의 RECEIVE"처럼 수치 없이 대상만 썼다.
+    assert "값 없이 대상만 쓰지 않고" in tools["aggregate_result"].description and "그렇다고 수치를" in claude
+    assert "present_chart(chart_type=bar, x_column=첫 기준" in tools["aggregate_result"].description
+    assert "`present_chart`(막대, x=첫 기준" in claude and "`present_chart`(막대, x=첫 기준" in simulation
 
 
 def test_rag_final_answers_require_a_source_or_url() -> None:
