@@ -330,6 +330,25 @@ def test_catalog_name_matches_are_hedged_and_conclusions_are_not_repeated() -> N
     assert "즉, 질문하신" in claude and "즉, 질문하신" in tools["search_documents"].description
 
 
+def test_multi_value_questions_list_values_and_state_the_period() -> None:
+    tools = {t.name: t for t in planning_tools(access_scope="scope-a")}
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+    skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
+
+    # "등급이 여러 개로 나누어진 제품"에 20행 모두 "등급 수 3"인 표를 보여 줬고, 규칙에 없는 GRADE_CD 비어 있지 않음 조건을
+    # "테이블 조회 규칙에 따라"라고 했으며, 전체 기간(2026년 1~6월)을 밝히지 않았다.
+    for text in (claude, skill, tools["execute_sql"].description):
+        assert "모든" in text and "한 문장으로 답한다" in text
+        assert "MIN·MAX" in text
+    assert "GRADE_CD IS NOT NULL" in tools["execute_sql"].description
+    assert "query_rules에 실제로 있는 것만" in tools["execute_sql"].description
+    assert "`query_rules`에 실제로 있는 것만" in claude
+    # 값 목록을 더한 뒤에도 20행 모두 "등급 개수 3" 열을 표에 남겼다.
+    assert "columns에서 빼고" in tools["present_table"].description
+    # 규칙을 더한 뒤 등급 컬럼이 GRADE_CD 하나뿐인데도 "어느 기준의 등급인지" 되묻고 멈췄다.
+    assert "맞는 컬럼이 하나뿐이면" in tools["describe_table"].description and "맞는 컬럼이 하나뿐이면" in claude
+
+
 def test_rag_final_answers_require_a_source_or_url() -> None:
     claude = CLAUDE_MD.read_text(encoding="utf-8")
 
