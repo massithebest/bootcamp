@@ -8,7 +8,7 @@
 
 - 범위: Claude 실행부 옆에 `AGENT_RUNTIME=openai` 실행부를 추가하고 같은 평가 세트로 비교해 기본값 전환을 정한다.
   Frontend·공개 API·`AgentEvent` 계약은 바꾸지 않는다.
-- 현재 단계: 0~4단계 완료(2026-11-02).
+- 현재 단계: 0~5단계 완료(2026-11-02).
   - Tool 이름·설명·입력 schema·handler·화면 노출 여부의 단일 출처는 `agent/tool_specs.py::tool_specs()`이고,
     `agent/sdk_tools.py`는 이를 Claude MCP Tool로 감싸기만 한다.
   - `agent/openai_runtime.py`: 지침(`SYSTEM_PROMPT` + `agent_sdk/CLAUDE.md` + Skill 목록), 공통 명세 FunctionTool(전부 non-strict)과
@@ -18,8 +18,9 @@
     `agent/openai_event_adapter.py`가 Claude 어댑터와 같은 `AgentEvent`로 바꾸며, Tool 이벤트 조립은 `agent/tool_events.py`를 함께 쓴다.
   - 대화 기록·분기: `agent/openai_session_store.py`가 성공한 턴의 `to_input_list()`를 conversation 최신 기록과 turn_id 분기 지점으로
     프로세스 메모리에 둔다(대화당 분기 지점 50개, 넘치면 오래된 것부터 삭제). 분기 규칙과 경고 문구는 Claude 실행부와 같다.
-  - 한계: 타임아웃·max_turns 초과는 아직 라우트의 일반 오류 문구로 끝나고, 실패한 턴은 기록하지 않는다.
-- 다음 행동: 5단계 오류·타임아웃(이벤트 대기 타임아웃 시 실행 취소, max_turns 초과·게이트웨이 오류의 공개 문구, `error` → `done`).
+  - 오류: 이벤트 대기 초과·max_turns 초과·게이트웨이 오류·모델 응답 오류는 `agent/public_messages.py`의 공개 문구로 `error` → `done`
+    (turn_id 없음)으로 끝나고, 완료 전 종료(오류·연결 종료)는 SDK 실행을 취소하며 기록하지 않는다. 설정 누락 등 그 밖의 예외는 라우트가 처리한다.
+- 다음 행동: 6단계 앱 검증(SQL·차트·문서·시뮬레이션·데이터 없음·삭제 요청·편집·재생성·후속질문 클릭)과 7단계 비교 평가.
 - 선행 확인: 폐쇄망 Nexus에 `openai-agents==0.24.0`·`griffelib` 등록 여부(반입 전).
 
 ## 목표와 책임

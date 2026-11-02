@@ -6,11 +6,11 @@
 import asyncio
 
 import pytest
-from agents import MaxTurnsExceeded
 
 from agent import openai_session_store as session_store
 from agent.agent import _resolve_resume
 from agent.openai_runtime import run_openai_agent
+from agent.public_messages import FORK_FALLBACK_MESSAGE, MAX_TURNS_MESSAGE
 from core import config
 from tests.openai_fakes import DEPLOYMENT, FakeGateway, text_turn, tool_turn
 
@@ -121,7 +121,7 @@ def test_old_fork_points_are_dropped_beyond_the_per_conversation_cap(monkeypatch
     assert session_store.turn_history(first) is None
     assert session_store.turn_history(second) is not None
     events, _ = _turn(gateway, "Q2 수정", fork=first)
-    assert events[0].content == session_store.FORK_FALLBACK_MESSAGE
+    assert events[0].content == FORK_FALLBACK_MESSAGE
 
 
 def test_failed_turn_is_not_recorded(monkeypatch) -> None:
@@ -129,8 +129,8 @@ def test_failed_turn_is_not_recorded(monkeypatch) -> None:
     _, first = _turn(gateway, "Q1")
 
     monkeypatch.setattr(config, "AGENT_MAX_TURNS", 1)
-    with pytest.raises(MaxTurnsExceeded):
-        _turn(gateway, "Q2")
+    failed, failed_turn = _turn(gateway, "Q2")
+    assert failed[-2].content == MAX_TURNS_MESSAGE and failed_turn is None
     monkeypatch.setattr(config, "AGENT_MAX_TURNS", 25)
     _turn(gateway, "Q3")
 

@@ -10,6 +10,7 @@
 - `access_scope`는 Tool handler 클로저로만 전달하고 모델 입력에 넣지 않는다.
 """
 
+import asyncio
 import json
 import logging
 import uuid
@@ -18,7 +19,9 @@ from typing import Any
 
 from agents import (
     Agent,
+    AgentsException,
     FunctionTool,
+    MaxTurnsExceeded,
     ModelSettings,
     OpenAIChatCompletionsModel,
     RunConfig,
@@ -26,10 +29,17 @@ from agents import (
     set_tracing_disabled,
 )
 from agents.result import RunResultStreaming
-from openai import AsyncAzureOpenAI, AsyncOpenAI
+from openai import APIError, AsyncAzureOpenAI, AsyncOpenAI
 
 from agent import openai_session_store as session_store
 from agent.openai_event_adapter import OpenAIEventAdapter
+from agent.public_messages import (
+    FORK_FALLBACK_MESSAGE,
+    INCOMPLETE_RESPONSE_MESSAGE,
+    LLM_API_FAILURE_MESSAGE,
+    LLM_RESPONSE_TIMEOUT_MESSAGE,
+    MAX_TURNS_MESSAGE,
+)
 from agent.skills import AGENT_SDK_DIR, get_skill, list_skills
 from agent.system_prompt import SYSTEM_PROMPT
 from agent.tool_events import TOOL_FAILURE_PAYLOAD
@@ -192,8 +202,26 @@ def _resolve_history(
         return [], None
     history = session_store.turn_history(fork_from_turn_id)
     if history is None:
-        return [], AgentEvent(type="error", content=session_store.FORK_FALLBACK_MESSAGE)
+        return [], AgentEvent(type="error", content=FORK_FALLBACK_MESSAGE)
     return history, None
+
+
+def _failure_message(exc: Exception) -> str | None:
+    """실행 실패를 공개 문구로 바꾼다. 처리하지 않는 예외는 None(라우트의 일반 오류로)."""
+
+    if isinstance(exc, MaxTurnsExceeded):
+        logger.warning("Agent 최대 모델 호출 수 초과: max_turns=%s", config.AGENT_MAX_TURNS)
+        return MAX_TURNS_MESSAGE
+    if isinstance(exc, APIError):
+        logger.error(
+            "LLM API 호출 실패: error_type=%s status=%s",
+            type(exc).__name__, getattr(exc, "status_code", None),
+        )
+        return LLM_API_FAILURE_MESSAGE
+    if isinstance(exc, AgentsException):
+        logger.error("Agent 실행 실패: error_type=%s", type(exc).__name__)
+        return INCOMPLETE_RESPONSE_MESSAGE
+    return None
 
 
 async def run_openai_agent(
@@ -208,7 +236,11 @@ async def run_openai_agent(
 
     `fork_from_turn_id`가 None 이면 대화의 최신 기록에 이어 쓰고, 빈 문자열이면 처음부터,
     알 수 없는 값이면 경고 `error` 후 처음부터 실행한다. 성공한 턴만 기록·분기 지점으로 남긴다.
-    예상하지 못한 예외는 라우트가 공개 `error` → `done`으로 바꾼다.
+
+    `LLM_RESPONSE_TIMEOUT_SECONDS` 동안 다음 스트림 이벤트가 없거나, 최대 호출 수 초과·게이트웨이
+    오류·모델 응답 오류가 나면 공개 문구로 `error` → `done`(turn_id 없음)으로 끝낸다. 완료 전에
+    끝나면(오류·클라이언트 연결 종료 포함) 실행 중인 SDK 작업을 취소한다. 그 밖의 예외는 라우트가
+    공개 `error` → `done`으로 바꾼다.
     """
 
     turn_id = str(uuid.uuid4())
@@ -220,9 +252,34 @@ async def run_openai_agent(
     result = run_streamed(
         [*history, {"role": "user", "content": message}], access_scope=access_scope, model=model
     )
-    async for raw_event in result.stream_events():
-        for event in adapter.convert(raw_event):
-            yield event
+    raw_events = result.stream_events()
+    completed = False
+    try:
+        while True:
+            try:
+                raw_event = await asyncio.wait_for(
+                    anext(raw_events), timeout=config.LLM_RESPONSE_TIMEOUT_SECONDS
+                )
+            except StopAsyncIteration:
+                break
+            for event in adapter.convert(raw_event):
+                yield event
+        completed = True
+    except asyncio.TimeoutError:
+        logger.warning("LLM 응답 대기 시간 초과: timeout=%ss", config.LLM_RESPONSE_TIMEOUT_SECONDS)
+        failure = LLM_RESPONSE_TIMEOUT_MESSAGE
+    except Exception as exc:
+        failure = _failure_message(exc)
+        if failure is None:
+            raise
+    finally:
+        if not completed:
+            result.cancel()
+
+    if not completed:
+        yield AgentEvent(type="error", content=failure)
+        yield AgentEvent(type="done")
+        return
 
     session_store.record_turn(conversation_id, turn_id, result.to_input_list())
     done_data: dict[str, object] = {"turn_id": turn_id}

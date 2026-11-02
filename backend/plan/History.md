@@ -2,6 +2,17 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-11-02 — OpenAI Agents SDK 실행부 5단계: 오류·타임아웃·연결 종료
+
+- 공개 오류 문구를 `agent/public_messages.py`로 모아 두 실행부가 함께 쓴다(Claude 문구 변화 없음). OpenAI 실행부는
+  `LLM_RESPONSE_TIMEOUT_SECONDS` 동안 다음 스트림 이벤트가 없으면 지연 문구, `MaxTurnsExceeded`는 최대 단계 초과 문구, `openai.APIError`는
+  LLM API 호출 실패 문구(로그에는 오류 종류·상태 코드만), 그 밖의 SDK 오류(`ModelBehaviorError` 등)는 응답 미완료 문구로 `error` → `done`을
+  보낸다. 완료 전에 끝나면 오류든 클라이언트 연결 종료든 `RunResultStreaming.cancel()`로 실행 중인 Tool까지 취소하고 기록하지 않는다.
+  설정 누락처럼 예상하지 못한 예외는 지금처럼 라우트가 일반 오류로 바꾼다.
+- 검증: 오류 테스트 6건(지연 시 Tool 취소, max_turns, 게이트웨이 500 본문 비노출, 등록되지 않은 Tool 호출, 연결 종료 시 취소·미기록, 처리하지
+  않는 예외 전달)과 기록 테스트 수정으로 Backend 476건 통과. 실제 게이트웨이에서 `AGENT_MAX_TURNS=2`(2.9초)·대기 1초(2.1초) 모두 공개 문구로
+  끝나고 기록이 남지 않았다.
+
 ## 2026-11-02 — OpenAI Agents SDK 실행부 4단계: 대화 기록과 편집·재생성 분기
 
 - `agent/openai_session_store.py`: 성공한 턴의 `RunResult.to_input_list()`를 conversation_id 최신 기록과 turn_id 분기 지점으로 보관한다.

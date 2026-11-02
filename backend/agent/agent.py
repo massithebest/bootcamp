@@ -7,6 +7,11 @@ from collections.abc import AsyncIterator
 from claude_agent_sdk import ClaudeAgentOptions, query
 
 from agent.event_adapter import AgentEventAdapter
+from agent.public_messages import (
+    FORK_FALLBACK_MESSAGE,
+    INCOMPLETE_RESPONSE_MESSAGE,
+    LLM_RESPONSE_TIMEOUT_MESSAGE,
+)
 from agent.sdk_tools import build_planning_mcp_server, tool_names
 from agent.skills import AGENT_SDK_DIR
 from agent.session_store import (
@@ -28,9 +33,6 @@ from core.config import (
 
 #: `agent/agent_sdk/` — CLAUDE.md 와 .claude/skills 가 위치한 Agent 작업 디렉터리.
 AGENT_SDK_CWD = str(AGENT_SDK_DIR)
-LLM_RESPONSE_TIMEOUT_MESSAGE = (
-    "LLM API 서버 응답이 지연되고 있습니다. 잠시 후에 다시 시도해 주세요."
-)
 
 
 def _build_options(
@@ -102,7 +104,7 @@ def _resolve_resume(
     if anchor is None:
         warning = AgentEvent(
             type="error",
-            content="이전 응답 지점을 찾을 수 없어 새 대화로 시작합니다.",
+            content=FORK_FALLBACK_MESSAGE,
         )
         return None, None, warning
 
@@ -187,7 +189,7 @@ async def run_agent(
     # 닫힌 경우도 성공 turn으로 기록하지 않는다.
     if adapter.result_succeeded is not True:
         if adapter.result_succeeded is None:
-            yield AgentEvent(type="error", content="Agent 응답이 완료되기 전에 종료되었습니다.")
+            yield AgentEvent(type="error", content=INCOMPLETE_RESPONSE_MESSAGE)
         yield AgentEvent(type="done")
         return
 

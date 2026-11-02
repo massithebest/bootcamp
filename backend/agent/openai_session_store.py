@@ -18,9 +18,6 @@ from typing import Any
 #: 대화 하나에서 편집/재생성 분기 지점으로 보관하는 최근 턴 수.
 MAX_TURNS_PER_CONVERSATION = 50
 
-#: 알 수 없거나 보관 기간이 지난 turn_id 로 분기할 때의 경고(Claude 실행부와 같은 문구).
-FORK_FALLBACK_MESSAGE = "이전 응답 지점을 찾을 수 없어 새 대화로 시작합니다."
-
 _latest_by_conversation: dict[str, tuple[Any, ...]] = {}
 _snapshot_by_turn: dict[str, tuple[Any, ...]] = {}
 _turns_by_conversation: dict[str | None, deque[str]] = {}

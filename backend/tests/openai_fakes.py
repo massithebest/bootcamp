@@ -46,10 +46,17 @@ def tool_turn(name: str, args: dict, call_id: str = "call_1", text: str | None =
     return chunks + [_chunk({}, "tool_calls"), _chunk(usage=USAGE)]
 
 
-class FakeGateway:
-    """턴마다 준비한 SSE 응답을 순서대로 돌려주고 받은 요청을 기록한다."""
+#: 게이트웨이 오류 응답 본문. 내부 정보가 공개 문구·로그에 새지 않는지 확인하는 표지다.
+GATEWAY_ERROR_DETAIL = "upstream secret detail"
 
-    def __init__(self, *turns: list[dict]) -> None:
+
+class FakeGateway:
+    """턴마다 준비한 SSE 응답을 순서대로 돌려주고 받은 요청을 기록한다.
+
+    턴 대신 HTTP 상태 코드(int)를 넣으면 그 상태의 오류 응답을 돌려준다.
+    """
+
+    def __init__(self, *turns: list[dict] | int) -> None:
         self.turns = list(turns)
         self.requests: list[httpx2.Request] = []
         self.bodies: list[dict] = []
@@ -58,6 +65,8 @@ class FakeGateway:
         self.requests.append(request)
         self.bodies.append(json.loads(request.content))
         chunks = self.turns.pop(0)
+        if isinstance(chunks, int):
+            return httpx2.Response(chunks, json={"error": {"message": GATEWAY_ERROR_DETAIL}})
         body = "".join(f"data: {json.dumps(c, ensure_ascii=False)}\n\n" for c in chunks) + "data: [DONE]\n\n"
         return httpx2.Response(200, headers={"content-type": "text/event-stream"}, content=body.encode())
 
