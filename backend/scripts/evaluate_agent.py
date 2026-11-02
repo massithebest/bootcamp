@@ -46,6 +46,10 @@ CASE_TIMEOUT_SECONDS = 300
 DEFAULT_TOLERANCE = 0.5
 
 _NUMBER = re.compile(r"-?\d[\d,]*(?:\.\d+)?")
+#: 답변·결과의 년월 표기(2026-03, 2026.03, 2026/03, 2026년 3월)를 정답 SQL 의 YYYYMM 숫자(202603)와 맞춘다.
+_PERIOD = re.compile(r"(?<!\d)(20\d{2})\s*(?:-|\.|/|년\s*)(0?[1-9]|1[0-2])(?!\d)")
+#: 결과를 사용자에게 보여 주는 Tool. 호출한 result_id 의 미리보기 행은 사용자가 화면에서 본 값이다.
+_PRESENT_TOOLS = {"present_table", "present_chart"}
 _WRITE_SQL = re.compile(r"\b(insert|update|delete|drop|alter|create|replace|truncate|merge|attach)\b", re.I)
 
 #: 서버 SQL 가드가 반드시 막아야 하는 조회 전용 위반 예시(정적 지표).
@@ -68,8 +72,14 @@ GUARD_ATTACKS = [
 # ---- 채점 (순수 함수) --------------------------------------------------------
 
 
+def period_numbers(text: str) -> list[float]:
+    """년월 표기를 YYYYMM 숫자로 바꾼다(예: '2026-03', '2026년 3월' → 202603)."""
+
+    return [float(f"{year}{int(month):02d}") for year, month in _PERIOD.findall(text)]
+
+
 def extract_numbers(text: str) -> list[float]:
-    """답변 문장 속 숫자(천 단위 쉼표 포함)를 모두 꺼낸다."""
+    """답변 문장 속 숫자(천 단위 쉼표 포함)와 년월 표기(YYYYMM)를 모두 꺼낸다."""
 
     values = []
     for token in _NUMBER.findall(text):
@@ -77,7 +87,7 @@ def extract_numbers(text: str) -> list[float]:
             values.append(float(token.replace(",", "")))
         except ValueError:
             continue
-    return values
+    return values + period_numbers(text)
 
 
 def numbers_from_rows(rows: list) -> list[float]:
@@ -95,12 +105,30 @@ def numbers_from_rows(rows: list) -> list[float]:
                 try:
                     values.append(float(cell.replace(",", "")))
                 except ValueError:
-                    continue
+                    values.extend(period_numbers(cell))
     return values
 
 
+def _found(value: float, found: list[float], tolerance: float) -> bool:
+    return any(abs(f - value) <= tolerance for f in found)
+
+
 def all_matched(expected: list[float], found: list[float], tolerance: float = DEFAULT_TOLERANCE) -> bool:
-    return bool(expected) and all(any(abs(f - e) <= tolerance for f in found) for e in expected)
+    return bool(expected) and all(_found(e, found, tolerance) for e in expected)
+
+
+def answer_matched(expected: list[float], text_numbers: list[float], shown_numbers: list[float],
+                   tolerance: float = DEFAULT_TOLERANCE) -> bool:
+    """지침대로 답했는지: 핵심 수치 하나 이상은 본문에, 나머지는 본문이나 화면에 보여 준 표·차트에 있으면 된다.
+
+    지침은 표·차트에 나온 값을 본문에 모두 나열하지 말고 핵심 수치(최대·최소 등)만 쓰라고 한다.
+    """
+
+    return (
+        bool(expected)
+        and any(_found(e, text_numbers, tolerance) for e in expected)
+        and all_matched(expected, text_numbers + shown_numbers, tolerance)
+    )
 
 
 def summarize_events(events: list[dict]) -> dict[str, Any]:
@@ -115,6 +143,15 @@ def summarize_events(events: list[dict]) -> dict[str, Any]:
     first_sql = names.index("execute_sql") if "execute_sql" in names else None
     sql_args = [((c.get("data") or {}).get("args") or {}).get("sql", "") for c in calls if c.get("tool_name") == "execute_sql"]
     sql_results = [r for r in results if r.get("tool_name") == "execute_sql"]
+    rows_by_result = {
+        data["result_id"]: data.get("sample_rows") or []
+        for data in ((r.get("data") or {}) for r in results)
+        if data.get("result_id") and data.get("status") != "error"
+    }
+    presented = {
+        ((c.get("data") or {}).get("args") or {}).get("result_id")
+        for c in calls if c.get("tool_name") in _PRESENT_TOOLS
+    }
     return {
         "text": text,
         "tools": names,
@@ -127,6 +164,11 @@ def summarize_events(events: list[dict]) -> dict[str, Any]:
         "sql_sample_numbers": [
             n for r in sql_results if (r.get("data") or {}).get("status") != "error"
             for n in numbers_from_rows((r.get("data") or {}).get("sample_rows") or [])
+        ],
+        # present_table·present_chart 로 사용자에게 보여 준 결과의 미리보기 값(최대 5행).
+        "presented_numbers": [
+            n for result_id in presented if result_id in rows_by_result
+            for n in numbers_from_rows(rows_by_result[result_id])
         ],
         "tool_results": {r.get("tool_name"): (r.get("data") or {}) for r in results},
         # Agent 가 보낸 error 이벤트(응답 시간 초과·SDK 실패 등). 없으면 None.
@@ -142,7 +184,8 @@ def score_case(case: dict, summary: dict, expected: list[float] | None) -> dict[
     tolerance = case.get("tolerance", DEFAULT_TOLERANCE)
     answer_correct = data_correct = cited = None
     if category == "sql":
-        answer_correct = summary["completed"] and all_matched(expected or [], extract_numbers(text), tolerance)
+        answer_correct = summary["completed"] and answer_matched(
+            expected or [], extract_numbers(text), summary.get("presented_numbers") or [], tolerance)
         data_correct = all_matched(expected or [], summary["sql_sample_numbers"], tolerance)
     elif category == "document":
         cited = all(source in text for source in case.get("sources", []))

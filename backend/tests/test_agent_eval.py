@@ -310,3 +310,51 @@ def test_summary_keeps_the_agent_error_message() -> None:
     summary = summarize_events(events)
     assert summary["agent_error"] == "LLM 응답이 지연되고 있습니다." and summary["completed"] is False
     assert summarize_events([{"type": "done", "data": {"turn_id": "t"}}])["agent_error"] is None
+
+
+def _presented_events(text: str, rows: list[dict], *, present: str | None = "present_table") -> list[dict]:
+    """execute_sql 결과(result_id·미리보기 행)와, 선택적으로 그 결과를 보여 준 present_* 호출."""
+
+    result_id = "r" * 32
+    events = [
+        {"type": "tool_call", "tool_name": "describe_table", "tool_call_id": "t0", "data": {"args": {}}},
+        {"type": "tool_call", "tool_name": "execute_sql", "tool_call_id": "t1", "data": {"args": {"sql": "SELECT 1"}}},
+        {"type": "tool_result", "tool_name": "execute_sql", "tool_call_id": "t1",
+         "data": {"status": "ok", "result_id": result_id, "sample_rows": rows}},
+    ]
+    if present:
+        events.append({"type": "tool_call", "tool_name": present, "tool_call_id": "t2",
+                       "data": {"args": {"result_id": result_id}}})
+    return events + [{"type": "text", "content": text}, {"type": "done", "data": {"turn_id": "turn-1"}}]
+
+
+def test_year_month_notation_matches_the_yyyymm_truth() -> None:
+    from scripts.evaluate_agent import numbers_from_rows, period_numbers
+
+    assert period_numbers("가장 많은 월은 2026-03, 그다음은 2026년 1월과 2026.06") == [202603.0, 202601.0, 202606.0]
+    assert 202603.0 in extract_numbers("계획수량 합계가 가장 많은 월은 2026-03이고 257,072입니다.")
+    assert numbers_from_rows([{"월": "2026-03", "계획수량": 257072.0}]) == [202603.0, 257072.0]
+    case = {"category": "sql"}
+    summary = summarize_events(_presented_events(
+        "계획수량 합계가 가장 많은 월은 2026-03이고, 합계는 257,072입니다.", [{"월": "2026-03", "계획수량": 257072.0}]))
+
+    assert score_case(case, summary, [202603.0, 257072.0]) == {"answer_correct": True, "data_correct": True, "cited": None}
+
+
+def test_group_answers_need_a_key_figure_and_the_rest_in_the_presented_table() -> None:
+    rows = [{"공장": "FAC003", "계획수량": 50799.0}, {"공장": "FAC002", "계획수량": 45995.0},
+            {"공장": "FAC001", "계획수량": 43159.0}]
+    expected = [43159.0, 45995.0, 50799.0]
+    case = {"category": "sql"}
+    key_figures = "2026년 6월 공장별 계획수량은 FAC003이 50,799로 가장 많고 FAC001이 43,159로 가장 적습니다."
+
+    # 지침대로 핵심 수치만 쓰고 나머지는 표로 보여 줬으면 정답이다.
+    assert score_case(case, summarize_events(_presented_events(key_figures, rows)), expected)["answer_correct"] is True
+    assert score_case(case, summarize_events(_presented_events(key_figures, rows, present="present_chart")),
+                      expected)["answer_correct"] is True
+    # 표를 띄우지 않았으면 본문에 없는 값은 사용자가 볼 수 없다.
+    assert score_case(case, summarize_events(_presented_events(key_figures, rows, present=None)),
+                      expected)["answer_correct"] is False
+    # 표만 띄우고 결론에 수치가 하나도 없으면 오답이다.
+    no_figures = "2026년 6월 공장별 계획수량을 표로 보여드렸습니다."
+    assert score_case(case, summarize_events(_presented_events(no_figures, rows)), expected)["answer_correct"] is False
