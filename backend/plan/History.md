@@ -2,6 +2,18 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-11-02 — OpenAI Agents SDK 실행부 6단계: 앱 검증
+
+- `AGENT_RUNTIME=openai`로 Backend를 띄워 브라우저(1440px)에서 확인했다. 서버 오류 로그는 없었다.
+  - SQL 표·SQL 차트(3·4단계): 공장별 합계, 월별 추이 선 차트, mock DB와 일치.
+  - 문서: "WIP(재공)는 어떻게 관리되나요?" → `search_documents` 1회, 문서 제목·source·version 출처, 후속질문 3개.
+  - 후속질문 클릭: "WIP의 현재 공정 단계가 올바른지…" → 앞 대화를 이어 Route 문서까지 출처와 함께 답함.
+  - 시뮬레이션: "2026-09 PKT 목표수량 swap … GIVE와 RECEIVE 방향별 합계" → 실행·`aggregate_result`·막대 차트, 두 방향 모두 2,222.3.
+  - 데이터 없음: "2026년 10월 계획수량 합계" → 10월 데이터 없음, 1월~6월 범위, 어느 월로 볼지 묻고 후속질문 없음.
+  - 삭제 요청: Tool 호출 없이 읽기 전용이라 거절하고 대안을 본문에 안내(3초).
+  - 이어지는 질문·질문 편집·재생성(4단계): 앞 턴 맥락 유지, 버린 갈래 내용 없음.
+- Frontend 코드 변경 없이 `npm test`(112건)·`npm run build`·`npm run lint` 통과.
+
 ## 2026-11-02 — OpenAI Agents SDK 실행부 5단계: 오류·타임아웃·연결 종료
 
 - 공개 오류 문구를 `agent/public_messages.py`로 모아 두 실행부가 함께 쓴다(Claude 문구 변화 없음). OpenAI 실행부는
