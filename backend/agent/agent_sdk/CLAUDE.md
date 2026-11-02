@@ -44,7 +44,7 @@ Skills, 입력·출력 schema는 각 Tool 설명을 따른다.
 | `get_recipe` | recipe의 grain·규칙·CTE 확인 |
 | `get_result_summary` | 저장 결과의 메타데이터·요약 확인 |
 | `get_result_page` | 저장 결과의 필요한 구간 확인 |
-| `aggregate_result` | 저장 결과의 그룹별 합계·건수 재집계(새 `result_id`) |
+| `aggregate_result` | SQL로 재조회할 수 없는 저장 결과(시뮬레이션 등)의 그룹별 합계·건수 재집계(새 `result_id`) |
 | `present_sql_preview` | 실행 SQL 표시 |
 | `present_chart` | `result_id`의 bar/line/area 차트 표시. 막대는 기본 grouped, 필요하면 stacked |
 | `present_table` | `result_id`의 서버 페이지 표 표시 |
@@ -76,6 +76,8 @@ Skills, 입력·출력 schema는 각 Tool 설명을 따른다.
   `present_*` Tool을 scalar 인자로 호출한다. 행·차트 data 배열은 넣지 않는다.
 - 시뮬레이션처럼 SQL로 다시 조회할 수 없는 결과를 방향·사이트·제품 등 기준별 합계·건수로 비교하면
   `aggregate_result`로 서버에서 집계하고, 답변 수치는 그 결과를 그대로 쓴다. 원본 행을 읽어 직접 더하지 않는다.
+  `execute_sql` 결과에는 쓰지 않는다. 보여 줄 집계 단위(예: 공장별)는 처음 SQL의 GROUP BY에서 만들고, 단위를 바꿔야
+  하면 SQL을 다시 작성한다.
   표·차트에는 원본이 아닌 집계 결과의 `result_id`를 넘겨 기준별 한 행씩만 보여 주고, 원본 행(예: GIVE·RECEIVE가
   섞인 11행)을 기준·값 컬럼만 골라 표로 띄우지 않는다. `labels`에는 한국어 컬럼 이름을 넣는다. 비교를 물었으면
   집계 결과를 `present_chart`(막대, x=첫 기준, `group_by_column`=둘째 기준)로 보여 주고 표는 요청할 때만 더한다.

@@ -2,6 +2,16 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-11-02 — SQL 결과에 대한 `aggregate_result` 사용 금지
+
+- "2026년 6월 공장별 계획수량과 실적수량을 비교해줘"에서 영업배치코드까지 나눈 SQL 결과 15행을 `aggregate_result`로 두 번
+  공장별로 다시 집계한 뒤, 그 결과는 쓰지 않고 SQL을 또 실행했다(Tool 7개·33초).
+- `aggregate_result` 설명·CLAUDE.md Tool 인덱스와 결과 표시 규칙·sql-analysis Skill에 SQL 결과는 처음 SQL의 GROUP BY로
+  집계하고 단위를 바꾸려면 SQL을 다시 작성하며, 이 Tool은 SQL로 재조회할 수 없는 결과(시뮬레이션 등)에만 쓴다고 적었다.
+  서버도 `source="execute_sql"` 결과를 거부하고 GROUP BY SQL을 다시 실행하라고 안내한다.
+- 재실행에서 `aggregate_result` 없이 Tool 5개·29초로 같은 차트와 정확한 수치(계획 139,953 / 실적 73,241.2)를 확인했다.
+  Backend 437건 테스트 통과.
+
 ## 2026-11-02 — 집계 비교 답변의 차트·결론·후속질문
 
 - "swap 결과를 사이트별로 나눠서 GIVE와 RECEIVE 수량 합계를 비교해줘"에서 세 가지를 고쳤다. 비교 질문인데 집계 결과를

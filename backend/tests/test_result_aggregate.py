@@ -109,3 +109,11 @@ def test_aggregate_hides_results_from_other_scopes(store, tmp_path) -> None:
     assert result["status"] == "error"
     assert str(tmp_path) not in json.dumps(result, ensure_ascii=False)
     assert len(list(tmp_path.glob("*.parquet"))) == 1
+
+
+def test_aggregate_rejects_sql_results(store) -> None:
+    meta = store.save(["FAC_ID", "qty"], [["FAC001", 1]], source="execute_sql", conversation_id=None, access_scope="scope-a")
+
+    result = asyncio.run(aggregate_result(meta.result_id, ["FAC_ID"], "qty", "sum", access_scope="scope-a"))
+
+    assert result["status"] == "error" and "GROUP BY" in result["message"]

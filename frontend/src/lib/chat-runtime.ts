@@ -85,8 +85,8 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
     (part): part is Extract<MessagePart, { kind: "tool" }> =>
       part.kind === "tool" && isStandaloneTool(part.toolName),
   );
-  const standaloneParts = allStandaloneParts.filter((part, index) =>
-    shouldShowStandalonePart(part, index, allStandaloneParts),
+  const standaloneParts = allStandaloneParts.filter((part) =>
+    shouldShowStandalonePart(part, message.parts),
   );
   const hideMarkdownTables = standaloneParts.some((part) =>
     part.toolName === "present_table" &&
@@ -217,24 +217,34 @@ export function toRunResult(message: ChatMessage): ChatModelRunResult {
   };
 }
 
-/** 같은 Tool/result_id의 후속 성공으로 보정된 실패 호출은 standalone UI에서 숨긴다. */
+/** 결과를 새로 만드는 Tool. 실패한 표시 뒤에 다시 조회했다면 그 결과로 보정한 것으로 본다. */
+const RESULT_PRODUCING_TOOLS = new Set(["execute_sql", "run_simulation", "aggregate_result"]);
+
+/**
+ * 후속 성공으로 보정된 실패 호출은 standalone UI에서 숨긴다. 같은 Tool이 같은 result_id로
+ * 성공했거나, 실패 뒤 결과를 다시 만든(execute_sql 등) 다음 같은 Tool이 성공한 경우다.
+ */
 function shouldShowStandalonePart(
   part: Extract<MessagePart, { kind: "tool" }>,
-  index: number,
-  parts: Extract<MessagePart, { kind: "tool" }>[],
+  parts: readonly MessagePart[],
 ): boolean {
   if (isSuccessfulStandalonePart(part)) return true;
   // present_sql_preview는 args에 result_id가 없어 아래 공통 분기가 항상 그대로 보여준다.
-  // present_chart·present_table·present_simulation은 result_id별로 dedup한다 — 한 턴에
-  // 서로 다른 result_id로 여러 번 호출될 수 있으므로 Tool 이름만으로 묶지 않는다.
+  // present_chart·present_table·present_simulation은 한 턴에 서로 다른 result_id로 여러 번
+  // 호출될 수 있으므로, 다시 조회하지 않은 채 다른 result_id로 성공한 호출은 보정으로 보지 않는다.
   const resultId = typeof part.args?.result_id === "string" ? part.args.result_id : null;
   if (!resultId) return true;
-  return !parts.slice(index + 1).some(
-    (later) =>
+  let requeried = false;
+  for (const later of parts.slice(parts.indexOf(part) + 1)) {
+    if (later.kind !== "tool") continue;
+    if (RESULT_PRODUCING_TOOLS.has(later.toolName)) requeried = true;
+    if (
       later.toolName === part.toolName &&
-      later.args?.result_id === resultId &&
-      isSuccessfulStandalonePart(later),
-  );
+      (later.args?.result_id === resultId || requeried) &&
+      isSuccessfulStandalonePart(later)
+    ) return false;
+  }
+  return true;
 }
 
 function isSuccessfulStandalonePart(

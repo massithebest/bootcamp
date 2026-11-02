@@ -182,6 +182,33 @@ test('a corrected chart failure is hidden when the same result later succeeds', 
   assert.equal(chartParts.length, 1);
   assert.equal(chartParts[0].toolCallId, 'chart-success');
 });
+test('a failed chart is hidden when the agent re-queries and charts the new result', () => {
+  const chartIds = (events, prefix) => {
+    let current = message();
+    events.forEach((event, i) => { current = applyAgentEvent(current, event, `${prefix}-${i}`); });
+    const content = convertMessage(current).content;
+    return {
+      charts: content.filter(part => part.type === 'tool-call' && part.toolName === 'present_chart').map(part => part.toolCallId),
+      errors: content.filter(part => part.type === 'tool-call' && part.isError).length,
+    };
+  };
+  const failed = [
+    { type: 'tool_call', tool_name: 'present_chart', tool_call_id: 'chart-failed', data: { args: { result_id: 'result-1' } } },
+    { type: 'tool_result', tool_name: 'present_chart', tool_call_id: 'chart-failed', data: { status: 'error', code: 'COLUMN_NOT_FOUND', message: '조회 결과에 없는 컬럼이 지정되었습니다.' } },
+  ];
+  const requery = [
+    { type: 'tool_call', tool_name: 'execute_sql', tool_call_id: 'sql-2' },
+    { type: 'tool_result', tool_name: 'execute_sql', tool_call_id: 'sql-2', data: { status: 'ok', result_id: 'result-2' } },
+  ];
+  const success = [
+    { type: 'tool_call', tool_name: 'present_chart', tool_call_id: 'chart-ok', data: { args: { result_id: 'result-2' } } },
+    { type: 'tool_result', tool_name: 'present_chart', tool_call_id: 'chart-ok', data: { status: 'ok', result_id: 'result-2' } },
+  ];
+
+  assert.deepEqual(chartIds([...failed, ...requery, ...success], 'requery'), { charts: ['chart-ok'], errors: 0 });
+  // 다시 조회하지 않고 다른 결과를 그린 성공은 별개 차트이므로 실패를 그대로 보여 준다.
+  assert.deepEqual(chartIds([...failed, ...success], 'other'), { charts: ['chart-failed', 'chart-ok'], errors: 1 });
+});
 for (const type of ['error', 'cancelled', 'complete']) test(`done preserves ${type} lifecycle`, () => {
   const m = { ...message(), runState: type === 'error' ? { type, message: '오류' } : { type } };
   const result = applyAgentEvent(m, { type: 'done' }, 'end');

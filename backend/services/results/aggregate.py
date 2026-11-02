@@ -22,6 +22,8 @@ AGGREGATIONS = ("sum", "count", "avg", "min", "max")
 GROUP_BY_MAX_ITEMS = 3
 LABEL_MAX_LENGTH = 40
 _PANDAS_AGGREGATION = {"sum": "sum", "count": "count", "avg": "mean", "min": "min", "max": "max"}
+#: SQL 결과는 GROUP BY로 다시 조회하는 편이 정확하고 Tool 호출도 적다.
+SQL_RESULT_SOURCE = "execute_sql"
 _DEFAULT_LABEL = {"sum": "합계", "count": "건수", "avg": "평균", "min": "최소", "max": "최대"}
 
 
@@ -112,6 +114,10 @@ def aggregate_result(
         meta, frame = open_result(result_id, access_scope, store)
     except QueryResultError as exc:
         raise AggregateError(exc.message) from None
+    if meta.source == SQL_RESULT_SOURCE:
+        raise AggregateError(
+            "SQL 조회 결과는 다시 집계하지 않습니다. 필요한 기준으로 GROUP BY 한 SQL을 다시 실행하세요."
+        )
 
     grouped, excluded = _aggregate(frame, group_by, value_column, aggregation)
     groups, value = _output_names(group_by, value_column, aggregation, labels or {})

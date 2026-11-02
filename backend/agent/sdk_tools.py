@@ -293,7 +293,9 @@ def _aggregate_result_tool(access_scope: str | None):
     @tool(
         "aggregate_result",
         "execute_sql·run_simulation이 반환한 result_id를 group_by 컬럼별로 서버에서 다시 집계해 새 result_id로 저장한다. "
-        "SQL로 다시 조회할 수 없는 결과(시뮬레이션 등)를 방향·사이트·제품별 합계·건수로 비교할 때 쓴다. "
+        "SQL로 다시 조회할 수 없는 결과(시뮬레이션 등)를 방향·사이트·제품별 합계·건수로 비교할 때만 쓴다. "
+        "execute_sql 결과에는 쓰지 않는다: 필요한 집계 단위(예: 공장별)는 처음 SQL의 GROUP BY에서 만들고, "
+        "다른 단위가 필요하면 SQL을 다시 작성해 실행한다. "
         "원본 행을 get_result_page로 읽어 직접 더하지 않고, 답변 수치는 이 Tool이 돌려준 값을 그대로 쓴다. "
         "aggregation은 sum·count·avg·min·max 중 하나다. "
         "labels에는 결과 컬럼의 한국어 이름을 넣는다(예: {\"swap_direction\": \"Swap 방향\", \"swap_swapQty\": \"Swap 수량 합계\"}). "
