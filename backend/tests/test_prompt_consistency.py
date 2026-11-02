@@ -232,6 +232,9 @@ def test_data_tool_descriptions_distinguish_sql_simulation_and_documents() -> No
     assert "한 줄씩 다시 나열하지 않고" in tools["present_table"].description
     assert "문제(미일치 등)가 있는 항목만 짚는다" in tools["run_simulation"].description
     assert "해당 기간 데이터가 없다" in tools["execute_sql"].description
+    # "이번 달" 0행에 기준 월·데이터가 있는 범위를 알리지 않고 묻지도 않은 채 끝났다.
+    assert "해석한 실제 월" in tools["execute_sql"].description and "MIN·MAX" in tools["execute_sql"].description
+    assert "어느 기간으로 볼지 묻고 멈춘다" in tools["execute_sql"].description
     # PKT swap 답변 근거에 "view=swapped 조건으로 조회"처럼 시뮬레이션 파라미터가 그대로 나왔다.
     assert "swap이 발생한 행만" in tools["run_simulation"].description
     assert "정렬 순서만 바꾸거나" in tools["suggest_follow_ups"].description

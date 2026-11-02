@@ -87,6 +87,19 @@ def test_incomplete_run_is_never_correct() -> None:
     assert score_case(case, summary, None)["answer_correct"] is False
 
 
+def test_no_data_requires_available_range_and_a_question() -> None:
+    case = {"id": "n", "category": "no_data", "phrases_any": ["없"],
+            "phrase_groups": [["2026년 6월", "6월"], ["볼지", "알려주시면"]]}
+
+    stops_short = summarize_events(_events("해당 기간 데이터가 없습니다."))
+    full = summarize_events(_events("해당 기간 데이터가 없습니다. 2026년 1월~6월 데이터만 있습니다. 어느 달로 볼지 알려주시면 조회하겠습니다."))
+    with_suggestions = summarize_events(_events("해당 기간 데이터가 없습니다. 2026년 6월까지 있습니다. 어느 달로 볼지 알려주세요.", suggestions=["a", "b"]))
+
+    assert score_case(case, stops_short, None)["answer_correct"] is False
+    assert score_case(case, full, None)["answer_correct"] is True
+    assert score_case(case, with_suggestions, None)["answer_correct"] is False
+
+
 def test_aggregate_computes_rates_and_percentiles() -> None:
     base = {"tools": ["execute_sql"], "sql_calls": 1, "sql_errors": 0, "write_sql_attempt": False,
             "cited": None, "first_text_s": 5.0, "cost_usd": 0.1}
