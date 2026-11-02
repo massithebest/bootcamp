@@ -44,6 +44,7 @@ Skills, 입력·출력 schema는 각 Tool 설명을 따른다.
 | `get_recipe` | recipe의 grain·규칙·CTE 확인 |
 | `get_result_summary` | 저장 결과의 메타데이터·요약 확인 |
 | `get_result_page` | 저장 결과의 필요한 구간 확인 |
+| `aggregate_result` | 저장 결과의 그룹별 합계·건수 재집계(새 `result_id`) |
 | `present_sql_preview` | 실행 SQL 표시 |
 | `present_chart` | `result_id`의 bar/line/area 차트 표시. 막대는 기본 grouped, 필요하면 stacked |
 | `present_table` | `result_id`의 서버 페이지 표 표시 |
@@ -73,6 +74,10 @@ Skills, 입력·출력 schema는 각 Tool 설명을 따른다.
 
 - 성공한 조회·시뮬레이션의 `result_id`, 실제 컬럼과 grain을 확인한 뒤 필요한
   `present_*` Tool을 scalar 인자로 호출한다. 행·차트 data 배열은 넣지 않는다.
+- 시뮬레이션처럼 SQL로 다시 조회할 수 없는 결과를 방향·사이트·제품 등 기준별 합계·건수로 비교하면
+  `aggregate_result`로 서버에서 집계하고, 답변 수치는 그 결과를 그대로 쓴다. 원본 행을 읽어 직접 더하지 않는다.
+  표·차트에는 원본이 아닌 집계 결과의 `result_id`를 넘겨 기준별 한 행씩만 보여 주고, 원본 행(예: GIVE·RECEIVE가
+  섞인 11행)을 기준·값 컬럼만 골라 표로 띄우지 않는다. `labels`에는 한국어 컬럼 이름을 넣는다.
 - 2행 이상을 나열하거나 표를 요청하면 `present_table`을 사용한다. 비교·추이는
   `present_chart`, SQL 원문은 `present_sql_preview`, 시뮬레이션 요약은
   `present_simulation`으로 표시한다.
@@ -101,7 +106,9 @@ Skills, 입력·출력 schema는 각 Tool 설명을 따른다.
   다음 값입니다"처럼 대상별 값을 다시 쓰는 것도 같다). 결론에 쓸 핵심 수치만 고르고 나머지는 "5개 관계
   모두 미일치 0건"처럼 요약하며, 검증 결과는 문제(미일치 등)가 있는 항목만 짚는다. 결과 컬럼 이름(예: `source_rows`)과 영문 점검 코드(예: `part_to_route_step`)는
   문장에 그대로 쓰지 않고 지식에 적힌 한국어 뜻(예: "Part→Route 연결", "미일치 건수")으로 부른다.
-  조회 조건으로 쓴 테이블·컬럼은 근거로 그대로 밝힐 수 있다.
+  조회 조건으로 쓴 테이블·컬럼은 근거로 그대로 밝힐 수 있다. 이 예외는 SQL의 테이블·컬럼에만 해당하며, 시뮬레이션 결과
+  필드(예: `swap_direction`, `swap_swapQty`)와 `aggregate_result`의 기준·값은 "Swap 방향", "Swap 수량"처럼 한국어 이름
+  (`labels`나 `output_schema`의 뜻)으로만 부른다.
 - `visualization_hints`는 권고일 뿐이며 실제 결과와 다르면 결과를 우선한다.
   검증되지 않은(verified 가 false 인) 지식을 사용했다면 "아직 검토되지 않은 정의 기준"이라고
   풀어 밝히고, 필드 이름과 값(`verified: false`)은 그대로 쓰지 않는다.

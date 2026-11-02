@@ -226,6 +226,13 @@ def test_mock_pkt_swap_swapped_view_only_includes_swap_rows(mock_db) -> None:
     rows = [dict(zip(columns, row)) for row in page["rows"]]
     assert rows  # 합성 데이터는 swap이 적어도 한 건 발생하도록 구성됨
     assert all(row["swap_direction"] in {"GIVE", "RECEIVE"} for row in rows)
+    # 한 행에 swapReason이 하나뿐이라 GIVE·RECEIVE를 1:1로 짝지어야 방향별 합계가 같다.
+    totals = {"GIVE": 0.0, "RECEIVE": 0.0}
+    for row in rows:
+        totals[row["swap_direction"]] += row["swap_swapQty"]
+    assert round(totals["GIVE"], 1) == round(totals["RECEIVE"], 1)
+    swap_ids = [row["swap_swapId"] for row in rows]
+    assert all(swap_ids.count(swap_id) == 2 for swap_id in swap_ids)
 
 
 def test_mock_pkt_swap_by_ids_filters_products(mock_db) -> None:

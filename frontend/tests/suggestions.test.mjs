@@ -52,7 +52,7 @@ test('follow-ups follow the selected branch, not the last generated run', () => 
 });
 
 test('toolkit registers every Backend tool', () => {
-  const expected = ['execute_sql', 'search_documents', 'list_simulation', 'run_simulation', 'list_tables', 'describe_table', 'list_kpis', 'get_kpi', 'list_recipes', 'get_recipe', 'get_result_summary', 'get_result_page', 'present_sql_preview', 'present_chart', 'present_table', 'present_simulation'];
+  const expected = ['execute_sql', 'search_documents', 'list_simulation', 'run_simulation', 'list_tables', 'describe_table', 'list_kpis', 'get_kpi', 'list_recipes', 'get_recipe', 'get_result_summary', 'get_result_page', 'aggregate_result', 'present_sql_preview', 'present_chart', 'present_table', 'present_simulation'];
   assert.deepEqual(Object.keys(toolkitModule.productionPlanningToolkit).sort(), expected.sort());
   for (const name of ['present_sql_preview', 'present_chart', 'present_table', 'present_simulation']) assert.equal(toolkitModule.productionPlanningToolkit[name].display, 'standalone', name);
   for (const name of toolkitModule.GROUPED_TOOL_NAMES) assert.notEqual(toolkitModule.productionPlanningToolkit[name].display, 'standalone', name);

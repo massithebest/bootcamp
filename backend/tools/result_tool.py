@@ -2,6 +2,8 @@
 
 from datetime import datetime, timezone
 
+from services.results.aggregate import AggregateError
+from services.results.aggregate import aggregate_result as aggregate_stored_result
 from services.results.store import ResultMeta, ResultStore, get_result_store, summarize_dataframe
 
 
@@ -81,3 +83,25 @@ async def get_result_page(
         "row_count": page.row_count,
         "rows": page.rows,
     }
+
+
+async def aggregate_result(
+    result_id: str,
+    group_by: list[str],
+    value_column: str,
+    aggregation: str,
+    labels: dict[str, str] | None = None,
+    *,
+    access_scope: str | None = None,
+) -> dict:
+    try:
+        return aggregate_stored_result(
+            result_id,
+            group_by=group_by,
+            value_column=value_column,
+            aggregation=aggregation,
+            labels=labels,
+            access_scope=access_scope,
+        )
+    except AggregateError as exc:
+        return {"status": "error", "message": exc.message}

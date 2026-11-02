@@ -2,7 +2,28 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
-## 2026-10-26 — FAC_ID 공장 정의와 표·차트 답변 표현 정리
+## 2026-11-02 — 저장 결과 기준별 재집계 Tool(`aggregate_result`)
+
+- "2026-09 PKT 목표수량 swap 결과에서 GIVE와 RECEIVE 방향별 수량 합계를 비교해줘"에 방향·수량 컬럼만 고른 원본
+  11행(GIVE·RECEIVE가 섞임)을 표로 띄워 어떤 기준의 표인지 알 수 없었다. 시뮬레이션 결과는 SQL로 다시 집계할 수
+  없어 모델이 행을 읽어 직접 더했고, GIVE 합계를 2,808.7로 잘못 썼다(실제 2,809.1).
+- `services/results/aggregate.py`와 `aggregate_result` Tool을 추가했다. 저장 결과를 group_by 기준으로 서버에서
+  sum·count·avg·min·max 집계해 같은 scope의 새 `result_id`로 저장하고, `labels`로 한국어 컬럼 이름을 붙인다. 기준
+  값이 빈 행(swap이 없는 행)은 그룹으로 만들지 않고 `excluded_blank_group_rows`로 수만 알린다. 처음에는 빈 기준도
+  그룹으로 남겨 표에 "— 0" 행이 나와 제외로 바꿨다.
+- CLAUDE.md·simulation Skill·`run_simulation` 설명에 기준별 합계·건수 비교는 `aggregate_result`로 집계하고 그 값을
+  인용하며, 표·차트에는 집계 결과의 `result_id`를 넘기고 원본 행을 표로 띄우지 않는다는 규칙을 넣었다.
+- 앱에서 같은 질문이 "Swap 방향 / Swap 수량 합계" 두 행(GIVE 2,809.1 / RECEIVE 2,096.6)으로 나오는 것을 확인했다.
+  Backend 436건(신규 `test_result_aggregate.py` 포함)·Frontend 111건 테스트, lint·build 통과.
+- mock swap은 한 행에 swapReason을 하나만 담는데 한 행이 여러 상대와 swap할 수 있어, 두 사이트에서 받은 제품
+  (PROD_0009 SITE_A)은 마지막 RECEIVE만 남아 GIVE·RECEIVE 합계가 712.5 어긋났다. `mock_pkt_swap._apply_swap`이 GIVE·RECEIVE
+  행을 1:1로만 짝짓도록 고쳐 방향별 합계가 같아졌고(swapped 10행, 각 2,222.3), 같은 swapId가 정확히 두 행인지 테스트한다.
+- 근거에 "swap_direction을 방향으로, swap_swapQty를 수량으로 사용"처럼 결과 필드 이름이 남았다. CLAUDE.md의 "조회 조건
+  컬럼은 그대로 밝힐 수 있다" 예외를 SQL 테이블·컬럼으로 한정하고, `run_simulation`·`aggregate_result` 설명에 결과 필드
+  이름을 근거 문장에도 쓰지 않는다고 적었다. 재실행에서 "Swap 방향별 Swap 수량 합계"로 쓰고 두 합계가 2,222.3으로 같음을
+  확인했다.
+
+
 
 - 카탈로그가 FAC_ID를 "공정 ID"로 정의했지만 평가 세트는 "공장(FAC_ID)"으로 묻고 있었다. 사용자 확인에 따라 FAC_ID를 공장 ID로
   정했고 `fp_target.yaml`의 컬럼 설명·caveat, 런타임 지침 예시("공장별")를 맞췄다.

@@ -61,7 +61,11 @@ def _generate_base_rows(rng: random.Random) -> list[dict]:
 def _apply_swap(rows: list[dict]) -> list[dict]:
     """targetQty = planQty - poutQty를 계산한 뒤, 같은 제품 내에서 우선순위
     순으로 잉여(targetQty>0)를 부족(targetQty<0)에 채워 GIVE/RECEIVE
-    swapReason을 채운다."""
+    swapReason을 채운다.
+
+    한 행은 swapReason을 하나만 담으므로 GIVE 행과 RECEIVE 행을 1:1로 짝짓는다.
+    이미 짝지어진 행에 다시 swap을 붙이면 앞선 swapReason이 덮여 GIVE와 RECEIVE
+    합계가 어긋난다."""
 
     by_product: dict[str, list[dict]] = {}
     for row in rows:
@@ -81,6 +85,8 @@ def _apply_swap(rows: list[dict]) -> list[dict]:
             for receive_row in deficit:
                 if available <= 0:
                     break
+                if receive_row["swapReason"] is not None:
+                    continue
                 need = receive_row["targetQty"]
                 if need <= 0:
                     continue
@@ -118,6 +124,7 @@ def _apply_swap(rows: list[dict]) -> list[dict]:
                     "counterCsCode": give_row["customer"],
                 }
                 available -= swap_qty
+                break
 
     rows_out = [row for group in by_product.values() for row in group]
     for row in rows_out:

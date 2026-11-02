@@ -33,7 +33,8 @@ from tools.present_tool import (
     present_table,
 )
 from tools.rag_tool import search_documents
-from tools.result_tool import get_result_page, get_result_summary
+from services.results.aggregate import aggregate_input_schema
+from tools.result_tool import aggregate_result, get_result_page, get_result_summary
 from tools.simulation_tool import list_simulation, run_simulation
 from tools.sql_tool import execute_sql
 from tools.suggestion_tool import suggest_follow_ups, suggest_follow_ups_input_schema
@@ -155,7 +156,10 @@ def _run_simulation_tool(access_scope: str | None):
         "적합한 등록 종류가 없으면 임의의 종류를 만들지 않는다. "
         "결과를 표로 보여 줬다면 답변 근거에 표의 행을 한 줄씩 다시 적지 말고, 검증 결과는 문제(미일치 등)가 "
         "있는 항목만 짚는다. 모두 통과했으면 '5개 관계 모두 미일치 0건'처럼 한 문장으로 요약한다. "
-        "params 의 이름·값(예: view=swapped)은 답변에 그대로 쓰지 말고 'swap이 발생한 행만'처럼 풀어 쓴다.",
+        "params 의 이름·값(예: view=swapped)은 답변에 그대로 쓰지 말고 'swap이 발생한 행만'처럼 풀어 쓴다. "
+        "결과를 방향·사이트·제품별 합계·건수로 비교하려면 aggregate_result로 서버에서 집계해 그 값과 새 result_id를 쓴다. "
+        "결과 필드 이름(예: swap_direction, swap_swapQty, planProductId)은 근거 문장에도 쓰지 않고 "
+        "'Swap 방향', 'Swap 수량', '계획 제품'처럼 한국어 이름으로 부른다.",
         {"simulation_type": str, "params": dict},
     )
     async def _run_simulation(args: dict[str, Any]) -> dict[str, Any]:
@@ -285,6 +289,36 @@ def _get_result_page_tool(access_scope: str | None):
     return _get_result_page
 
 
+def _aggregate_result_tool(access_scope: str | None):
+    @tool(
+        "aggregate_result",
+        "execute_sql·run_simulation이 반환한 result_id를 group_by 컬럼별로 서버에서 다시 집계해 새 result_id로 저장한다. "
+        "SQL로 다시 조회할 수 없는 결과(시뮬레이션 등)를 방향·사이트·제품별 합계·건수로 비교할 때 쓴다. "
+        "원본 행을 get_result_page로 읽어 직접 더하지 않고, 답변 수치는 이 Tool이 돌려준 값을 그대로 쓴다. "
+        "aggregation은 sum·count·avg·min·max 중 하나다. "
+        "labels에는 결과 컬럼의 한국어 이름을 넣는다(예: {\"swap_direction\": \"Swap 방향\", \"swap_swapQty\": \"Swap 수량 합계\"}). "
+        "기준 값이 비어 있는 행(예: swap이 없는 행)은 집계에서 빠지고 excluded_blank_group_rows로 그 수를 알려 준다. "
+        "표·차트에는 원본 result_id가 아니라 이 Tool이 돌려준 새 result_id를 넘겨, 그룹별 집계 행만 보여 준다. "
+        "답변의 결론·근거 문장에서도 기준·값은 labels의 한국어 이름으로 부르고 원본 컬럼 이름(예: swap_direction, "
+        "swap_swapQty)을 쓰지 않는다('swap_direction을 방향으로 사용' 같은 문장도 쓰지 않는다). "
+        "새 result_id도 답변 본문에 적지 않는다.",
+        aggregate_input_schema(),
+    )
+    async def _aggregate_result(args: dict[str, Any]) -> dict[str, Any]:
+        return _ok(
+            await aggregate_result(
+                result_id=args["result_id"],
+                group_by=args["group_by"],
+                value_column=args["value_column"],
+                aggregation=args["aggregation"],
+                labels=args.get("labels"),
+                access_scope=access_scope,
+            )
+        )
+
+    return _aggregate_result
+
+
 def _present_sql_preview_tool(access_scope: str | None):
     @tool(
         "present_sql_preview",
@@ -393,6 +427,7 @@ def planning_tools(access_scope: str | None = None):
         _run_simulation_tool(access_scope), _list_tables, _describe_table,
         _list_kpis, _get_kpi, _list_recipes, _get_recipe,
         _get_result_summary_tool(access_scope), _get_result_page_tool(access_scope),
+        _aggregate_result_tool(access_scope),
         _present_sql_preview_tool(access_scope),
         _present_chart_tool(access_scope),
         _present_table_tool(access_scope),
@@ -428,6 +463,7 @@ async def tool_catalog() -> list[dict]:
         "list_kpis": "KPI 요약 목록", "get_kpi": "KPI 공식·진단·SQL 정의",
         "list_recipes": "집계 recipe 요약 목록", "get_recipe": "CTE·출력 grain·사용 예시",
         "get_result_summary": "저장 결과 메타데이터·수치 요약", "get_result_page": "저장 결과의 일부 행",
+        "aggregate_result": "그룹별 재집계 결과 참조(새 result_id·집계 행 preview)",
         "present_sql_preview": "SQL 표시 설정 검증 결과(빈 객체 또는 안전한 오류)",
         "present_chart": "차트 표시 설정 검증 결과(빈 객체 또는 안전한 오류)",
         "present_table": "표 표시 설정 검증 결과(빈 객체 또는 안전한 오류)",

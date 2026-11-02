@@ -263,6 +263,23 @@ def test_presented_results_use_readable_labels_and_are_not_repeated() -> None:
     assert "같은 `result_id`로 `present_table`을 또 호출하지" in claude
 
 
+def test_grouped_comparisons_of_stored_results_are_aggregated_on_the_server() -> None:
+    tools = {t.name: t for t in planning_tools(access_scope="scope-a")}
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+    simulation = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "simulation" / "SKILL.md").read_text(encoding="utf-8")
+
+    # swap 방향별 합계 비교에서 GIVE·RECEIVE가 섞인 원본 11행을 표로 띄우고, 합계를 직접 더해 GIVE를 2,808.7로 잘못 썼다.
+    assert "직접 더하지 않는다" in claude and "원본 행(예: GIVE·RECEIVE가" in claude
+    assert "aggregate_result(result_id, group_by" in simulation and "직접 더하지 않는다" in simulation
+    assert "직접 더하지 않고" in tools["aggregate_result"].description
+    assert "새 result_id를 넘겨" in tools["aggregate_result"].description
+    assert "aggregate_result" in tools["run_simulation"].description
+    # 근거에 "swap_direction을 방향으로, swap_swapQty를 수량으로 사용"처럼 결과 필드 이름이 그대로 남았다.
+    assert "이 예외는 SQL의 테이블·컬럼에만 해당" in claude
+    assert "근거 문장에도 쓰지 않고" in tools["run_simulation"].description
+    assert "'swap_direction을 방향으로 사용' 같은 문장도 쓰지 않는다" in tools["aggregate_result"].description
+
+
 def test_rag_final_answers_require_a_source_or_url() -> None:
     claude = CLAUDE_MD.read_text(encoding="utf-8")
 

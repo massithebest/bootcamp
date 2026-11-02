@@ -14,6 +14,7 @@ export const GROUPED_TOOL_NAMES = [
   "get_recipe",
   "get_result_summary",
   "get_result_page",
+  "aggregate_result",
 ] as const;
 
 const groupedTools = Object.fromEntries(

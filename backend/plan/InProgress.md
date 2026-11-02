@@ -76,6 +76,11 @@ Backend가 소유하는 범위는 다음과 같다.
   한 화면에 시각적으로 묶는 기능(과거 `Card`)은 없다 — 같은 `result_id`로 여러 `present_*`를
   호출해도 화면에는 순차적으로 나열되며 연결은 모델이 텍스트로 설명한다. 자동 표 보완은
   하지 않는다.
+- `aggregate_result(result_id, group_by[1~3], value_column, aggregation(sum|count|avg|min|max), labels?)`는
+  접근 가능한 저장 결과를 서버에서 기준별로 다시 집계해 같은 scope·TTL의 새 `result_id`로 저장하고, 집계 결과
+  preview와 `source_result_id`·`source_row_count`·`excluded_blank_group_rows`(기준 값이 빈 행 수)를 돌려준다.
+  `labels`는 결과 컬럼의 표시 이름이며 값 컬럼 기본 이름은 `<컬럼> 합계|건수|평균|최소|최대`다. 원본 결과는
+  바꾸지 않는다. 오류는 `{status:"error", message}`이며 다른 scope 결과는 없는 결과와 같은 메시지로 거부한다.
 - `present_chart.bar_mode`는 선택 enum `grouped|stacked`이며 기본은 `grouped`다.
   `stacked`는 막대 차트에서만 허용하고 `group_by_column`이 필요하다. 표시 모드만
   바꾸므로 `/api/query-results/{id}/chart` 응답 payload는 바뀌지 않는다.

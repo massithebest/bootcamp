@@ -24,7 +24,7 @@ from tools.present_tool import (
     present_table,
 )
 from tools.rag_tool import search_documents
-from tools.result_tool import get_result_page, get_result_summary
+from tools.result_tool import aggregate_result, get_result_page, get_result_summary
 from tools.simulation_tool import list_simulation, run_simulation
 from tools.sql_tool import execute_sql
 from tools.suggestion_tool import suggest_follow_ups
@@ -43,6 +43,7 @@ ALL_TOOLS = (
     get_recipe,
     get_result_summary,
     get_result_page,
+    aggregate_result,
     present_sql_preview,
     present_chart,
     present_table,
