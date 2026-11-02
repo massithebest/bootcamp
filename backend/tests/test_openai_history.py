@@ -9,7 +9,7 @@ import pytest
 
 from agent import openai_session_store as session_store
 from agent.agent import _resolve_resume
-from agent.openai_runtime import run_openai_agent
+from agent.openai_runtime import run_openai_agent, with_guide
 from agent.public_messages import FORK_FALLBACK_MESSAGE, MAX_TURNS_MESSAGE
 from core import config
 from tests.openai_fakes import DEPLOYMENT, FakeGateway, text_turn, tool_turn
@@ -38,14 +38,18 @@ def _turn(gateway: FakeGateway, message: str, conversation_id: str | None = "con
 
 
 def _dialogue(body: dict) -> list[tuple[str, str]]:
-    """system 지침을 뺀 (role, content) 목록. Tool 호출 메시지는 content 대신 Tool 이름."""
+    """system 지침과 첫 질문 앞 CLAUDE.md 를 뺀 (role, content) 목록. Tool 호출 메시지는 content 대신 Tool 이름."""
 
+    guide_prefix = with_guide("")
     rows = []
     for message in body["messages"][1:]:
         if message.get("tool_calls"):
             rows.append(("call", message["tool_calls"][0]["function"]["name"]))
         else:
-            rows.append((message["role"], message.get("content")))
+            content = message.get("content")
+            if isinstance(content, str):
+                content = content.removeprefix(guide_prefix)
+            rows.append((message["role"], content))
     return rows
 
 

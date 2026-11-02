@@ -42,14 +42,37 @@ def test_tracing_is_disabled_on_import() -> None:
     assert isinstance(trace("probe"), NoOpTrace)
 
 
-def test_instructions_combine_system_prompt_runtime_guide_and_skill_index() -> None:
+def test_system_instructions_hold_the_role_prompt_and_skill_index_only() -> None:
     instructions = openai_runtime.build_instructions()
+    guide = openai_runtime.INSTRUCTIONS_PATH.read_text(encoding="utf-8").strip()
 
     assert instructions.startswith(SYSTEM_PROMPT.strip())
-    assert openai_runtime.INSTRUCTIONS_PATH.read_text(encoding="utf-8").strip() in instructions
+    assert guide not in instructions
     assert "load_skill(name)" in instructions
     for skill in list_skills():
         assert f"`{skill.name}`: {skill.description}" in instructions
+
+
+def test_runtime_guide_precedes_only_the_first_question_of_a_conversation() -> None:
+    from agent import openai_session_store
+
+    openai_session_store.clear()
+    guide = openai_runtime.INSTRUCTIONS_PATH.read_text(encoding="utf-8").strip()
+    gateway = FakeGateway(text_turn("A1"), text_turn("A2"))
+
+    async def turn(message: str) -> None:
+        async for _ in openai_runtime.run_openai_agent(message, "guide-conv", None, "scope", model=gateway.model()):
+            pass
+
+    asyncio.run(turn("Q1"))
+    asyncio.run(turn("Q2"))
+    openai_session_store.clear()
+
+    # Claude CLI 처럼 CLAUDE.md 를 대화 첫 질문 바로 앞에 둔다(system 에 두면 caveats 를 덜 지킨다).
+    first = gateway.bodies[0]["messages"][1]["content"]
+    assert guide in first and first.endswith("\n\nQ1") and first == openai_runtime.with_guide("Q1")
+    later = [m["content"] for m in gateway.bodies[1]["messages"] if m["role"] == "user"]
+    assert later == [openai_runtime.with_guide("Q1"), "Q2"]
 
 
 def test_text_turn_calls_the_gateway_deployment_with_runtime_settings() -> None:

@@ -123,6 +123,9 @@ def test_build_options_limits_builtin_tools_to_skill() -> None:
         name == "Skill" or name.startswith("mcp__planning__")
         for name in options.allowed_tools
     )
+    # 실행 PC 의 사용자 MCP 서버(브라우저 자동화 등)가 Agent Tool 로 노출되던 회귀를 막는다.
+    assert options.strict_mcp_config is True
+    assert list(options.mcp_servers) == ["planning"]
 
 
 def test_optional_catalog_filters_are_optional_on_the_mcp_wire() -> None:

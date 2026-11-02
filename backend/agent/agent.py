@@ -56,6 +56,9 @@ def _build_options(
         cwd=AGENT_SDK_CWD,
         setting_sources=["project"],  # CLAUDE.md / .claude/skills 로드
         mcp_servers={"planning": build_planning_mcp_server(access_scope)},
+        # 실행 PC 의 사용자·로컬 MCP 설정(예: 브라우저 자동화)을 불러오지 않고 위 서버만 쓴다.
+        # bypassPermissions 라 불러온 외부 Tool 도 승인 없이 실행될 수 있다.
+        strict_mcp_config=True,
         # 내장 도구는 Skill 만 사용 가능하게 한다. allowed_tools 는 자동 승인 목록일 뿐
         # 사용 가능 도구를 제한하지 않으므로, bypassPermissions 와 함께 쓰려면 tools 로
         # Bash/Write/Read 등 나머지 내장 도구를 반드시 꺼야 한다.

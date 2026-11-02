@@ -358,3 +358,14 @@ def test_rag_final_answers_require_a_source_or_url() -> None:
     assert "최종 응답" in claude
     assert "`source` 또는 검색 결과가 제공한 URL을 반드시 포함" in claude
     assert "출처와 URL이 모두 없는 검색 결과는 최종 답변의 근거로 사용하지 않는다" in claude
+
+
+def test_clarifying_answers_end_without_tool_calls() -> None:
+    tools = {t.name: t for t in tool_specs()}
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+
+    # 기준 없는 세그먼트 질문에 되묻는 문장을 쓰면서 suggest_follow_ups·present_sql_preview 를 함께 호출했다(2026-11-02).
+    assert "Tool 호출 없이 텍스트로만" in tools["describe_table"].description
+    assert "caveats 가 다른 컬럼으로 대신하지 말라고 하면" in tools["describe_table"].description
+    assert "되묻고 멈추는 응답에서는 호출하지 않는다" in tools["suggest_follow_ups"].description
+    assert "Tool 호출 없이 텍스트로만 끝낸다" in claude

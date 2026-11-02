@@ -2,6 +2,25 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-11-02 — 실행부 간 되묻기 규칙 차이 원인과 조정, Claude 실행부 외부 MCP 차단
+
+- 원인 조사: 두 실행부가 게이트웨이로 보내는 요청을 저장하고, "2026년 5월 세그먼트별 계획수량" 질문의 결정 지점(describe_table 직후)
+  요청을 한 가지씩 바꿔 각 8회 다시 보냈다. Claude 요청은 그대로 8/8 되물었고 병렬 Tool 호출·Skill 본문 전달 방식·출력 상한·외부
+  Tool 제거는 영향이 없었지만, CLAUDE.md 를 첫 user 메시지에서 system 으로 옮기자 3/8로 떨어졌다. OpenAI 요청은 그대로 0/8이었고
+  `strict`·Tool 이름 접두어·병렬 호출은 영향이 거의 없었다. 지침 내용은 같아도 질문 바로 앞(Claude CLI의 `<system-reminder>`)에 둔
+  지침을 더 잘 따른다. OpenAI 쪽은 되묻는 문장과 함께 `suggest_follow_ups`·`present_sql_preview`를 호출하는 경향도 있었고(평가 오답,
+  답변 중복 표시의 원인), Tool 설명 규칙으로 막는다.
+- 조정: OpenAI 실행부는 CLAUDE.md 본문을 대화 첫 user 메시지 질문 앞에 두고 system 에는 `SYSTEM_PROMPT` + Skill 목록만 둔다.
+  `describe_table`·`suggest_follow_ups` 설명과 CLAUDE.md 에 "기준을 되묻고 멈추는 응답은 Tool 호출 없이 텍스트로만 끝낸다"를 더하고,
+  caveats 가 다른 컬럼 대체를 막으면 되묻도록 명시했다. 평가 세트의 되묻기 표현(`알려 주세요`·`지정해 주시면`·`보려는지` 등)을 넓혀,
+  올바르게 되묻고도 표현 차이로 오답 처리되던 경우를 바로잡았다.
+- 함께 고친 것: Claude 실행부가 실행 PC 의 사용자 MCP 설정(chrome-devtools 브라우저 자동화 Tool 33개)을 `bypassPermissions` 상태로
+  모델에 노출하고 있었다. `strict_mcp_config=True`로 `planning` 서버만 쓰게 했고, 실제 요청에서 Tool 이 19개(planning 18 + Skill)로
+  줄어든 것을 확인했다. Claude CLI 는 2,048자를 넘는 Tool 설명을 잘라 보내 `execute_sql` 마지막 문장이 빠졌으므로 설명을 2,029자로 줄이고
+  상한 테스트를 더했다. Claude CLI 는 저장소 루트·backend 의 개발용 CLAUDE.md(`@AGENTS.md` 한 줄과 PC 절대경로)도 함께 보낸다(미조치, 기록).
+- 결과(같은 날, 넓힌 표현 기준으로 재채점): 되묻기 문항 OpenAI 실행부 조정 전 7/15(47%) → 조정 후 9/9, Claude 실행부 16/16.
+  조정 후 전체 1회: OpenAI 93.3%(p50 13.6초 / p90 43.4초), Claude 80.0%(16.4초 / 34.2초). Backend 484건 통과.
+
 ## 2026-11-02 — OpenAI Agents SDK 실행부 7단계: 비교 평가와 판정(전환 보류)
 
 - 평가 스크립트: `--runtime claude|openai`·`--repeat N`을 추가하고, 비용은 두 실행부 공통의 입력·출력 토큰과 모델 호출 수로 남긴다.

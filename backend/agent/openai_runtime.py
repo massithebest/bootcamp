@@ -1,7 +1,8 @@
 """OpenAI Agents SDK 실행부.
 
 `agent/tool_specs.py` 의 공통 Tool 명세와 Claude 실행부와 같은 런타임 지침
-(`system_prompt.py` + `agent_sdk/CLAUDE.md` + Skills)으로 Agent 를 만들고,
+(`system_prompt.py` + `agent_sdk/CLAUDE.md` + Skills)으로 Agent 를 만들고(CLAUDE.md 는 Claude CLI 처럼
+대화 첫 user 메시지에 둔다),
 사내 게이트웨이의 Chat Completions 를 직접 호출해 한 턴을 스트리밍 실행한다.
 `AgentEvent` 변환은 `openai_event_adapter`가 맡는다.
 
@@ -73,16 +74,29 @@ def _parse_arguments(raw: str) -> dict[str, Any] | None:
 
 
 def build_instructions() -> str:
-    """SYSTEM_PROMPT + CLAUDE.md 본문 + Skill 목록. 지침 파일이 없으면 시작 오류."""
+    """system 지침: SYSTEM_PROMPT + Skill 목록. CLAUDE.md 본문은 `with_guide`로 첫 질문 앞에 둔다."""
 
     skills = "\n".join(f"- `{skill.name}`: {skill.description}" for skill in list_skills())
     return (
         f"{SYSTEM_PROMPT.strip()}\n\n"
-        f"{INSTRUCTIONS_PATH.read_text(encoding='utf-8').strip()}\n\n"
         "## Skill 불러오기\n\n"
         f"업무 절차가 필요한 질의는 답하기 전에 `{LOAD_SKILL_TOOL_NAME}(name)`으로 해당 Skill 본문을 읽고 "
         "그 절차를 따른다. 사용할 수 있는 Skill:\n"
         f"{skills}"
+    )
+
+
+def with_guide(message: str) -> str:
+    """대화 첫 user 메시지: CLAUDE.md 본문을 질문 바로 앞에 붙인다. 지침 파일이 없으면 실행 오류.
+
+    Claude 실행부(CLI)와 같은 배치다. 같은 지침을 system 에 두면 모델이 테이블 caveats 를 어기고 비슷한
+    컬럼으로 바꿔 답하는 비율이 크게 늘었다(2026-11-02 결정 지점 재생 실험: user 8/8 → system 3/8 되물음).
+    """
+
+    guide = INSTRUCTIONS_PATH.read_text(encoding="utf-8").strip()
+    return (
+        "<system-reminder>\n아래 CLAUDE.md 지침은 기본 동작보다 우선하며 그대로 따른다.\n\n"
+        f"{guide}\n</system-reminder>\n\n{message}"
     )
 
 
@@ -320,7 +334,8 @@ async def run_openai_agent(
     adapter = OpenAIEventAdapter()
     retry_wait = RetryWait()
     result = run_streamed(
-        [*history, {"role": "user", "content": message}],
+        # 지침은 대화 첫 메시지에만 붙이고, 이후 턴은 기록에 남은 그 메시지를 그대로 이어 쓴다.
+        [*history, {"role": "user", "content": message if history else with_guide(message)}],
         access_scope=access_scope, model=model, retry_wait=retry_wait,
     )
     raw_events = result.stream_events()

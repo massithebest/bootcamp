@@ -62,3 +62,10 @@ def test_claude_tools_bind_access_scope_to_shared_handlers(monkeypatch) -> None:
     assert result.is_error is not True
     assert seen == {"sql": "SELECT 1", "purpose": "확인", "access_scope": "scope-x"}
     assert json.loads(result.content[0].text) == {"status": "success", "row_count": 1}
+
+
+def test_tool_descriptions_fit_the_claude_cli_limit() -> None:
+    # Claude CLI 는 2,048자를 넘는 Tool 설명을 잘라 보낸다(execute_sql 마지막 문장이 잘렸다, 2026-11-02).
+    too_long = {spec.name: len(spec.description) for spec in tool_specs() if len(spec.description) > 2048}
+
+    assert too_long == {}
