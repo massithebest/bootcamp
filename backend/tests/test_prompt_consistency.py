@@ -297,6 +297,20 @@ def test_grouped_comparisons_of_stored_results_are_aggregated_on_the_server() ->
     assert "`present_chart`(막대, x=첫 기준" in claude and "`present_chart`(막대, x=첫 기준" in simulation
 
 
+def test_single_value_columns_are_dropped_and_distributions_show_shares() -> None:
+    tools = {t.name: t for t in planning_tools(access_scope="scope-a")}
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+    skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
+
+    # PROD_0016만 조회한 공장별 표에 세 행 모두 같은 "제품" 열이 남았다.
+    for text in (claude, skill, tools["execute_sql"].description):
+        assert "WHERE로 한 값만 남긴 컬럼" in text
+    # "공장별로 어떻게 나눠져 있어?"에 두 공장 차이만 답하고 가장 작은 공장과 비중을 빠뜨렸다.
+    for text in (claude, skill, tools["execute_sql"].description):
+        assert "비중(%)" in text
+    assert "차이만 쓰고 나머지 대상을 빠뜨리지 않는다" in claude
+
+
 def test_rag_final_answers_require_a_source_or_url() -> None:
     claude = CLAUDE_MD.read_text(encoding="utf-8")
 
