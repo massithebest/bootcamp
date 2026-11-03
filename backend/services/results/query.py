@@ -110,6 +110,28 @@ def _extreme_rows(frame: pd.DataFrame, series: pd.Series, dimensions: list[Any])
     }
 
 
+def _repeated_columns(meta: ResultMeta, frame: pd.DataFrame) -> list[dict[str, str]]:
+    """첫 기준 컬럼의 묶음마다 모든 행에 같은 값이 반복되는 수치 컬럼(윈도 함수로 붙인 상위 합계 등).
+
+    공장·영업배치 표의 모든 행에 공장 합계·달성률 열이 반복해 붙었다(2026-11-03, 지침만으로는 8회 중 3회).
+    더 세밀한 기준이 함께 있고 행이 둘 이상인 묶음이 있을 때만 본다.
+    """
+
+    roles = {column.name: column.role for column in meta.columns}
+    dimensions = [name for name in frame.columns if roles.get(str(name)) != "measure"]
+    if len(dimensions) < 2:
+        return []
+    key = dimensions[0]
+    groups = frame.groupby(key, dropna=False, sort=False)
+    if groups.size().max() < 2:
+        return []
+    return [
+        {"column": str(name), "same_within": str(key)}
+        for name in frame.columns
+        if roles.get(str(name)) == "measure" and groups[name].nunique(dropna=False).max() == 1
+    ]
+
+
 def build_preview(meta: ResultMeta, frame: pd.DataFrame) -> dict[str, Any]:
     """모델과 UI가 표현을 판단하는 bounded metadata. 전체 행은 포함하지 않는다."""
 
@@ -178,6 +200,11 @@ def tool_preview(
     """
 
     preview = build_preview(meta, frame)
+    if kind == "database":
+        # 시뮬레이션 결과는 GIVE·RECEIVE 쌍의 Swap 수량처럼 원래 같은 값을 나누는 열이 있어 SQL 결과에만 둔다.
+        repeated = _repeated_columns(meta, frame)
+        if repeated:
+            preview["repeated_columns"] = repeated
     return {"status": preview.pop("status"), "kind": kind, **extra, **preview}
 
 

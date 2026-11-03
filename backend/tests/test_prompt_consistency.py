@@ -417,6 +417,8 @@ def test_plan_versus_actual_tables_are_wide_and_lead_with_the_gap() -> None:
     # 영업배치를 넣은 계획·실적 비교가 지표 열의 long 형식 30행 표로 나오고, 결론은 "가장 큰 단일 항목은 … 계획수량 19,903"이었다(2026-11-03).
     assert "wide 형식" in claude and "long 형식은 차트용" in claude
     assert "wide 형식" in tools["present_table"].description
+    # 공장·영업배치 표의 모든 행에 공장 계획수량·실적수량·차이·달성률 4개 열이 반복해 붙었다(2026-11-03).
+    assert "repeated_columns" in claude and "repeated_columns" in tools["present_table"].description
     assert "차이·달성률" in claude and "차이·달성률" in SYSTEM_PROMPT
     assert "한 문장으로 밝힌다" in claude
 

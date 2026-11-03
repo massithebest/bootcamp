@@ -15,6 +15,7 @@ from services.results.query import (
     read_chart,
     read_preview,
     read_table,
+    tool_preview,
 )
 from services.results.store import LocalParquetResultStore, ResultColumn
 
@@ -345,6 +346,30 @@ def test_preview_is_bounded_and_has_no_full_rows(store) -> None:
     assert {group["value"]: group["count"] for group in preview["top_groups"]["line"]} == {"A": 6, "B": 6}
     assert "rows" not in preview and "table" not in preview
     assert [c["name"] for c in preview["columns"]] == ["work_month", "line", "qty"]
+
+
+def test_sql_preview_flags_measures_repeated_within_the_first_dimension(store) -> None:
+    # 공장·영업배치 표의 모든 행에 공장 합계·달성률 열이 반복해 붙었다(2026-11-03).
+    rows = [
+        ["FAC001", "BATCH_01", 329, 43159, 36.9],
+        ["FAC001", "BATCH_02", 17729, 43159, 36.9],
+        ["FAC002", "BATCH_01", 6173, 45995, 66.0],
+        ["FAC002", "BATCH_02", 10300, 45995, 66.0],
+    ]
+    meta = _save(store, ["공장", "영업배치", "계획수량", "공장 계획수량", "공장 달성률(%)"], rows)
+    frame = pd.DataFrame(rows, columns=[c.name for c in meta.columns])
+
+    preview = tool_preview(meta, frame, kind="database")
+
+    assert preview["repeated_columns"] == [
+        {"column": "공장 계획수량", "same_within": "공장"},
+        {"column": "공장 달성률(%)", "same_within": "공장"},
+    ]
+    # 시뮬레이션 결과(GIVE·RECEIVE 쌍이 같은 Swap 수량을 나눔)와 한 행씩인 묶음에는 붙이지 않는다.
+    assert "repeated_columns" not in tool_preview(meta, frame, kind="simulation")
+    single = _save(store, ["공장", "영업배치", "계획수량"], [["FAC001", "B1", 1], ["FAC002", "B1", 1]])
+    single_frame = pd.DataFrame([["FAC001", "B1", 1], ["FAC002", "B1", 1]], columns=["공장", "영업배치", "계획수량"])
+    assert "repeated_columns" not in tool_preview(single, single_frame, kind="database")
 
 
 def test_preview_groups_are_capped_at_ten(store) -> None:
