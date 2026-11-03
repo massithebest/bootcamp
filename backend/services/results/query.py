@@ -104,10 +104,18 @@ def _extreme_rows(frame: pd.DataFrame, series: pd.Series, dimensions: list[Any])
     numeric = pd.to_numeric(series, errors="coerce")
     if not dimensions or numeric.notna().sum() == 0:
         return {}
-    return {
-        f"{kind}_at": {str(name): _series_value(frame.at[index, name]) for name in dimensions}
-        for kind, index in (("max", numeric.idxmax()), ("min", numeric.idxmin()))
-    }
+    extremes: dict[str, Any] = {}
+    for kind, value in (("max", numeric.max()), ("min", numeric.min())):
+        rows = numeric.index[numeric == value]
+        extremes[f"{kind}_at"] = {str(name): _series_value(frame.at[rows[0], name]) for name in dimensions}
+        # 같은 값이 여러 행이면 첫 행만 대상으로 썼다(2026-11-04 "part_1이 216으로 가장 많고" — 6개 Part가 216 동률).
+        if len(rows) > 1:
+            extremes[f"{kind}_count"] = int(len(rows))
+            extremes[f"{kind}_ties"] = [
+                {str(name): _series_value(frame.at[index, name]) for name in dimensions}
+                for index in rows[:PREVIEW_SAMPLE_ROWS]
+            ]
+    return extremes
 
 
 def _repeated_columns(meta: ResultMeta, frame: pd.DataFrame) -> list[dict[str, str]]:

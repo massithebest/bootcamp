@@ -277,7 +277,8 @@ def tool_specs() -> list[ToolSpec]:
             "나열하지 않는다('점검한 관계는 Part→Route 연결, Route Step→설비 Family 연결, … 5개이며'처럼 이름을 늘어놓는 것도 "
             "나열이며, 관계 이름은 표에 있다). present_simulation 요약 카드에 보인 지표 값(예: Part 2개, Route Step 926개)도 근거에서 다시 쓰지 않는다. "
             "params 의 이름·값(예: view=swapped)은 답변에 그대로 쓰지 말고 'swap이 발생한 행만'처럼 풀어 쓴다. "
-            "결과를 방향·사이트·제품별 합계·건수로 비교하려면 aggregate_result로 서버에서 집계해 그 값과 새 result_id를 쓴다. "
+            "결과를 어떤 기준 컬럼(방향·사이트·등급·제품·고객 등)별 합계·건수로 비교하든 aggregate_result로 서버에서 집계해 그 값과 새 result_id를 쓴다. "
+            "시뮬레이션 결과는 DB 테이블이 아니므로 execute_sql로 조회하지 않고, get_result_page로 읽은 행을 직접 더하지 않는다. "
             "결과 컬럼은 'Swap 방향', 'Swap 수량', '계획 제품'처럼 한국어 이름으로 저장되므로 그 이름으로 부른다. "
             "Swap 수량은 swap 하나를 GIVE·RECEIVE 두 행에 같은 값으로 적은 것이므로, 가장 큰 swap 등을 쓸 때는 한 행(수취·RECEIVE)이 아니라 "
             "swap 단위로 'PROD_0006의 SITE_B→SITE_A swap 828.4'처럼 보내는 쪽과 받는 쪽을 함께 쓴다. "
@@ -378,7 +379,7 @@ def tool_specs() -> list[ToolSpec]:
         ToolSpec(
             "aggregate_result",
             "execute_sql·run_simulation이 반환한 result_id를 group_by 컬럼별로 서버에서 다시 집계해 새 result_id로 저장한다. "
-            "SQL로 다시 조회할 수 없는 결과(시뮬레이션 등)를 방향·사이트·제품별 합계·건수로 비교할 때만 쓴다. "
+            "SQL로 다시 조회할 수 없는 결과(시뮬레이션 등)를 결과의 어떤 기준 컬럼(예: 방향·사이트·등급·제품)별로든 합계·건수로 비교할 때 쓴다. "
             "execute_sql 결과에는 쓰지 않는다: 필요한 집계 단위(예: 공장별)는 처음 SQL의 GROUP BY에서 만들고, "
             "다른 단위가 필요하면 SQL을 다시 작성해 실행한다. "
             "원본 행을 get_result_page로 읽어 직접 더하지 않고, 답변 수치는 이 Tool이 돌려준 값을 그대로 쓴다. "

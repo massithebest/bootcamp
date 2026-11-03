@@ -290,6 +290,9 @@ def test_grouped_comparisons_of_stored_results_are_aggregated_on_the_server() ->
     assert "이 예외는 SQL의 테이블·컬럼에만 해당" in claude
     assert "한국어 이름으로 저장되므로" in tools["run_simulation"].description
     assert "swap 단위로" in tools["run_simulation"].description
+    # 등급별 비교가 '방향·사이트·제품별'에 없어 aggregate_result를 쓰지 않고 행을 직접 더해 틀렸다(2026-11-04).
+    assert "등급" in tools["aggregate_result"].description and "때만 쓴다" not in tools["aggregate_result"].description
+    assert "execute_sql로 조회하지 않고" in tools["run_simulation"].description
     # 제품 ID를 되물으면서 '예: ["PROD_0001"]'처럼 파라미터 형식을 그대로 보였다(2026-11-03).
     simulation_skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "simulation" / "SKILL.md").read_text(encoding="utf-8")
     assert "목록 형식" in tools["run_simulation"].description and "목록 형식" in simulation_skill
@@ -430,6 +433,8 @@ def test_extreme_value_targets_come_from_result_rows() -> None:
     # 18행 결과의 통계에서 최대·최소 값만 보고 월을 추정해 "2026-03 FAC003 100,241"을 6월로 답했다(2026-11-03).
     assert "max_at" in SYSTEM_PROMPT and "min_at" in SYSTEM_PROMPT
     assert "max_at" in claude and "짐작하지 않는다" in claude
+    # 동률(6개 Part 216)을 한 Part의 최대로 썼다(4/4, 2026-11-04).
+    assert "max_count" in SYSTEM_PROMPT and "동률을 밝힌다" in SYSTEM_PROMPT
     # 근거에 "최대 계획수량의 대상은 결과 통계에 표시된 행 기준으로 확인했습니다"처럼 확인 방법을 적었다(2026-11-03).
     assert "어디서 확인했는지" in SYSTEM_PROMPT
     # 두 세그먼트 비교에 '가장 많고'를 썼고(5/5), swap 쌍의 값을 수취 행 하나의 값처럼 썼다(2/5, 2026-11-03).

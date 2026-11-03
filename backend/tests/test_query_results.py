@@ -348,6 +348,20 @@ def test_preview_is_bounded_and_has_no_full_rows(store) -> None:
     assert [c["name"] for c in preview["columns"]] == ["work_month", "line", "qty"]
 
 
+def test_preview_statistics_report_tied_extremes(store) -> None:
+    # 6개 Part가 216 동률인데 첫 행(part_1)만 '가장 많다'고 답했다(2026-11-04).
+    rows = [[f"part_{i}", 216 if i <= 6 else 215] for i in range(1, 11)]
+    meta = _save(store, ["Part", "Lot 수"], rows)
+
+    stats = read_preview(meta.result_id, access_scope=SCOPE)["statistics"]["Lot 수"]
+
+    assert stats["max_at"] == {"Part": "part_1"} and stats["max_count"] == 6
+    assert [tie["Part"] for tie in stats["max_ties"]] == ["part_1", "part_2", "part_3", "part_4", "part_5"]
+    assert stats["min_count"] == 4 and stats["min_ties"][0] == {"Part": "part_7"}
+    single = _save(store, ["Part", "Lot 수"], [["a", 1], ["b", 2]])
+    assert "max_count" not in read_preview(single.result_id, access_scope=SCOPE)["statistics"]["Lot 수"]
+
+
 def test_sql_preview_flags_measures_repeated_within_the_first_dimension(store) -> None:
     # 공장·영업배치 표의 모든 행에 공장 합계·달성률 열이 반복해 붙었다(2026-11-03).
     rows = [
