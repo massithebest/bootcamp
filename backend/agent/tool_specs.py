@@ -279,6 +279,8 @@ def tool_specs() -> list[ToolSpec]:
             "params 의 이름·값(예: view=swapped)은 답변에 그대로 쓰지 말고 'swap이 발생한 행만'처럼 풀어 쓴다. "
             "결과를 방향·사이트·제품별 합계·건수로 비교하려면 aggregate_result로 서버에서 집계해 그 값과 새 result_id를 쓴다. "
             "결과 컬럼은 'Swap 방향', 'Swap 수량', '계획 제품'처럼 한국어 이름으로 저장되므로 그 이름으로 부른다. "
+            "Swap 수량은 swap 하나를 GIVE·RECEIVE 두 행에 같은 값으로 적은 것이므로, 가장 큰 swap 등을 쓸 때는 한 행(수취·RECEIVE)이 아니라 "
+            "swap 단위로 'PROD_0006의 SITE_B→SITE_A swap 828.4'처럼 보내는 쪽과 받는 쪽을 함께 쓴다. "
             "status가 missing_params면 파라미터 이름·목록 형식(예: [\"PROD_0001\"])·view 값을 보이지 말고 "
             "'볼 제품 ID를 알려 주세요(예: PROD_0001, PROD_0002)'처럼 말로 되묻는다.",
             _object_schema(

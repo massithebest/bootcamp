@@ -289,6 +289,7 @@ def test_grouped_comparisons_of_stored_results_are_aggregated_on_the_server() ->
     # 근거에 "swap_direction을 방향으로, swap_swapQty를 수량으로 사용"처럼 결과 필드 이름이 그대로 남았다.
     assert "이 예외는 SQL의 테이블·컬럼에만 해당" in claude
     assert "한국어 이름으로 저장되므로" in tools["run_simulation"].description
+    assert "swap 단위로" in tools["run_simulation"].description
     # 제품 ID를 되물으면서 '예: ["PROD_0001"]'처럼 파라미터 형식을 그대로 보였다(2026-11-03).
     simulation_skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "simulation" / "SKILL.md").read_text(encoding="utf-8")
     assert "목록 형식" in tools["run_simulation"].description and "목록 형식" in simulation_skill
@@ -431,3 +432,5 @@ def test_extreme_value_targets_come_from_result_rows() -> None:
     assert "max_at" in claude and "짐작하지 않는다" in claude
     # 근거에 "최대 계획수량의 대상은 결과 통계에 표시된 행 기준으로 확인했습니다"처럼 확인 방법을 적었다(2026-11-03).
     assert "어디서 확인했는지" in SYSTEM_PROMPT
+    # 두 세그먼트 비교에 '가장 많고'를 썼고(5/5), swap 쌍의 값을 수취 행 하나의 값처럼 썼다(2/5, 2026-11-03).
+    assert "비교 대상이 둘뿐이면" in SYSTEM_PROMPT
