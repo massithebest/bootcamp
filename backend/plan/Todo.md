@@ -22,10 +22,14 @@
 
 ### P3
 
-- [ ] Claude 실행부를 제거할지 정하고, 제거하면 `agent/agent.py`·`agent/event_adapter.py`·`agent/sdk_tools.py`·`agent/session_store.py`,
+- [ ] Claude 실행부를 제거할지 정하고, 제거하면 `agent/claude_runtime.py`·`agent/event_adapter.py`·`agent/sdk_tools.py`·`agent/session_store.py`,
   `/anthropic` 프록시(`api/routes_anthropic_proxy.py`·`services/llm/azure_openai_proxy.py`), `LLM_PROVIDER`·`AGENT_MODEL`·
-  `CLAUDE_CLI_PATH`·provider 키 설정, `claude-agent-sdk` 의존과 Node.js·CLI 반입 안내를 함께 정리한다. 기본 실행부는 2026-11-03부터
+  `CLAUDE_CLI_PATH`·provider 키 설정, `requirements-claude.txt`와 Node.js·CLI 반입 안내를 함께 정리한다. 기본 실행부는 2026-11-03부터
   `openai`이며, 그전에 폐쇄망 Nexus에 `openai-agents==0.24.0`·`griffelib` 등록과 실제 게이트웨이 동작을 확인한다.
+- [ ] 테스트 설치(`requirements-dev.txt`)는 Claude 실행부 테스트 때문에 `claude-agent-sdk`를 포함한다. 폐쇄망 Nexus에 이 패키지가 없으면
+  Claude 전용 테스트(`test_agent.py`·`test_event_adapter.py`·`test_suggestions.py` 등, `agent.claude_runtime`·`agent.sdk_tools`를 import 하는
+  파일)를 패키지가 없을 때 건너뛰게 나누고 dev 요구사항에서 뺀다. `test_api.py`·`test_tool_specs.py`처럼 공통 계약을 같이 검증하는 파일은
+  Claude 부분만 분리해야 한다.
 - [ ] OpenAI 실행부의 대화 기록·분기(`agent/openai_session_store.py`)는 프로세스 메모리라 재시작·다중 워커에서 이어지지 않는다.
   아래 영속 대화·분기 저장 설계에 OpenAI 실행부 기록(`to_input_list()` 스냅샷) 저장 방식을 포함한다.
 - [ ] PoC 해싱 임베딩 검색(2026-10-24)을 의미 검색이 되는 임베딩으로 바꾼다. 사내 임베딩 모델·반입 가능

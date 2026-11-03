@@ -39,7 +39,7 @@ class TurnAnchor:
 
     `session_id` 를 `resume` 하되 `fork_session=True` 로 새 session_id 를
     받고, `last_entry_uuid` 를 `resume_session_at` 에 넘겨 그 지점까지만
-    이력을 적재한다 (agent/agent.py 참고).
+    이력을 적재한다 (agent/claude_runtime.py 참고).
     """
 
     session_id: str

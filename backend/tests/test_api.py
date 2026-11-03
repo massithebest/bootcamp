@@ -13,7 +13,7 @@ from claude_agent_sdk import (
 )
 from fastapi.testclient import TestClient
 
-import agent.agent as agent_module
+import agent.claude_runtime as agent_module
 from agent import session_store
 from api.schemas import AgentEvent
 from main import app

@@ -3,7 +3,6 @@ uvicorn==0.52.4
 pydantic==2.13.5
 python-dotenv==1.2.3
 PyYAML==6.0.2
-claude-agent-sdk==0.2.152
 openai-agents==0.24.0
 langchain==1.4.0
 langchain-openai==1.6.1
@@ -15,6 +14,6 @@ requests==2.34.2
 httpx==0.28.1
 
 # 참고:
-# 기본 실행부(AGENT_RUNTIME=openai)는 openai-agents 만 쓴다. claude-agent-sdk 는 AGENT_RUNTIME=claude 일 때만
-# 쓰이며 Node.js 및 Claude Code CLI(`claude`)를 필요로 한다.
+# 기본 실행부(AGENT_RUNTIME=openai)는 이 파일만 설치하면 된다. AGENT_RUNTIME=claude 로 쓰려면
+# requirements-claude.txt 를 설치하고 Node.js 및 Claude Code CLI(`claude`)를 준비한다.
 # 폐쇄망에서는 사내에서 사용 가능한 패키지명/버전으로 대체한다.

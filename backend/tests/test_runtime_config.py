@@ -153,3 +153,38 @@ def test_openai_runtime_reports_missing_gateway_settings_by_name(monkeypatch) ->
 
     monkeypatch.setattr(config, "AGENT_RUNTIME", "claude")
     assert config.missing_agent_runtime_settings() == []
+
+
+#: 해당 패키지가 설치되지 않은 환경을 흉내 낸 뒤 앱을 import 하고 첫 채팅 실행부를 고른다.
+_WITHOUT_PACKAGE = """
+import asyncio, sys
+from importlib.abc import MetaPathFinder
+
+class Block(MetaPathFinder):
+    def find_spec(self, name, path=None, target=None):
+        if name.split(".")[0] == {blocked!r}:
+            raise ImportError(name + " is not installed")
+
+sys.meta_path.insert(0, Block())
+import main
+from agent import agent
+import agent.{runtime}
+print("loaded", "agent.{other}" in sys.modules)
+"""
+
+
+@pytest.mark.parametrize(
+    ("runtime", "blocked", "other"),
+    [("openai", "claude_agent_sdk", "claude_runtime"), ("claude", "agents", "openai_runtime")],
+)
+def test_app_imports_without_the_unused_runtime_package(runtime, blocked, other) -> None:
+    # 기본 OpenAI 실행부만 쓰는 폐쇄망 설치에 claude-agent-sdk 가 없어도 앱이 떠야 한다(반대도 같다).
+    result = run_import(
+        {"ENV": "dev", "SERVICE_MODE": "mock", "AGENT_RUNTIME": runtime},
+        _WITHOUT_PACKAGE.format(
+            blocked=blocked, runtime=f"{runtime}_runtime", other=other
+        ),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().splitlines()[-1] == "loaded False"

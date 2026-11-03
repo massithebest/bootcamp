@@ -1,4 +1,5 @@
--r requirements.txt
+# 테스트는 두 실행부의 이벤트 변환·Tool 등록을 함께 검증한다.
+-r requirements-claude.txt
 
 pytest
 httpx

@@ -13,7 +13,7 @@ from claude_agent_sdk import (
     UserMessage,
 )
 
-import agent.agent as agent_module
+import agent.claude_runtime as agent_module
 from agent import session_store
 from agent.agent import run_agent
 from agent.event_adapter import AgentEventAdapter

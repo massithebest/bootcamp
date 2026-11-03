@@ -8,7 +8,7 @@ import asyncio
 import pytest
 
 from agent import openai_session_store as session_store
-from agent.agent import _resolve_resume
+from agent.claude_runtime import _resolve_resume
 from agent.openai_runtime import run_openai_agent, with_guide
 from agent.public_messages import FORK_FALLBACK_MESSAGE, MAX_TURNS_MESSAGE
 from core import config

@@ -172,12 +172,12 @@ def test_run_agent_dispatches_to_the_openai_runtime(monkeypatch) -> None:
         calls.append(args)
         yield agent_module.AgentEvent(type="done", data={"turn_id": "t"})
 
-    def fail_query(**_kwargs):
+    def fail_claude(*_args):
         raise AssertionError("Claude 실행부를 호출하면 안 된다")
 
     monkeypatch.setattr(config, "AGENT_RUNTIME", "openai")
     monkeypatch.setattr("agent.openai_runtime.run_openai_agent", fake_run_openai_agent)
-    monkeypatch.setattr(agent_module, "query", fail_query)
+    monkeypatch.setattr("agent.claude_runtime.run_claude_agent", fail_claude)
 
     events = _collect(agent_module.run_agent("질문", "conv", None, "scope"))
 

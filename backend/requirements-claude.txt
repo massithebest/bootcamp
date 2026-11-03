@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# AGENT_RUNTIME=claude 실행부 전용(agent/claude_runtime.py). 기본 OpenAI 실행부만 쓰면 설치하지 않아도 된다.
+claude-agent-sdk==0.2.152

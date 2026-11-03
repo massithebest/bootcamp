@@ -2,6 +2,20 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-11-03 — Claude 실행부 지연 import와 설치 분리
+
+- Claude 실행부를 대체용으로 남기고 OpenAI 실행부를 기본으로 유지하기로 했다. 그런데 `agent/agent.py`가 맨 위에서
+  `claude_agent_sdk`를 import 하고 OpenAI 실행도 이 모듈의 `run_agent`를 거쳐, Nexus에 `claude-agent-sdk`가 없으면 기본 실행부로도
+  앱이 뜨지 않았다.
+- Claude 실행 코드를 `agent/claude_runtime.py`(`run_claude_agent`, git 이력 유지)로 옮기고 `agent/agent.py`는 `AGENT_RUNTIME`에 따라
+  호출 시점에 해당 실행부만 import 하는 진입점으로 줄였다. `claude-agent-sdk`는 `requirements.txt`에서 빼 `requirements-claude.txt`로
+  옮겼고 `requirements-dev.txt`는 두 실행부 테스트를 위해 이를 포함한다. 평가 스크립트의 Claude 토큰 계측은 패키지가 없으면 건너뛴다.
+  README·폐쇄망 가이드·InProgress·Todo 를 갱신했다.
+- 검증: 한 패키지의 import 를 막은 하위 프로세스에서 `main`을 import 하고 실행부를 고르는 테스트 2건(OpenAI는 `claude_agent_sdk` 없이,
+  Claude는 `agents` 없이) 추가, Backend 497건 통과. 실제 호출로 OpenAI 실행부(앱, 2026년 6월 공장별 계획수량 FAC003 50,799·FAC001
+  43,159 — mock DB와 일치)와 Claude 실행부(최대·최소 대상 프로브 1회 정답)가 모두 진입점을 거쳐 동작했다. 테스트 설치에서도
+  `claude-agent-sdk`를 빼는 일은 Todo 에 남겼다.
+
 ## 2026-11-03 — PKT swap 결과 컬럼 한국어화, 되묻기 형식·확인 방법 서술 제거
 
 - 앱 확인에서 (1) PKT swap 결과 표 머리글이 `planProductId`·`swap_direction`·`swap_swapQty`처럼 영어 필드명이었고, (2) 제품 ID를

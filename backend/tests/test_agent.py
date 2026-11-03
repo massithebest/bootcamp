@@ -12,9 +12,10 @@ import pytest
 from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
 from mcp_types import CallToolRequestParams, PaginatedRequestParams
 
-import agent.agent as agent_module
+import agent.claude_runtime as agent_module
 from agent import session_store
-from agent.agent import _build_options, _resolve_resume, run_agent
+from agent.agent import run_agent
+from agent.claude_runtime import _build_options, _resolve_resume
 from api.schemas import AgentEvent
 
 

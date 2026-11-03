@@ -56,7 +56,7 @@ SERVICE_MODE=mock uvicorn main:app --reload --port 8100
 ```
 
 `/api/chat`은 항상 실제 Agent 실행부를 호출한다. 기본 실행부(`AGENT_RUNTIME=openai`)로 채팅을 확인하려면
-`.env`에 `AZURE_OPENAI_*` 게이트웨이 설정을 채운다(`AGENT_RUNTIME=claude`면 `LLM_PROVIDER`와 인증값, Claude Code CLI 필요). 지식·시각화 API와 `pytest`는
+`.env`에 `AZURE_OPENAI_*` 게이트웨이 설정을 채운다(`AGENT_RUNTIME=claude`면 `requirements-claude.txt` 추가 설치, `LLM_PROVIDER`와 인증값, Claude Code CLI 필요). 지식·시각화 API와 `pytest`는
 provider 없이 동작한다. 자세한 실행 방법은 [Backend 안내](backend/README.md)와
 [폐쇄망 배포 가이드](backend/docs/CLOSED_NETWORK_SETUP.md)를 따른다.
 

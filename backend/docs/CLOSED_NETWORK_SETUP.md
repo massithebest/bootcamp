@@ -63,6 +63,9 @@ Part 1. 폐쇄망 인프라 구축        Part 2. pntfp 서비스 로직 이식�
   - `httpx` (폐쇄망에서 반입할 HTTP 연동 코드의 의존성으로 사용 예정)
   - `openai-agents` (OpenAI Agents SDK 실행부. 현재 개발 환경에 없던 전이 의존성은
     `griffelib`뿐이며, 나머지는 기존 패키지 버전 범위로 충족된다)
+- `claude-agent-sdk`는 `requirements.txt`에 없다. `AGENT_RUNTIME=claude`로 쓸 때만
+  `requirements-claude.txt`로 설치하며, 테스트용 `requirements-dev.txt`는 이를 포함한다.
+  기본 OpenAI 실행부는 이 패키지 없이 import·실행된다.
 
 ## 1-2. 폐쇄망 PC로 이전
 
@@ -139,7 +142,7 @@ Part 2 §2-3을 따라 추가한다. `MOCK_DB_PATH`는 설정하지 않는다.
   `LLM_RESPONSE_TIMEOUT_SECONDS` 응답 지연 한도를 세지 않는다.
 - 대화 기록·질문 편집 분기는 Backend 프로세스 메모리에 둔다. 재시작하면 이전 대화를 이어 쓰거나 분기할 수 없고
   (새 대화 경고), 여러 워커로 띄우면 워커마다 기록이 따로 생긴다.
-- `AGENT_RUNTIME=claude`는 Claude Agent SDK(`claude-agent-sdk`)와 Node.js·Claude Code CLI(`claude`)가 필요하며
+- `AGENT_RUNTIME=claude`는 Claude Agent SDK(`requirements-claude.txt`의 `claude-agent-sdk`)와 Node.js·Claude Code CLI(`claude`)가 필요하며
   아래 `LLM_PROVIDER` 설정을 따른다. 실행 PC 의 사용자 MCP 설정은 불러오지 않는다(`strict_mcp_config`).
 
 ### `LLM_PROVIDER=local`과 `/anthropic` 프록시
@@ -269,7 +272,7 @@ import 관계와 사용처를 확인한 뒤 대상과 필요성을 먼저 결정
 | `sql_service.py` | `backend/services/production/sql_service.py` | Text-to-SQL 생성은 옮기지 않고, Agent가 전달한 SQL의 읽기 전용 실행 구현만 병합한다. |
 | `sql_prompts.py` | 기본적으로 직접 복사하지 않음 | 기존 Text-to-SQL 프롬프트에서 테이블·조인·KPI·업무 규칙을 추출해 별도 운영 `KNOWLEDGE_DIR`에 반영한다. 런타임 SQL 생성 프롬프트로 연결하지 않는다. |
 
-`backend/services/mock/`, `backend/tools/`, `backend/agent/agent.py`는 반입 파일로
+`backend/services/mock/`, `backend/tools/`, `backend/agent/`(실행부)는 반입 파일로
 교체하지 않는다. 호출 계약을 맞추는 데 꼭 필요한 변경이 있으면 호출자와 테스트를
 함께 확인해 최소 범위로 수정한다.
 
@@ -474,7 +477,7 @@ Agent가 SQL을 올바르게 생성하려면 실제 DB와 서비스에 맞는 �
    `KNOWLEDGE_DIR=<backend 절대경로>\\knowledge\\production`으로 지정한다.
    `knowledge/mock`과 `knowledge/` 상위 폴더는 운영 경로로 지정하지 않는다.
    합성 mock DB 관련 변수는 설정하지 않는다.
-4. 테스트를 실행할 폐쇄망 이식 환경에는 `requirements-dev.txt`를 설치하고,
+4. 테스트를 실행할 폐쇄망 이식 환경에는 `requirements-dev.txt`(`claude-agent-sdk` 포함)를 설치하고,
    mock service·외부 provider E2E를 제외한 공통 계약 테스트를 실행한다.
 
 ```powershell

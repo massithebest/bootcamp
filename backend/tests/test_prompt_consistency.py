@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from agent.agent import AGENT_SDK_CWD
+from agent.skills import AGENT_SDK_DIR as AGENT_SDK_CWD
 from agent.tool_specs import tool_specs
 from agent.system_prompt import SYSTEM_PROMPT
 from services.knowledge.catalog import get_store

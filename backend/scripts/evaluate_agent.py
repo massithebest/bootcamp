@@ -375,10 +375,13 @@ def _install_meter() -> dict:
 
     openai_runtime.run_streamed = metered_run
 
-    import agent.agent as agent_module
-    from claude_agent_sdk import ResultMessage
+    try:
+        from agent import claude_runtime
+        from claude_agent_sdk import ResultMessage
+    except ImportError:  # claude-agent-sdk 없이 기본 OpenAI 실행부만 설치한 환경
+        return meter
 
-    original = agent_module.query
+    original = claude_runtime.query
 
     async def metered(*, prompt, options):
         async for message in original(prompt=prompt, options=options):
@@ -394,7 +397,7 @@ def _install_meter() -> dict:
                 meter["cost_usd"] = message.total_cost_usd if config.LLM_PROVIDER == "anthropic" else None
             yield message
 
-    agent_module.query = metered
+    claude_runtime.query = metered
     return meter
 
 

@@ -18,7 +18,8 @@ cp .env.example .env
 Windows PowerShell에서는 `py -3.11 -m venv .venv`와
 `.\.venv\Scripts\Activate.ps1`을 사용한다. 폐쇄망 실행 환경은
 [폐쇄망 배포 가이드](docs/CLOSED_NETWORK_SETUP.md)에 따라 개발 도구를 제외한
-`requirements.txt`를 설치한다.
+`requirements.txt`를 설치한다. 기본 OpenAI 실행부는 이 파일만으로 동작하고, `AGENT_RUNTIME=claude`를 쓸 때만
+`requirements-claude.txt`(`claude-agent-sdk`)를 더 설치한다. `requirements-dev.txt`는 두 실행부 테스트를 위해 둘 다 포함한다.
 
 주요 환경변수는 다음과 같다.
 

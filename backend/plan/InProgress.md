@@ -52,9 +52,11 @@ Backend가 소유하는 범위는 다음과 같다.
   클라이언트 재시도는 끄고 `RetryWait`가 408·409·429·5xx·네트워크 오류를 1~32초 backoff로 재시도하며 대기 중에는 응답 지연 한도를
   세지 않는다. 이벤트 대기 초과·최대 호출 수 초과·게이트웨이 오류·모델 응답 오류는 공개 문구로 `error` → `done`(turn_id 없음),
   완료 전 종료는 SDK 실행을 취소하고 기록하지 않는다. 스트림 변환은 `agent/openai_event_adapter.py`.
+- 실행부 선택은 `agent/agent.py`의 `run_agent`가 호출 시점에 해당 실행부 모듈만 import 한다. 기본 설치(`requirements.txt`)에는
+  `claude-agent-sdk`가 없고, 앱 import·OpenAI 실행은 그 패키지 없이 동작한다(`test_runtime_config.py`가 반대 방향과 함께 검증).
 - `openai` 대화 기록(`agent/openai_session_store.py`): 성공한 턴의 `to_input_list()`를 conversation 최신 기록과 turn_id 분기 지점으로
   프로세스 메모리에 둔다(대화당 분기 지점 50개). 분기 규칙과 경고 문구는 Claude 실행부와 같다.
-- `claude`(`agent/agent.py`): `strict_mcp_config=True`로 `planning` MCP 서버만 쓴다(실행 PC 의 사용자 MCP 미노출).
+- `claude`(`agent/claude_runtime.py`, 설치는 `requirements-claude.txt`): `strict_mcp_config=True`로 `planning` MCP 서버만 쓴다(실행 PC 의 사용자 MCP 미노출).
   Claude CLI 는 저장소 상위 폴더의 개발용 CLAUDE.md(`@AGENTS.md` 한 줄)도 함께 읽는다.
 
 ## 외부에 제공하는 안정 계약
