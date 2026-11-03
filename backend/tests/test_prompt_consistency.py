@@ -442,6 +442,8 @@ def test_extreme_value_targets_come_from_result_rows() -> None:
     # 근거가 "표에는 제품, 사이트, 등급, …를 담았습니다"처럼 표의 열 구성을 설명했다(10/10, 2026-11-04).
     claude = CLAUDE_MD.read_text(encoding="utf-8")
     assert "무엇이 담겼는지" in SYSTEM_PROMPT and "표에 담은 열·항목을 설명하지 않는다" in claude
+    # "차트에서는 월별 추이를 확인할 수 있습니다"처럼 표·차트를 가리키기만 하는 문장이 남았다(6/12, 2026-11-04).
+    assert "가리키는 문장" in SYSTEM_PROMPT and "보라고 가리키기만 하는 문장은 쓰지 않는다" in claude
     assert "표에 담은 열·항목을 설명하지 않는다" in {t.name: t for t in tool_specs()}["present_table"].description
     simulation_skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "simulation" / "SKILL.md").read_text(encoding="utf-8")
     assert "표에 담은 필드를 나열하지 않는다" in simulation_skill and "어떤 필드인지 밝히" not in simulation_skill
