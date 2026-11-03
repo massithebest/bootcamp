@@ -434,3 +434,9 @@ def test_extreme_value_targets_come_from_result_rows() -> None:
     assert "어디서 확인했는지" in SYSTEM_PROMPT
     # 두 세그먼트 비교에 '가장 많고'를 썼고(5/5), swap 쌍의 값을 수취 행 하나의 값처럼 썼다(2/5, 2026-11-03).
     assert "비교 대상이 둘뿐이면" in SYSTEM_PROMPT
+    # 근거가 "표에는 제품, 사이트, 등급, …를 담았습니다"처럼 표의 열 구성을 설명했다(10/10, 2026-11-04).
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+    assert "무엇이 담겼는지" in SYSTEM_PROMPT and "표에 담은 열·항목을 설명하지 않는다" in claude
+    assert "표에 담은 열·항목을 설명하지 않는다" in {t.name: t for t in tool_specs()}["present_table"].description
+    simulation_skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "simulation" / "SKILL.md").read_text(encoding="utf-8")
+    assert "표에 담은 필드를 나열하지 않는다" in simulation_skill and "어떤 필드인지 밝히" not in simulation_skill
