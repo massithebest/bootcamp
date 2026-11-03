@@ -405,3 +405,14 @@ def test_answers_keep_key_figures_skip_duplicate_tables_and_keep_required_column
     assert "차트로 보여 주지 않는 2행 이상 결과" in claude and "차트로 보여 주지 않는 2행 이상 결과" in skill
     # "계획 대비 실적 비교는 SALES_BATCH_CD 필수 포함" 규칙을 읽고도 공장 합계만 보여 줬다(0/5).
     assert "SALES_BATCH_CD" in claude and "요청 기준 합계" in tools["describe_table"].description
+
+
+def test_plan_versus_actual_tables_are_wide_and_lead_with_the_gap() -> None:
+    tools = {t.name: t for t in tool_specs()}
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+
+    # 영업배치를 넣은 계획·실적 비교가 지표 열의 long 형식 30행 표로 나오고, 결론은 "가장 큰 단일 항목은 … 계획수량 19,903"이었다(2026-11-03).
+    assert "wide 형식" in claude and "long 형식은 차트용" in claude
+    assert "wide 형식" in tools["present_table"].description
+    assert "차이·달성률" in claude and "차이·달성률" in SYSTEM_PROMPT
+    assert "한 문장으로 밝힌다" in claude
