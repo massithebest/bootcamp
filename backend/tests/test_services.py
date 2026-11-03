@@ -232,6 +232,10 @@ def test_mock_pkt_swap_all_view_returns_items_and_metadata(mock_db) -> None:
     # 요약 카드에 "targetQty 합계"처럼 영어 필드명이 그대로 보였다.
     assert {"목표수량 합계", "계획수량 합계"} <= labels.keys()
     assert re.fullmatch(r"[0-9a-f]{32}", result["result_id"])
+    # 결과 표 머리글에 planProductId·swap_direction 같은 영어 필드명이 그대로 보였다(2026-11-03).
+    columns = [column["name"] for column in result["columns"]]
+    assert {"계획 제품", "Swap 방향", "Swap 수량"} <= set(columns)
+    assert not {"planProductId", "swap_direction", "swap_swapQty"} & set(columns)
 
 
 def test_mock_pkt_swap_swapped_view_only_includes_swap_rows(mock_db) -> None:
@@ -247,13 +251,13 @@ def test_mock_pkt_swap_swapped_view_only_includes_swap_rows(mock_db) -> None:
     columns = [column["name"] for column in result["columns"]]
     rows = [dict(zip(columns, row)) for row in page["rows"]]
     assert rows  # 합성 데이터는 swap이 적어도 한 건 발생하도록 구성됨
-    assert all(row["swap_direction"] in {"GIVE", "RECEIVE"} for row in rows)
+    assert all(row["Swap 방향"] in {"GIVE", "RECEIVE"} for row in rows)
     # 한 행에 swapReason이 하나뿐이라 GIVE·RECEIVE를 1:1로 짝지어야 방향별 합계가 같다.
     totals = {"GIVE": 0.0, "RECEIVE": 0.0}
     for row in rows:
-        totals[row["swap_direction"]] += row["swap_swapQty"]
+        totals[row["Swap 방향"]] += row["Swap 수량"]
     assert round(totals["GIVE"], 1) == round(totals["RECEIVE"], 1)
-    swap_ids = [row["swap_swapId"] for row in rows]
+    swap_ids = [row["Swap ID"] for row in rows]
     assert all(swap_ids.count(swap_id) == 2 for swap_id in swap_ids)
 
 
@@ -267,7 +271,7 @@ def test_mock_pkt_swap_by_ids_filters_products(mock_db) -> None:
         get_result_page(all_result["result_id"], offset=0, limit=all_result["row_count"])
     )
     columns = [column["name"] for column in all_result["columns"]]
-    first_id = dict(zip(columns, page["rows"][0]))["planProductId"]
+    first_id = dict(zip(columns, page["rows"][0]))["계획 제품"]
 
     by_ids_result = asyncio.run(
         mock_simulation_service.run_simulation(
@@ -279,7 +283,7 @@ def test_mock_pkt_swap_by_ids_filters_products(mock_db) -> None:
     filtered_page = asyncio.run(
         get_result_page(by_ids_result["result_id"], offset=0, limit=by_ids_result["row_count"])
     )
-    filtered_ids = {dict(zip(columns, row))["planProductId"] for row in filtered_page["rows"]}
+    filtered_ids = {dict(zip(columns, row))["계획 제품"] for row in filtered_page["rows"]}
     assert filtered_ids == {first_id}
 
 
@@ -291,6 +295,8 @@ def test_mock_pkt_swap_by_ids_requires_plan_prod_ids() -> None:
     )
     assert result["status"] == "missing_params"
     assert result["missing"][0]["name"] == "plan_prod_ids"
+    # 되묻는 문장에 '["PROD_0001"]' 같은 목록 형식이 그대로 옮겨졌다.
+    assert "[" not in result["missing"][0]["example"]
 
 
 def test_mock_pkt_swap_requires_view() -> None:

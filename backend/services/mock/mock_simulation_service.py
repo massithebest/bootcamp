@@ -18,13 +18,17 @@ from services.simulation.registry import list_simulation_types, validate_simulat
 
 SIMULATION_TYPE = "입력_정합성_검증"
 
-_PKT_SWAP_ITEM_COLUMNS = [
-    "planProductId", "planYm", "planVersion", "osCode", "fabId", "site", "grade",
-    "customer", "planQty", "poutQty", "targetQty",
-    "swap_swapId", "swap_direction", "swap_prodGrpNm", "swap_gbnCd",
-    "swap_frParaVal", "swap_toParaVal", "swap_swapQty",
-    "swap_counterPlanProdId", "swap_counterSite", "swap_counterGrade", "swap_counterCsCode",
-]
+#: swap 결과는 그대로 표 머리글이 되므로 한국어 이름으로 저장한다(원본 필드 뜻은 시뮬레이션 output_schema와 같다).
+_PKT_SWAP_ITEM_LABELS = {
+    "planProductId": "계획 제품", "planYm": "계획 년월", "planVersion": "계획 버전",
+    "osCode": "OS 코드", "fabId": "FAB", "site": "사이트", "grade": "등급", "customer": "고객",
+    "planQty": "계획수량", "poutQty": "실적수량", "targetQty": "목표수량",
+    "swap_swapId": "Swap ID", "swap_direction": "Swap 방향", "swap_prodGrpNm": "Swap 제품군",
+    "swap_gbnCd": "Swap 구분코드", "swap_frParaVal": "Swap 보내는 사이트", "swap_toParaVal": "Swap 받는 사이트",
+    "swap_swapQty": "Swap 수량", "swap_counterPlanProdId": "상대 제품", "swap_counterSite": "상대 사이트",
+    "swap_counterGrade": "상대 등급", "swap_counterCsCode": "상대 고객",
+}
+_PKT_SWAP_ITEM_COLUMNS = list(_PKT_SWAP_ITEM_LABELS.values())
 
 
 def _flatten_pkt_swap_item(item: dict) -> list:
@@ -262,8 +266,8 @@ class MockSimulationService:
                     "missing": [
                         {
                             "name": "plan_prod_ids",
-                            "description": "view=by_ids일 때 조회할 제품 ID 목록",
-                            "example": '["PROD_0001"]',
+                            "description": "swap 결과를 볼 제품 ID(여러 개면 쉼표로 구분)",
+                            "example": "PROD_0001, PROD_0002",
                         }
                     ],
                 }

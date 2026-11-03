@@ -278,8 +278,9 @@ def tool_specs() -> list[ToolSpec]:
             "나열이며, 관계 이름은 표에 있다). present_simulation 요약 카드에 보인 지표 값(예: Part 2개, Route Step 926개)도 근거에서 다시 쓰지 않는다. "
             "params 의 이름·값(예: view=swapped)은 답변에 그대로 쓰지 말고 'swap이 발생한 행만'처럼 풀어 쓴다. "
             "결과를 방향·사이트·제품별 합계·건수로 비교하려면 aggregate_result로 서버에서 집계해 그 값과 새 result_id를 쓴다. "
-            "결과 필드 이름(예: swap_direction, swap_swapQty, planProductId)은 근거 문장에도 쓰지 않고 "
-            "'Swap 방향', 'Swap 수량', '계획 제품'처럼 한국어 이름으로 부른다.",
+            "결과 컬럼은 'Swap 방향', 'Swap 수량', '계획 제품'처럼 한국어 이름으로 저장되므로 그 이름으로 부른다. "
+            "status가 missing_params면 파라미터 이름·목록 형식(예: [\"PROD_0001\"])·view 값을 보이지 말고 "
+            "'볼 제품 ID를 알려 주세요(예: PROD_0001, PROD_0002)'처럼 말로 되묻는다.",
             _object_schema(
                 {"simulation_type": _STRING, "params": _OBJECT}, ["simulation_type", "params"]
             ),
@@ -378,7 +379,7 @@ def tool_specs() -> list[ToolSpec]:
             "다른 단위가 필요하면 SQL을 다시 작성해 실행한다. "
             "원본 행을 get_result_page로 읽어 직접 더하지 않고, 답변 수치는 이 Tool이 돌려준 값을 그대로 쓴다. "
             "aggregation은 sum·count·avg·min·max 중 하나다. "
-            "labels에는 결과 컬럼의 한국어 이름을 넣는다(예: {\"swap_direction\": \"Swap 방향\", \"swap_swapQty\": \"Swap 수량 합계\"}). "
+            "labels에는 집계 값의 표시 이름을 넣는다(예: {\"Swap 수량\": \"Swap 수량 합계\"}). "
             "기준 값이 비어 있는 행(예: swap이 없는 행)은 집계에서 빠지고 excluded_blank_group_rows로 그 수를 알려 준다. "
             "표·차트에는 원본 result_id가 아니라 이 Tool이 돌려준 새 result_id를 넘겨, 그룹별 집계 행만 보여 준다. "
             "비교를 물었으면 present_chart(chart_type=bar, x_column=첫 기준, group_by_column=둘째 기준(있으면), "
@@ -387,8 +388,8 @@ def tool_specs() -> list[ToolSpec]:
             "('SITE_A 1,794.7, SITE_C 1,298.3, SITE_B GIVE 924.0·RECEIVE 427.6'처럼 행 값을 한 문장에 이어 쓰는 것도 나열이다). "
             "그래도 고른 핵심 수치는 숫자로 쓴다('가장 큰 합계는 SITE_A의 RECEIVE'처럼 값 없이 대상만 쓰지 않고 "
             "'가장 큰 합계는 SITE_A의 RECEIVE 1,794.7'처럼 쓴다). "
-            "답변의 결론·근거 문장에서도 기준·값은 labels의 한국어 이름으로 부르고 원본 컬럼 이름(예: swap_direction, "
-            "swap_swapQty)을 쓰지 않는다('swap_direction을 방향으로 사용' 같은 문장도 쓰지 않는다). "
+            "답변의 결론·근거 문장에서도 기준·값은 결과 컬럼과 labels의 한국어 이름으로 부르고 영문 필드 이름을 쓰지 않는다"
+            "('swap_direction을 방향으로 사용' 같은 문장도 쓰지 않는다). "
             "새 result_id도 답변 본문에 적지 않는다.",
             aggregate_input_schema(),
             _aggregate_result,

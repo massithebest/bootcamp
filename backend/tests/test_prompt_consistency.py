@@ -288,7 +288,10 @@ def test_grouped_comparisons_of_stored_results_are_aggregated_on_the_server() ->
     assert "`aggregate_result`로 다시 집계하지 않는다" in sql_skill
     # 근거에 "swap_direction을 방향으로, swap_swapQty를 수량으로 사용"처럼 결과 필드 이름이 그대로 남았다.
     assert "이 예외는 SQL의 테이블·컬럼에만 해당" in claude
-    assert "근거 문장에도 쓰지 않고" in tools["run_simulation"].description
+    assert "한국어 이름으로 저장되므로" in tools["run_simulation"].description
+    # 제품 ID를 되물으면서 '예: ["PROD_0001"]'처럼 파라미터 형식을 그대로 보였다(2026-11-03).
+    simulation_skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "simulation" / "SKILL.md").read_text(encoding="utf-8")
+    assert "목록 형식" in tools["run_simulation"].description and "목록 형식" in simulation_skill
     assert "'swap_direction을 방향으로 사용' 같은 문장도 쓰지 않는다" in tools["aggregate_result"].description
     # 사이트·방향별 비교에서 결론이 표의 4개 값을 모두 나열했고, 이미 답한 순유입을 다시 묻는 후속질문이 나왔고,
     # 비교 질문인데 표만 보여 줬다.
@@ -424,3 +427,5 @@ def test_extreme_value_targets_come_from_result_rows() -> None:
     # 18행 결과의 통계에서 최대·최소 값만 보고 월을 추정해 "2026-03 FAC003 100,241"을 6월로 답했다(2026-11-03).
     assert "max_at" in SYSTEM_PROMPT and "min_at" in SYSTEM_PROMPT
     assert "max_at" in claude and "짐작하지 않는다" in claude
+    # 근거에 "최대 계획수량의 대상은 결과 통계에 표시된 행 기준으로 확인했습니다"처럼 확인 방법을 적었다(2026-11-03).
+    assert "어디서 확인했는지" in SYSTEM_PROMPT
