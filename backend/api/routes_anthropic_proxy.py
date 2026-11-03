@@ -30,6 +30,10 @@ def _authorized(request: Request) -> bool:
     methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
 )
 async def proxy_anthropic(path: str, request: Request):
+    # Claude CLI 전용 경로라 기본 OpenAI 실행부에서는 열어 두지 않는다. 테스트·평가가 import 뒤에 실행부를 바꾸므로
+    # 라우터 등록이 아니라 요청 시점에 판단한다.
+    if config.AGENT_RUNTIME != "claude":
+        raise HTTPException(status_code=404, detail="Not Found")
     if config.LLM_PROVIDER != "azure_openai":
         raise HTTPException(
             status_code=501,

@@ -2,6 +2,14 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-11-03 — `/anthropic` 프록시를 Claude 실행부에서만 열기
+
+- 기본 OpenAI 실행부는 `/anthropic` 프록시를 쓰지 않는데 경로가 항상 등록돼 있었다(`LLM_PROVIDER=azure_openai`면 인증 후 게이트웨이로 전달).
+- 테스트·평가 스크립트가 앱 import 뒤에 실행부를 바꾸므로 라우터 등록은 그대로 두고, 요청 시점에 `AGENT_RUNTIME`이 `claude`가 아니면
+  404를 반환한다. 프록시 테스트는 `claude_runtime` fixture 로 고정하고 OpenAI 실행부 404 테스트를 추가했다. 폐쇄망 가이드·InProgress 갱신.
+- 검증: Backend 499건 통과. 실행 중인 백엔드(기본 openai)에서 `POST /anthropic/v1/messages` 404·`/health` 200, Claude 실행부 실제 호출
+  (최대·최소 대상 프로브 1회)은 프록시를 거쳐 정답.
+
 ## 2026-11-03 — SQL 미리보기에 반복 합계 열(repeated_columns) 표시
 
 - 앱 확인에서 "2026년 6월 공장별 계획 대비 실적" 표가 공장·영업배치 행마다 `공장 계획수량`·`공장 실적수량`·`공장 차이수량`·`공장 달성률(%)`

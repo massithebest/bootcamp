@@ -9,6 +9,9 @@ from fastapi.testclient import TestClient
 from main import app
 from services.llm import azure_openai_proxy as proxy
 
+# `/anthropic` 경로는 Claude 실행부에서만 열린다.
+pytestmark = pytest.mark.usefixtures("claude_runtime")
+
 TOKEN = "test-proxy-token"
 KEY = "atl-secret-key-should-not-leak"
 

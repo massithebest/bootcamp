@@ -113,7 +113,16 @@ def test_mock_run_simulation_returns_missing_params_without_touching_db() -> Non
 # ---- /anthropic 프록시: 폐쇄망 구현 반입 전 미구현 상태 ----
 
 
-def test_anthropic_proxy_is_unimplemented_until_closed_network_code_is_imported(monkeypatch) -> None:
+def test_anthropic_proxy_is_closed_on_the_openai_runtime(monkeypatch) -> None:
+    monkeypatch.setattr("core.config.AGENT_RUNTIME", "openai")
+    monkeypatch.setattr("core.config.LLM_PROVIDER", "azure_openai")
+
+    response = TestClient(app).post("/anthropic/v1/messages", json={"model": "test-model", "messages": []})
+
+    assert response.status_code == 404
+
+
+def test_anthropic_proxy_is_unimplemented_until_closed_network_code_is_imported(monkeypatch, claude_runtime) -> None:
     monkeypatch.setattr("core.config.LLM_PROVIDER", "local")
     client = TestClient(app)
 

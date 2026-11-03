@@ -136,6 +136,7 @@ Part 2 §2-3을 따라 추가한다. `MOCK_DB_PATH`는 설정하지 않는다.
 
 - 기본 실행부 `AGENT_RUNTIME=openai`는 OpenAI Agents SDK(`openai-agents`)로 Azure OpenAI 호환 게이트웨이의
   Chat Completions를 직접 호출한다. Node.js·Claude Code CLI·`/anthropic` 프록시가 필요 없고 `LLM_PROVIDER`도 쓰지 않는다.
+  이때 `/anthropic` 경로는 404를 반환한다(`AGENT_RUNTIME=claude`일 때만 열린다).
 - SDK 트레이싱은 기본값이 외부(OpenAI)로 전송하므로 실행부가 import 시점과 실행마다 끈다. 반입 뒤 첫 기동에서
   외부 주소로 나가는 요청이 없는지 방화벽·프록시 로그로 확인한다.
 - 게이트웨이가 요청 제한(429)·일시 오류를 주면 실행부가 1·2·4·8·16·32초 간격으로 다시 보내고, 재시도를 기다리는 동안은
