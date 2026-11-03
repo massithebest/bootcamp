@@ -254,7 +254,7 @@ def test_presented_results_use_readable_labels_and_are_not_repeated() -> None:
     skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
 
     # 공장별 비교 답변이 표·차트의 6개 값을 "공장별 월 계획수량 합계는 다음 값입니다"로 다시 나열했다.
-    assert "근거에서 다시 나열하지 않" in SYSTEM_PROMPT
+    assert "결론·근거 어디에서도 모두 이어 쓰지 않" in SYSTEM_PROMPT
     assert "계산에 사용한 값은 다음과 같습니다" in claude
     assert "계산에 사용한 값은 다음과 같습니다" in tools["present_chart"].description
     assert "계산에 사용한 값은 다음과 같습니다" in tools["present_table"].description
@@ -392,3 +392,16 @@ def test_no_data_answers_end_with_the_period_question() -> None:
     assert "어느 기간·대상으로 볼지 묻는 문장으로 끝내고 멈춘다" in SYSTEM_PROMPT
     assert "데이터가 없거나 Tool 이 오류를 내면 그대로 알리고 멈춘다" not in SYSTEM_PROMPT
     assert "근거 뒤 마지막 문장을 그 질문" in claude
+
+
+def test_answers_keep_key_figures_skip_duplicate_tables_and_keep_required_columns() -> None:
+    tools = {t.name: t for t in tool_specs()}
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+    skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
+
+    # 비교 답변이 차트 값을 결론에 모두 이어 쓰고(사이트 swap 5/5), 차트와 같은 결과를 표로 또 띄웠다(4/5, 2026-11-03).
+    assert "핵심 수치 1~2개" in SYSTEM_PROMPT and "같은 결과를 표로 다시 띄우지 않는다" in SYSTEM_PROMPT
+    assert "2행 이상을 나열하거나 표를 요청하면" not in claude
+    assert "차트로 보여 주지 않는 2행 이상 결과" in claude and "차트로 보여 주지 않는 2행 이상 결과" in skill
+    # "계획 대비 실적 비교는 SALES_BATCH_CD 필수 포함" 규칙을 읽고도 공장 합계만 보여 줬다(0/5).
+    assert "SALES_BATCH_CD" in claude and "요청 기준 합계" in tools["describe_table"].description
