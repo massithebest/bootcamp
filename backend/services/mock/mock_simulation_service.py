@@ -232,6 +232,11 @@ def _only_failed_checks(preview: dict, columns: list[str], rows: list[list]) -> 
         "top_groups": {
             name: groups for name, groups in preview["top_groups"].items() if name != _CHECK_COLUMNS["check"]
         },
+        # 통계의 최대·최소 대상 행(max_at·min_at)에도 관계 이름이 들어가므로 뺀다.
+        "statistics": {
+            name: {key: value for key, value in stats.items() if key not in ("max_at", "min_at")}
+            for name, stats in preview["statistics"].items()
+        },
         "check_summary": {"checked": len(rows), "failed": len(failed)},
     }
 

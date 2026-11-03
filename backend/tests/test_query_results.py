@@ -337,6 +337,9 @@ def test_preview_is_bounded_and_has_no_full_rows(store) -> None:
     assert preview["sample_rows"][0] == {"work_month": "2026-01", "line": "B", "qty": 10}
     assert preview["statistics"]["qty"] == {
         "min": 10, "max": 120, "avg": 65.0, "sum": 780, "null_count": 0,
+        # 최대·최소 값의 대상을 모델이 추정하지 않도록 그 행의 기준 컬럼 값을 함께 준다.
+        "max_at": {"work_month": "2026-12", "line": "A"},
+        "min_at": {"work_month": "2026-01", "line": "B"},
     }
     assert preview["distinct_counts"] == {"work_month": 12, "line": 2}
     assert {group["value"]: group["count"] for group in preview["top_groups"]["line"]} == {"A": 6, "B": 6}

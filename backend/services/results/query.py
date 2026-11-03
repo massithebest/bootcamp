@@ -94,10 +94,27 @@ def _series_value(value: Any) -> Any:
     return _json_value(value)
 
 
+def _extreme_rows(frame: pd.DataFrame, series: pd.Series, dimensions: list[Any]) -> dict[str, Any]:
+    """최대·최소 값이 나온 행의 기준(수치가 아닌 컬럼) 값. 같은 값이 여러 행이면 첫 행이다.
+
+    미리보기에는 표본 몇 행과 통계만 있어, 모델이 최대·최소 값의 대상(월·공장 등)을 추정해 틀리게 썼다
+    (2026-11-03 "공장별 월별 계획수량 추이": 2026-03 값을 6월로 답함).
+    """
+
+    numeric = pd.to_numeric(series, errors="coerce")
+    if not dimensions or numeric.notna().sum() == 0:
+        return {}
+    return {
+        f"{kind}_at": {str(name): _series_value(frame.at[index, name]) for name in dimensions}
+        for kind, index in (("max", numeric.idxmax()), ("min", numeric.idxmin()))
+    }
+
+
 def build_preview(meta: ResultMeta, frame: pd.DataFrame) -> dict[str, Any]:
     """모델과 UI가 표현을 판단하는 bounded metadata. 전체 행은 포함하지 않는다."""
 
     roles = {column.name: column.role for column in meta.columns}
+    dimensions = [name for name in frame.columns if roles.get(str(name)) != "measure"]
     sample_rows = [
         {str(name): _series_value(value) for name, value in zip(frame.columns, row)}
         for row in frame.head(PREVIEW_SAMPLE_ROWS).itertuples(index=False)
@@ -116,6 +133,7 @@ def build_preview(meta: ResultMeta, frame: pd.DataFrame) -> dict[str, Any]:
                 "avg": _series_value(series.mean()),
                 "sum": _series_value(series.sum(min_count=1)),
                 "null_count": int(series.isna().sum()),
+                **_extreme_rows(frame, series, dimensions),
             }
             continue
         distinct_counts[str(name)] = int(series.nunique(dropna=True))

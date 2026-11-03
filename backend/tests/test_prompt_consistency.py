@@ -416,3 +416,11 @@ def test_plan_versus_actual_tables_are_wide_and_lead_with_the_gap() -> None:
     assert "wide 형식" in tools["present_table"].description
     assert "차이·달성률" in claude and "차이·달성률" in SYSTEM_PROMPT
     assert "한 문장으로 밝힌다" in claude
+
+
+def test_extreme_value_targets_come_from_result_rows() -> None:
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+
+    # 18행 결과의 통계에서 최대·최소 값만 보고 월을 추정해 "2026-03 FAC003 100,241"을 6월로 답했다(2026-11-03).
+    assert "max_at" in SYSTEM_PROMPT and "min_at" in SYSTEM_PROMPT
+    assert "max_at" in claude and "짐작하지 않는다" in claude
