@@ -22,6 +22,11 @@
 
 ### P3
 
+- [ ] Claude 실행부가 "PKT swap 전체 결과에서 사이트별 계획수량과 목표수량"을 시뮬레이션 대신 `FP_TARGET` SQL(PNT 사이트·TARGET_QTY)로
+  답했다(1회, 2026-11-04). OpenAI 실행부는 4/4 `run_simulation`→`aggregate_result`. Claude 실행부를 계속 대체용으로 둘지 정할 때 함께 본다.
+- [ ] mock 카탈로그 `orders`·`wip`의 `hotlot` 컬럼에 코드값(`yes`·`no`)과 뜻을 변경 요청 경로로 등록한다. 지금은 지침이 `SELECT DISTINCT`
+  확인을 요구해 보완하지만, `codes`가 있으면 확인 조회 없이 바로 바른 조건을 쓴다(2026-11-04 Hot lot 오답).
+
 - [ ] Claude 실행부를 제거할지 정하고, 제거하면 `agent/claude_runtime.py`·`agent/event_adapter.py`·`agent/sdk_tools.py`·`agent/session_store.py`,
   `/anthropic` 프록시(`api/routes_anthropic_proxy.py`·`services/llm/azure_openai_proxy.py`), `LLM_PROVIDER`·`AGENT_MODEL`·
   `CLAUDE_CLI_PATH`·provider 키 설정, `requirements-claude.txt`와 Node.js·CLI 반입 안내를 함께 정리한다. 기본 실행부는 2026-11-03부터

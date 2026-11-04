@@ -425,6 +425,17 @@ def test_plan_versus_actual_tables_are_wide_and_lead_with_the_gap() -> None:
     assert "repeated_columns" in claude and "repeated_columns" in tools["present_table"].description
     assert "차이·달성률" in claude and "차이·달성률" in SYSTEM_PROMPT
     assert "한 문장으로 밝힌다" in claude
+    # 등급별 달성률 질문에 등급 합계 없이 등급·영업배치 조합의 최대·최소만 답했다(1/4, 공장 기준은 4/4, 2026-11-04).
+    assert "공장·등급·제품 등 영업배치를 더하기 전의 기준" in claude and "결론은 이 요청 기준" in claude
+    # hotlot 값이 모두 'no'인 orders 를 NULL 아님 조건으로 세어 Hot lot 26건이라고 답했다(실제 0건, 2026-11-04).
+    sql_skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
+    assert "SELECT DISTINCT" in claude and "SELECT DISTINCT" in sql_skill and "값이 `no`일 수 있다" in claude
+    # 시뮬레이션 결과 행을 SQL 리터럴로 옮겨 적어 사이트별 계획·목표수량을 합산했다(2026-11-04).
+    tools = {t.name: t for t in tool_specs()}
+    assert "extra_value_columns" in tools["aggregate_result"].description
+    # 값 열 2개 결과로 차트를 시도해 "x, y, group_by에는 서로 다른 컬럼" 오류가 화면에 남았다(2026-11-04).
+    assert "present_chart를 호출하지 않고 present_table로만" in tools["aggregate_result"].description
+    assert "SQL에 옮겨 적어" in tools["run_simulation"].description
 
 
 def test_extreme_value_targets_come_from_result_rows() -> None:

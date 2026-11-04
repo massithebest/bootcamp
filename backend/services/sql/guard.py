@@ -20,7 +20,8 @@ _FORBIDDEN = re.compile(
 
 #: `FROM`/`JOIN` 뒤의 테이블명. 앞의 `(?<![:\w.])` 는 `BETWEEN :from AND :to` 의
 #: `:from` 을 FROM 절로 오인해 `AND` 를 테이블명으로 잡는 것을 막는다.
-_TABLE_REF = re.compile(r"(?<![:\w.])\b(?:FROM|JOIN)\s+([A-Za-z_][A-Za-z0-9_]*)", re.I)
+#: 따옴표로 감싼 이름(`FROM "part"`)도 테이블로 잡는다.
+_TABLE_REF = re.compile(r"(?<![:\w.])\b(?:FROM|JOIN)\s+[\"`\[]?([A-Za-z_][A-Za-z0-9_]*)", re.I)
 
 
 class SqlGuardError(ValueError):
@@ -61,10 +62,19 @@ def check_sql(sql: str, allowed_tables: set[str]) -> str:
     }
     # 별칭이 붙은 서브쿼리(`FROM (...) t`)도 마찬가지다.
 
-    for table in _TABLE_REF.findall(stripped):
+    referenced = _TABLE_REF.findall(stripped)
+    for table in referenced:
         if table.lower() not in allowed_lower:
             raise SqlGuardError(
                 f"등록되지 않은 테이블입니다: {table}. list_tables 로 확인하세요."
             )
+    # 카탈로그 테이블을 하나도 읽지 않는 SQL은 값을 직접 적은 것이다. 시뮬레이션 결과 행을 SQL 리터럴로
+    # 옮겨 적어 합산한 답이 나왔다(2026-11-04) — 옮겨 적는 중 틀려도 결과는 DB 조회처럼 보인다.
+    catalog = {name.lower() for name in allowed_tables}
+    if not any(table.lower() in catalog for table in referenced):
+        raise SqlGuardError(
+            "카탈로그 테이블을 조회하지 않는 SQL(값을 직접 적은 SELECT)은 실행할 수 없습니다. "
+            "시뮬레이션·저장된 결과를 집계하려면 aggregate_result 를 쓰세요."
+        )
 
     return stripped

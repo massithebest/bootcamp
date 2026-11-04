@@ -198,6 +198,7 @@ async def _aggregate_result(args: dict[str, Any], access_scope: str | None) -> d
         value_column=args["value_column"],
         aggregation=args["aggregation"],
         labels=args.get("labels"),
+        extra_value_columns=args.get("extra_value_columns"),
         access_scope=access_scope,
     )
 
@@ -278,7 +279,7 @@ def tool_specs() -> list[ToolSpec]:
             "나열이며, 관계 이름은 표에 있다). present_simulation 요약 카드에 보인 지표 값(예: Part 2개, Route Step 926개)도 근거에서 다시 쓰지 않는다. "
             "params 의 이름·값(예: view=swapped)은 답변에 그대로 쓰지 말고 'swap이 발생한 행만'처럼 풀어 쓴다. "
             "결과를 어떤 기준 컬럼(방향·사이트·등급·제품·고객 등)별 합계·건수로 비교하든 aggregate_result로 서버에서 집계해 그 값과 새 result_id를 쓴다. "
-            "시뮬레이션 결과는 DB 테이블이 아니므로 execute_sql로 조회하지 않고, get_result_page로 읽은 행을 직접 더하지 않는다. "
+            "시뮬레이션 결과는 DB 테이블이 아니므로 execute_sql로 조회하지 않고(읽은 행 값을 SQL에 옮겨 적어 계산하는 것도 안 된다), get_result_page로 읽은 행을 직접 더하지 않는다. "
             "결과 컬럼은 'Swap 방향', 'Swap 수량', '계획 제품'처럼 한국어 이름으로 저장되므로 그 이름으로 부른다. "
             "Swap 수량은 swap 하나를 GIVE·RECEIVE 두 행에 같은 값으로 적은 것이므로, 가장 큰 swap 등을 쓸 때는 한 행(수취·RECEIVE)이 아니라 "
             "swap 단위로 'PROD_0006의 SITE_B→SITE_A swap 828.4'처럼 보내는 쪽과 받는 쪽을 함께 쓴다. "
@@ -384,6 +385,8 @@ def tool_specs() -> list[ToolSpec]:
             "다른 단위가 필요하면 SQL을 다시 작성해 실행한다. "
             "원본 행을 get_result_page로 읽어 직접 더하지 않고, 답변 수치는 이 Tool이 돌려준 값을 그대로 쓴다. "
             "aggregation은 sum·count·avg·min·max 중 하나다. "
+            "여러 값(예: 계획수량과 목표수량)을 같은 기준으로 함께 비교하려면 extra_value_columns에 나머지 값 컬럼을 넣어 한 번에 집계한다. "
+            "이렇게 값 열이 여럿인 결과는 한 차트에 담을 수 없으므로 present_chart를 호출하지 않고 present_table로만 보여 준다. "
             "labels에는 집계 값의 표시 이름을 넣는다(예: {\"Swap 수량\": \"Swap 수량 합계\"}). "
             "기준 값이 비어 있는 행(예: swap이 없는 행)은 집계에서 빠지고 excluded_blank_group_rows로 그 수를 알려 준다. "
             "표·차트에는 원본 result_id가 아니라 이 Tool이 돌려준 새 result_id를 넘겨, 그룹별 집계 행만 보여 준다. "

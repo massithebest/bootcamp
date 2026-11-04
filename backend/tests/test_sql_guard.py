@@ -97,3 +97,14 @@ def test_named_parameter_from_is_not_read_as_table() -> None:
 def test_subquery_from_paren_is_allowed() -> None:
     sql = "SELECT * FROM (SELECT * FROM part) t"
     assert check_sql(sql, ALLOWED)
+
+
+def test_sql_without_a_catalog_table_is_rejected() -> None:
+    # 시뮬레이션 결과 행을 `FROM (SELECT 'SITE_C', 4473.0 UNION ALL …)`처럼 옮겨 적어 합산했다(2026-11-04).
+    literal = "SELECT site, SUM(qty) FROM (SELECT 'SITE_C' AS site, 4473.0 AS qty UNION ALL SELECT 'SITE_A', 2513.0) GROUP BY site"
+    with pytest.raises(SqlGuardError) as excinfo:
+        check_sql(literal, ALLOWED)
+    assert "aggregate_result" in str(excinfo.value)
+    with pytest.raises(SqlGuardError):
+        check_sql("SELECT 1", ALLOWED)
+    assert check_sql('WITH s AS (SELECT * FROM "wip") SELECT COUNT(*) FROM s', ALLOWED)

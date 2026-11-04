@@ -92,6 +92,7 @@ async def aggregate_result(
     aggregation: str,
     labels: dict[str, str] | None = None,
     *,
+    extra_value_columns: list[str] | None = None,
     access_scope: str | None = None,
 ) -> dict:
     try:
@@ -100,6 +101,7 @@ async def aggregate_result(
             group_by=group_by,
             value_column=value_column,
             aggregation=aggregation,
+            extra_value_columns=extra_value_columns,
             labels=labels,
             access_scope=access_scope,
         )

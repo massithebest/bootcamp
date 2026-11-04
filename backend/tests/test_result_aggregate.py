@@ -117,3 +117,29 @@ def test_aggregate_rejects_sql_results(store) -> None:
     result = asyncio.run(aggregate_result(meta.result_id, ["FAC_ID"], "qty", "sum", access_scope="scope-a"))
 
     assert result["status"] == "error" and "GROUP BY" in result["message"]
+
+
+def test_aggregate_sums_extra_value_columns_in_one_result(store) -> None:
+    # 사이트별 계획·목표수량을 한 표로 보려고 결과 행을 SQL 리터럴로 옮겨 적어 합산했다(2026-11-04).
+    meta = store.save(
+        ["사이트", "계획수량", "목표수량"],
+        [["SITE_A", 100, 10.5], ["SITE_A", 50, -2.5], ["SITE_B", 70, 7.0]],
+        source="run_simulation:PKT_목표수량_스왑산출",
+        conversation_id=None,
+        access_scope="scope-a",
+    )
+
+    result = asyncio.run(
+        aggregate_result(
+            meta.result_id, ["사이트"], "계획수량", "sum", {"계획수량": "계획수량 합계"},
+            extra_value_columns=["목표수량"], access_scope="scope-a",
+        )
+    )
+
+    assert result["status"] == "ok"
+    assert [c["name"] for c in result["columns"]] == ["사이트", "계획수량 합계", "목표수량 합계"]
+    assert store.load(result["result_id"]).values.tolist() == [["SITE_A", 150, 8.0], ["SITE_B", 70, 7.0]]
+    duplicate = asyncio.run(
+        aggregate_result(meta.result_id, ["사이트"], "계획수량", "sum", extra_value_columns=["계획수량"], access_scope="scope-a")
+    )
+    assert duplicate["status"] == "error" and "겹칩니다" in duplicate["message"]
