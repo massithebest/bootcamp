@@ -13,6 +13,7 @@ from agent.public_messages import (
     INCOMPLETE_RESPONSE_MESSAGE,
     LLM_API_FAILURE_MESSAGE,
     LLM_RESPONSE_TIMEOUT_MESSAGE,
+    LLM_TOKEN_CAP_MESSAGE,
     MAX_TURNS_MESSAGE,
 )
 from core import config
@@ -120,6 +121,30 @@ def test_gateway_error_is_reported_without_upstream_details(monkeypatch, caplog)
     assert "InternalServerError" in caplog.text and "status=500" in caplog.text
     assert GATEWAY_ERROR_DETAIL not in caplog.text
     assert all(GATEWAY_ERROR_DETAIL not in (e.content or "") for e in events)
+
+
+def test_monthly_token_cap_fails_at_once_with_its_own_message(caplog) -> None:
+    # 재시도로 풀리지 않는 한도인데 6회 재시도로 1분 넘게 기다린 뒤 "잠시 후에 다시 시도"라고 안내했다(2026-11-04).
+    caplog.set_level(logging.ERROR, logger="agent.openai_runtime")
+    gateway = FakeGateway((429, "monthly_token_cap"), text_turn("끝"))
+
+    started = time.perf_counter()
+    events = _collect(gateway)
+
+    assert time.perf_counter() - started < 1
+    assert len(gateway.bodies) == 1
+    _assert_failed_with(events, LLM_TOKEN_CAP_MESSAGE)
+    assert "status=429" in caplog.text and "code=monthly_token_cap" in caplog.text
+    assert GATEWAY_ERROR_DETAIL not in caplog.text
+
+
+def test_rate_limit_with_another_code_still_retries() -> None:
+    gateway = FakeGateway((429, "rate_limit_exceeded"), text_turn("끝"))
+
+    events = _collect(gateway)
+
+    assert events[-1].type == "done" and events[-1].data["turn_id"]
+    assert len(gateway.bodies) == 2
 
 
 def test_model_calling_an_unknown_tool_ends_as_incomplete() -> None:

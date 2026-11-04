@@ -53,10 +53,10 @@ GATEWAY_ERROR_DETAIL = "upstream secret detail"
 class FakeGateway:
     """턴마다 준비한 SSE 응답을 순서대로 돌려주고 받은 요청을 기록한다.
 
-    턴 대신 HTTP 상태 코드(int)를 넣으면 그 상태의 오류 응답을 돌려준다.
+    턴 대신 HTTP 상태 코드(int)를 넣으면 그 상태의 오류 응답을, (상태, 오류 코드)를 넣으면 코드가 붙은 오류 응답을 돌려준다.
     """
 
-    def __init__(self, *turns: list[dict] | int) -> None:
+    def __init__(self, *turns: list[dict] | int | tuple[int, str]) -> None:
         self.turns = list(turns)
         self.requests: list[httpx2.Request] = []
         self.bodies: list[dict] = []
@@ -65,6 +65,11 @@ class FakeGateway:
         self.requests.append(request)
         self.bodies.append(json.loads(request.content))
         chunks = self.turns.pop(0)
+        if isinstance(chunks, tuple):
+            status, code = chunks
+            return httpx2.Response(
+                status, headers={"retry-after": "3600"}, json={"error": {"code": code, "message": GATEWAY_ERROR_DETAIL}}
+            )
         if isinstance(chunks, int):
             # 실제 게이트웨이처럼 오류 응답에 60초 재시도 대기를 싣는다.
             return httpx2.Response(

@@ -42,6 +42,7 @@ from agent.public_messages import (
     INCOMPLETE_RESPONSE_MESSAGE,
     LLM_API_FAILURE_MESSAGE,
     LLM_RESPONSE_TIMEOUT_MESSAGE,
+    LLM_TOKEN_CAP_MESSAGE,
     MAX_TURNS_MESSAGE,
 )
 from agent.skills import AGENT_SDK_DIR, get_skill, list_skills
@@ -176,6 +177,12 @@ def build_model(client: AsyncOpenAI | None = None) -> OpenAIChatCompletionsModel
 _RETRY_STATUSES = frozenset({408, 409, 429, 500, 502, 503, 504})
 #: 재시도 회차별 대기(초). Claude CLI 와 비슷한 지수 backoff 이고, 게이트웨이의 Retry-After 는 쓰지 않는다.
 RETRY_DELAYS = (1.0, 2.0, 4.0, 8.0, 16.0, 32.0)
+#: 게이트웨이의 월간 토큰 한도 오류 코드. 같은 429 라도 재시도로 풀리지 않아, 재시도하면 사용자만 1분 넘게 기다린다.
+TOKEN_CAP_ERROR_CODE = "monthly_token_cap"
+
+
+def _is_token_cap(exc: BaseException) -> bool:
+    return isinstance(exc, APIError) and exc.code == TOKEN_CAP_ERROR_CODE
 
 
 class RetryWait:
@@ -193,6 +200,8 @@ class RetryWait:
 
     def policy(self, context: RetryPolicyContext) -> bool | RetryDecision:
         error = context.normalized
+        if _is_token_cap(context.error):
+            return False
         if not (error.is_network_error or error.is_timeout or error.status_code in _RETRY_STATUSES):
             return False
         delay = RETRY_DELAYS[min(max(context.attempt, 1), len(RETRY_DELAYS)) - 1]
@@ -299,10 +308,10 @@ def _failure_message(exc: Exception) -> str | None:
         return MAX_TURNS_MESSAGE
     if isinstance(exc, APIError):
         logger.error(
-            "LLM API 호출 실패: error_type=%s status=%s",
-            type(exc).__name__, getattr(exc, "status_code", None),
+            "LLM API 호출 실패: error_type=%s status=%s code=%s",
+            type(exc).__name__, getattr(exc, "status_code", None), exc.code,
         )
-        return LLM_API_FAILURE_MESSAGE
+        return LLM_TOKEN_CAP_MESSAGE if _is_token_cap(exc) else LLM_API_FAILURE_MESSAGE
     if isinstance(exc, AgentsException):
         logger.error("Agent 실행 실패: error_type=%s", type(exc).__name__)
         return INCOMPLETE_RESPONSE_MESSAGE

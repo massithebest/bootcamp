@@ -24,6 +24,8 @@
 
 - [ ] Claude 실행부가 "PKT swap 전체 결과에서 사이트별 계획수량과 목표수량"을 시뮬레이션 대신 `FP_TARGET` SQL(PNT 사이트·TARGET_QTY)로
   답했다(1회, 2026-11-04). OpenAI 실행부는 4/4 `run_simulation`→`aggregate_result`. Claude 실행부를 계속 대체용으로 둘지 정할 때 함께 본다.
+- [ ] Claude 실행부는 `monthly_token_cap`을 구분하지 못한다. 프록시가 429를 그대로 넘겨 CLI가 재시도한 뒤 일반 실패 문구를 보여 준다.
+  Claude 실행부를 계속 대체용으로 둘지 정할 때 프록시 응답 변환과 함께 본다(2026-11-04, 한도 소진 중이라 동작 확인 전).
 - [ ] mock 카탈로그 `orders`·`wip`의 `hotlot` 컬럼에 코드값(`yes`·`no`)과 뜻을 변경 요청 경로로 등록한다. 지금은 지침이 `SELECT DISTINCT`
   확인을 요구해 보완하지만, `codes`가 있으면 확인 조회 없이 바로 바른 조건을 쓴다(2026-11-04 Hot lot 오답).
 

@@ -140,7 +140,8 @@ Part 2 §2-3을 따라 추가한다. `MOCK_DB_PATH`는 설정하지 않는다.
 - SDK 트레이싱은 기본값이 외부(OpenAI)로 전송하므로 실행부가 import 시점과 실행마다 끈다. 반입 뒤 첫 기동에서
   외부 주소로 나가는 요청이 없는지 방화벽·프록시 로그로 확인한다.
 - 게이트웨이가 요청 제한(429)·일시 오류를 주면 실행부가 1·2·4·8·16·32초 간격으로 다시 보내고, 재시도를 기다리는 동안은
-  `LLM_RESPONSE_TIMEOUT_SECONDS` 응답 지연 한도를 세지 않는다.
+  `LLM_RESPONSE_TIMEOUT_SECONDS` 응답 지연 한도를 세지 않는다. 오류 코드가 `monthly_token_cap`인 429(월간 토큰 한도)는 재시도로 풀리지
+  않으므로 바로 실패하고 사용자에게 한도 도달을 안내한다. 로그의 `code=`로 일반 요청 제한과 구분한다.
 - 대화 기록·질문 편집 분기는 Backend 프로세스 메모리에 둔다. 재시작하면 이전 대화를 이어 쓰거나 분기할 수 없고
   (새 대화 경고), 여러 워커로 띄우면 워커마다 기록이 따로 생긴다.
 - `AGENT_RUNTIME=claude`는 Claude Agent SDK(`requirements-claude.txt`의 `claude-agent-sdk`)와 Node.js·Claude Code CLI(`claude`)가 필요하며

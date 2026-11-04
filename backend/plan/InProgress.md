@@ -50,7 +50,7 @@ Backend가 소유하는 범위는 다음과 같다.
   질문 바로 앞(`with_guide`). Skill 본문은 숨김 Tool `load_skill`. Tool 은 전부 non-strict, `parallel_tool_calls=False`,
   `include_usage=True`, 출력 상한은 `max_completion_tokens`. 트레이싱은 import 시점과 실행마다 끈다. `AGENT_MAX_TURNS`(기본 25).
   클라이언트 재시도는 끄고 `RetryWait`가 408·409·429·5xx·네트워크 오류를 1~32초 backoff로 재시도하며 대기 중에는 응답 지연 한도를
-  세지 않는다. 이벤트 대기 초과·최대 호출 수 초과·게이트웨이 오류·모델 응답 오류는 공개 문구로 `error` → `done`(turn_id 없음),
+  세지 않는다. 오류 코드 `monthly_token_cap`은 재시도하지 않고 `LLM_TOKEN_CAP_MESSAGE`로 바로 끝낸다. 이벤트 대기 초과·최대 호출 수 초과·게이트웨이 오류·모델 응답 오류는 공개 문구로 `error` → `done`(turn_id 없음),
   완료 전 종료는 SDK 실행을 취소하고 기록하지 않는다. 스트림 변환은 `agent/openai_event_adapter.py`.
 - 실행부 선택은 `agent/agent.py`의 `run_agent`가 호출 시점에 해당 실행부 모듈만 import 한다. 기본 설치(`requirements.txt`)에는
   `claude-agent-sdk`가 없고, 앱 import·OpenAI 실행은 그 패키지 없이 동작한다(`test_runtime_config.py`가 반대 방향과 함께 검증).
