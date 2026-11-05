@@ -133,6 +133,8 @@ Backend가 소유하는 범위는 다음과 같다.
   대조한다. 권한은 `knowledge:write`(작성·제출·철회), `knowledge:approve`(승인·반려)다.
   알 수 없는 id·권한 부족·`KNOWLEDGE_MANAGEMENT_ENABLED=false`는 403 `{"detail"}`이다.
   스텁은 보안 경계가 아니며 실제 인증이 오면 `core/principal.py::current_principal`만 바꾼다.
+- `GET /api/model-info` → `{display_name: string|null}`. 운영자가 `MODEL_DISPLAY_NAME`으로 정한 입력창 표시 이름이며 deployment·provider 설정은 돌려주지 않는다.
+  실제 호출 모델과 자동으로 맞춰지지 않고, 모델 선택·추론 강도 조절은 제공하지 않는다.
 - `GET /api/me` → `{id, name, permissions[], mode: "stub"|"authenticated",
   knowledge_management, allow_self_approval, stub_users[{id,name}]}`. `stub_users`는 스텁에서만 채운다.
 - `GET /api/knowledge/guides/{kind}` → `{kind, key_field, fields[], template, immutable[]}`.

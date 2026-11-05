@@ -290,6 +290,10 @@ class StubUser(BaseModel):
     name: str
 
 
+class ModelInfoResponse(BaseModel):
+    display_name: str | None
+
+
 class MeResponse(BaseModel):
     id: str
     name: str

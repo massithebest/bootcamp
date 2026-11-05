@@ -10,8 +10,10 @@
 - [ ] 실제 screen reader와 긴 대화 성능을 운영 환경에서 검증한다.
 - [ ] 인증 principal이 연결되면 임시 사용자 선택기와 `lib/knowledge-user.ts`를 제거하고
   `GET /api/me`만으로 권한을 표시한다.
-- [ ] 실제 모델 설정 API가 제공될 때 현재 비활성 모델·추론 강도 control의 표시
-  정책을 재검토한다. API가 없으면 비활성 안내를 유지한다.
+- [ ] 브라우저 회귀 검사의 간헐 실패를 고친다: `knowledge-browser.html` "button missing: 텍스트 지식 등록", `workbench-browser.html` "Inspector scrollbar
+  changed text width". 메뉴 표시·폭 측정의 타이밍 의존으로 의심되며(미확인), `npm test`에 포함되지 않아 자동으로 드러나지 않는다.
+- [ ] 모델 선택·추론 강도 조절 API가 제공될 때 입력창의 읽기 전용 모델 이름을 선택 control로 바꾼다. 허용 모델 목록과 모델별 추론 강도 지원을
+  먼저 확인한다(`GET /api/model-info`는 표시 이름만 제공).
 - [ ] 결과 필터·재집계 API가 제공될 때 Result Store 후속 탐색 UX를 별도 계획한다.
 
 ### P3

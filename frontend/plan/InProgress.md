@@ -106,6 +106,8 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 구조화 YAML은 직접 수정 API가 없고 변경 요청이 승인될 때만 바뀐다. 요청마다 브라우저는
 저장된 임시 사용자 id를 `X-User-Id`로 보낸다(없으면 서버 기본 사용자).
 
+- `GET /api/model-info` → `{display_name: string|null}`. 입력창에 읽기 전용 글자로 보여 주고 `null`이거나 조회에 실패하면 "기본 모델"로 표시한다.
+  모델 선택·추론 강도 control은 Backend 기능이 없어 두지 않는다.
 - `GET /api/me` → `{id, name, permissions[], mode: "stub"|"authenticated", knowledge_management,
   allow_self_approval, stub_users[{id,name}]}`. 권한은 `knowledge:write`(작성·제출·철회),
   `knowledge:approve`(승인·반려)다. 응답이 이 형태가 아니면 쓰기 UI를 켜지 않는다(읽기 전용).

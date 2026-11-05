@@ -25,6 +25,7 @@ export async function runWorkbenchRegressions() {
   window.fetch = async (input, init) => {
     const url = String(input);
     if (url.endsWith("/api/chat")) return new Response(new ReadableStream({ start(c) { requests.push(c); } }));
+    if (url.endsWith("/api/model-info")) return Response.json({ display_name: "테스트 모델" });
     if (url.endsWith("/api/knowledge/tools")) return Response.json([{
       name: "execute_sql", description: "읽기 전용 SQL을 실행합니다.", output: "조회 결과", status: "available",
       input_schema: { type: "object", properties: { secret_schema_marker: { type: "string" } } },
@@ -360,10 +361,10 @@ export async function runWorkbenchRegressions() {
         tableHost.remove();
       }
     });
-    await run("F11/F17 reduced motion and unconnected controls are explicit", async () => {
-      check(host.querySelector('[aria-label="모델 GLM-5.3-Flash, 설정 기능 미연결"]'), "model display does not disclose its unconnected control");
-      check(host.querySelector('[aria-label="추론 강도 중간, 조절 기능 미연결"]'), "reasoning display does not disclose its unconnected control");
-      check(host.textContent?.includes("GLM-5.3-Flash") && host.textContent?.includes("중간"), "requested model metadata is absent");
+    await run("F11/F17 reduced motion and the server's model name are shown", async () => {
+      await waitFor(() => !!host.querySelector('[title="사용 모델: 테스트 모델"]'));
+      check(!host.textContent?.includes("GLM-5.3-Flash"), "fixed model label must not remain");
+      check(!host.querySelector('[aria-label^="추론 강도"]'), "unconnected reasoning control must not remain");
       await newChat(); await send();
       const spinner = host.querySelector('[data-slot="execution-pending-spinner"]')!;
       const spinnerStyle = getComputedStyle(spinner);

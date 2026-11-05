@@ -14,6 +14,7 @@ from api.routes_anthropic_proxy import router as anthropic_proxy_router
 from api.routes_chat import router as chat_router
 from api.routes_knowledge import router as knowledge_router
 from api.routes_me import router as me_router
+from api.routes_model_info import router as model_info_router
 from api.routes_query_results import router as query_results_router
 from core import config
 from core.config import CORS_ALLOW_ORIGINS
@@ -89,6 +90,11 @@ app.include_router(
 
 app.include_router(
     query_results_router,
+    prefix="/api",
+)
+
+app.include_router(
+    model_info_router,
     prefix="/api",
 )
 

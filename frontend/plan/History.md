@@ -2,6 +2,15 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-11-04 — 입력창 모델 이름을 서버 값으로 표시
+
+- 고정 글자 `GLM-5.3-Flash`와 비활성 추론 강도 "중간"을 없애고, `GET /api/model-info`의 표시 이름을 읽기 전용 글자로 보여 준다. 선택 기능이 없어
+  버튼·화살표를 뺐고, 값이 없거나 조회에 실패하면 "기본 모델"로 표시한다. workbench 회귀 검사를 갱신했다.
+- 검증: 앱에서 값 없음 "기본 모델", `MODEL_DISPLAY_NAME=gpt-5.4`일 때 "gpt-5.4" 표시. 테스트 112건, 빌드, lint 통과. `chat-browser.html` 9건 통과.
+- `npm test`에 포함되지 않는 브라우저 회귀 검사에 간헐 실패가 있다. `knowledge-browser.html`의 "button missing: 텍스트 지식 등록"과 `workbench-browser.html`의
+  "Inspector scrollbar changed text width"는 이번 변경 전 상태에서도 나왔다(각 4회 중 3회). 변경 후도 지식 6회 중 5회, Workbench 6회 중 3회 실패로 섞여 나오며 원인은 찾지 못했다.
+  실제 앱에서 지식 추가 메뉴는 정상으로 열렸다.
+
 ## 2026-11-02 — 다시 조회해 보정한 차트 실패 숨김
 
 - 공장별 계획·실적 비교에서 첫 SQL 결과로 그린 차트가 "조회 결과에 없는 컬럼"으로 실패했고, Agent가 SQL을 다시 실행해 새

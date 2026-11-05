@@ -3,14 +3,33 @@
  * Official Thread/ViewportFooter/composer/message composition, localized and
  * limited to the capabilities of the LocalRuntime used by this app.
  */
-import { useEffect, useReducer, useRef, type ComponentProps, type ComponentType, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useReducer, useRef, useState, type ComponentProps, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import { AuiIf, ComposerPrimitive, MessagePartPrimitive, MessagePrimitive, ThreadPrimitive } from "@assistant-ui/react";
-import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, GaugeIcon, PlusIcon, SparklesIcon, SquareIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, PlusIcon, SparklesIcon, SquareIcon } from "lucide-react";
+import { cachedModelDisplayName, fetchModelDisplayName } from "@/lib/model-info-api";
 import { MessageActions, MessageError } from "./message-actions.aui";
 import { TooltipIconButton } from "./tooltip-icon-button";
 import { EditMessage } from "./edit-message.aui";
 import { MarkdownText } from "./markdown-text";
 import { ThreadFollowupSuggestions } from "./follow-up-suggestions.aui";
+
+/** 서버가 알려 준 모델 표시 이름. 선택 기능이 없으므로 버튼이 아니라 글자로 보여 준다. */
+function ComposerModelLabel() {
+  const [name, setName] = useState(cachedModelDisplayName);
+  useEffect(() => {
+    if (name) return;
+    let active = true;
+    void fetchModelDisplayName().then((displayName) => { if (active) setName(displayName); });
+    return () => { active = false; };
+  }, [name]);
+  if (!name) return null;
+  return (
+    <span title={`사용 모델: ${name}`} className="inline-flex h-7 min-w-0 items-center gap-1 px-1.5 text-ink-2">
+      <SparklesIcon className="size-3.5 shrink-0" aria-hidden />
+      <span className="truncate">{name}</span>
+    </span>
+  );
+}
 
 export interface ThreadComponents {
   Welcome?: ComponentType;
@@ -105,30 +124,7 @@ function Composer({ autoFocus }: { autoFocus: boolean }) {
           >
             <PlusIcon />
           </TooltipIconButton>
-          <button
-            type="button"
-            aria-disabled="true"
-            tabIndex={-1}
-            title="표시 모델: GLM-5.3-Flash · 모델 설정 조회·선택 기능은 준비 중입니다."
-            aria-label="모델 GLM-5.3-Flash, 설정 기능 미연결"
-            className="inline-flex h-7 min-w-0 cursor-default items-center gap-1 rounded-md px-1.5 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
-          >
-            <SparklesIcon className="size-3.5 shrink-0" aria-hidden />
-            <span className="truncate">GLM-5.3-Flash</span>
-            <ChevronDownIcon className="size-3 shrink-0 text-ink-3" aria-hidden />
-          </button>
-          <button
-            type="button"
-            aria-disabled="true"
-            tabIndex={-1}
-            title="표시 추론 강도: 중간 · 추론 강도 조절 기능은 준비 중입니다."
-            aria-label="추론 강도 중간, 조절 기능 미연결"
-            className="inline-flex h-7 cursor-default items-center gap-1 rounded-md px-1.5 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
-          >
-            <GaugeIcon className="size-3.5" aria-hidden />
-            <span className="whitespace-nowrap">중간</span>
-            <ChevronDownIcon className="size-3 text-ink-3" aria-hidden />
-          </button>
+          <ComposerModelLabel />
         </div>
         <div className="flex shrink-0 items-center gap-2">
         <AuiIf condition={(s) => !s.thread.isRunning}>

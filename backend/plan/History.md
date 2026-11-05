@@ -2,6 +2,11 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-11-04 — 입력창 모델 표시 이름 조회 API
+
+- 입력창의 `GLM-5.3-Flash`는 고정 글자였고 실제 호출 모델과 달랐다. `GET /api/model-info`(`{display_name}`)와 `MODEL_DISPLAY_NAME` 설정을 더했다.
+  지침상 provider 설정을 공개하지 않아 deployment 이름을 그대로 돌려주지 않고 운영자가 정한 이름만 준다. API 테스트 1건 추가, Backend 505건 통과.
+
 ## 2026-11-04 — 월간 토큰 한도(`monthly_token_cap`) 즉시 실패와 안내
 
 - 03:00부터 게이트웨이가 429 `{"error":{"code":"monthly_token_cap"}}`, `retry-after: 3600`을 돌려줘 모든 채팅이 실패했다. 일반 요청 제한과 같게

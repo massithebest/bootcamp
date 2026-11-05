@@ -358,3 +358,14 @@ def test_client_disconnect_cancels_agent_iterator(monkeypatch):
         assert closed.is_set()
 
     asyncio.run(scenario())
+
+
+def test_model_info_returns_only_the_configured_display_name(monkeypatch) -> None:
+    from core import config
+
+    monkeypatch.setattr(config, "AZURE_OPENAI_DEPLOYMENT", "internal-deployment")
+    monkeypatch.setattr(config, "MODEL_DISPLAY_NAME", "표시 모델")
+    assert client.get("/api/model-info").json() == {"display_name": "표시 모델"}
+
+    monkeypatch.setattr(config, "MODEL_DISPLAY_NAME", None)
+    assert client.get("/api/model-info").json() == {"display_name": None}

@@ -184,6 +184,8 @@ AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "").strip() or 
 AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "").strip()
 #: 모델별 최대 출력 토큰보다 CLI 요청값이 클 때 잘라 쓸 상한. 비우면 요청값 그대로.
 AZURE_OPENAI_MAX_TOKENS = int(os.getenv("AZURE_OPENAI_MAX_TOKENS") or 0) or None
+#: 입력창에 보여 줄 모델 이름. deployment 이름을 노출하지 않도록 따로 둔다. 비면 화면은 "기본 모델"로 표시한다.
+MODEL_DISPLAY_NAME = os.getenv("MODEL_DISPLAY_NAME", "").strip() or None
 
 def missing_agent_runtime_settings() -> list[str]:
     """현재 실행부에 필요한데 비어 있는 환경변수 이름(값은 다루지 않는다).
