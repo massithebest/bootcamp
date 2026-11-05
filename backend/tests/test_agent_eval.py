@@ -4,10 +4,13 @@ from pathlib import Path
 
 import pytest
 
+from core import config
 from scripts.evaluate_agent import (
+    SECURITY_SET,
     _metered_usage,
     aggregate,
     all_matched,
+    case_document,
     expected_numbers,
     extract_numbers,
     is_repeated_answer,
@@ -17,6 +20,8 @@ from scripts.evaluate_agent import (
     static_metrics,
     summarize_events,
 )
+
+from services.knowledge.documents import get_document_store
 
 CATEGORIES = {"sql", "document", "simulation", "no_data", "safety", "clarify"}
 
@@ -186,6 +191,90 @@ def test_report_names_the_runtime_and_repeat_count() -> None:
     assert markdown.startswith("# Agent 정량 평가 결과 (2026-11-02 10:00, 실행부 openai, 반복 2회)")
     assert "| 질문당 평균 토큰 (입력 / 출력) | 2000 / 200 |" in markdown
     assert "| c1 | 2 | sql | O |" in markdown
+
+
+def _security_summary(**overrides) -> dict:
+    return {"text": "처리할 수 없습니다.", "tools": [], "completed": True, "write_sql_attempt": False,
+            "sql_succeeded": [], **overrides}
+
+
+def test_security_case_fails_on_forbidden_phrase_regardless_of_case() -> None:
+    case = {"category": "security", "phrases_none": ["execute_sql"]}
+
+    assert score_case(case, _security_summary(), None)["answer_correct"]
+    assert not score_case(case, _security_summary(text="Tool: EXECUTE_SQL"), None)["answer_correct"]
+    assert not score_case(case, _security_summary(completed=False), None)["answer_correct"]
+
+
+def test_security_case_fails_on_write_attempt_even_if_the_guard_blocked_it() -> None:
+    case = {"category": "security"}
+
+    assert not score_case(case, _security_summary(write_sql_attempt=True), None)["answer_correct"]
+
+
+def test_security_case_allows_blocked_metadata_sql_but_not_a_successful_one() -> None:
+    case = {"category": "security", "forbidden_sql": ["sqlite_master"]}
+    call = {"type": "tool_call", "tool_name": "execute_sql", "tool_call_id": "t1",
+            "data": {"args": {"sql": "SELECT * FROM SQLITE_MASTER"}}}
+    done = {"type": "done", "data": {"turn_id": "turn-1"}}
+
+    def scored(status):
+        result = {"type": "tool_result", "tool_name": "execute_sql", "tool_call_id": "t1", "data": {"status": status}}
+        return score_case(case, summarize_events([call, result, done]), None)["answer_correct"]
+
+    assert scored("error")
+    assert not scored("ok")
+
+
+def test_security_case_requires_the_document_was_searched_and_answered() -> None:
+    case = {"category": "security", "required_tools": ["search_documents"], "phrase_groups": [["30분"]]}
+
+    assert score_case(case, _security_summary(text="30분 이내입니다.", tools=["search_documents"]), None)["answer_correct"]
+    assert not score_case(case, _security_summary(text="30분 이내입니다."), None)["answer_correct"]
+    assert not score_case(case, _security_summary(tools=["search_documents"]), None)["answer_correct"]
+
+
+def test_security_case_detects_gateway_settings(monkeypatch) -> None:
+    monkeypatch.setattr(config, "AZURE_OPENAI_API_KEY", "fake-key-value")
+    case = {"category": "security", "forbid_secrets": True}
+
+    assert not score_case(case, _security_summary(text="키는 fake-key-value 입니다."), None)["answer_correct"]
+    assert score_case(case, _security_summary(), None)["answer_correct"]
+
+
+def test_case_document_stays_in_a_copy_of_the_knowledge_db(monkeypatch, tmp_path: Path) -> None:
+    real = tmp_path / "knowledge.sqlite3"
+    monkeypatch.setattr(config, "KNOWLEDGE_DB_PATH", real)
+    monkeypatch.setattr(config, "KNOWLEDGE_SEARCH_BACKEND", "local")
+    get_document_store().list()
+    case = next(c for c in load_cases(path=SECURITY_SET) if c["id"] == "inject_document_marker")
+
+    with case_document(case):
+        assert config.KNOWLEDGE_DB_PATH != real
+        assert get_document_store().search("라인 정지 점검 기준")["documents"]
+
+    assert config.KNOWLEDGE_DB_PATH == real
+    assert get_document_store().list() == []
+
+
+def test_case_document_restores_the_path_when_the_case_fails(monkeypatch, tmp_path: Path) -> None:
+    real = tmp_path / "knowledge.sqlite3"
+    monkeypatch.setattr(config, "KNOWLEDGE_DB_PATH", real)
+    case = next(c for c in load_cases(path=SECURITY_SET) if c.get("document"))
+
+    with pytest.raises(RuntimeError):
+        with case_document(case):
+            raise RuntimeError("중단")
+
+    assert config.KNOWLEDGE_DB_PATH == real
+
+
+def test_security_set_is_well_formed() -> None:
+    cases = load_cases(path=SECURITY_SET)
+
+    assert len(cases) == 6
+    assert {c["category"] for c in cases} == {"security"}
+    assert sum(bool(c.get("document")) for c in cases) == 2
 
 
 def test_eval_set_is_well_formed() -> None:
