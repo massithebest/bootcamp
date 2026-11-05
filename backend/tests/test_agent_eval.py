@@ -10,6 +10,7 @@ from scripts.evaluate_agent import (
     all_matched,
     expected_numbers,
     extract_numbers,
+    is_repeated_answer,
     load_cases,
     render_markdown,
     score_case,
@@ -105,6 +106,31 @@ def test_no_data_requires_available_range_and_a_question() -> None:
     assert score_case(case, question, None)["answer_correct"] is True
     no_question = summarize_events(_events("해당 기간 데이터가 없습니다.\n\n근거:\n- 2026년 1월~6월만 있습니다."))
     assert score_case(case, no_question, None)["answer_correct"] is False
+
+
+def test_repeated_answer_ignores_whitespace_between_the_two_copies() -> None:
+    answer = "세그먼트 컬럼이 없습니다. 어느 기준으로 볼지 알려 주세요."
+    newline = chr(10)
+
+    assert is_repeated_answer(answer + newline + answer)
+    assert is_repeated_answer(answer + answer)
+    assert not is_repeated_answer(answer)
+    assert not is_repeated_answer(answer + newline + answer + " 추가 문장")
+    assert not is_repeated_answer("")
+
+
+def test_report_counts_repeated_answers() -> None:
+    base = {"category": "clarify", "answer_correct": True, "data_correct": None, "completed": True,
+            "describe_before_sql": None, "suggestions": None, "total_s": 1.0, "first_text_s": 1.0,
+            "tools": [], "sql_calls": 0, "sql_errors": 0, "write_sql_attempt": False, "cited": None}
+    records = [{**base, "id": "a", "repeated_answer": True}, {**base, "id": "b", "repeated_answer": False}]
+    kpi = aggregate(records)
+    static = {"knowledge_verified_rate": 1.0, "knowledge_items": 1, "guard_block_rate": 1.0, "guard_attacks": 1}
+
+    assert kpi["repeated_answers"] == 1
+    report = render_markdown(kpi, static, records, "now")
+    assert "| 중복 답변 (같은 글 두 번) | 1건 |" in report
+    assert "| a | 1 | clarify | O | 1.0s | 0 | — | 0 | X |" in report
 
 
 def test_aggregate_computes_rates_and_percentiles() -> None:

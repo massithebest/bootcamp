@@ -133,6 +133,14 @@ def answer_matched(expected: list[float], text_numbers: list[float], shown_numbe
     )
 
 
+def is_repeated_answer(text: str) -> bool:
+    """답변 전체가 같은 글 두 번으로만 이루어졌는지 본다(공백·줄바꿈 차이는 무시). 일부만 반복되면 잡지 않는다."""
+
+    compact = "".join(text.split())
+    half = len(compact) // 2
+    return bool(compact) and len(compact) % 2 == 0 and compact[:half] == compact[half:]
+
+
 def summarize_events(events: list[dict]) -> dict[str, Any]:
     """AgentEvent dict 목록에서 채점에 필요한 사실을 뽑는다."""
 
@@ -269,6 +277,7 @@ def aggregate(records: list[dict]) -> dict[str, Any]:
         "rule_adherence_rate": _rate(sum(r["describe_before_sql"] for r in with_sql), len(with_sql)),
         "sql_error_rate": _rate(sum(r["sql_errors"] for r in records), sql_calls),
         "write_sql_attempts": sum(r["write_sql_attempt"] for r in records),
+        "repeated_answers": sum(bool(r.get("repeated_answer")) for r in records),
         "citation_rate": _rate(sum(bool(r["cited"]) for r in docs), len(docs)),
         "suggestion_rate": _rate(sum(bool(r["suggestions"]) for r in answerable if r["completed"]),
                                  sum(1 for r in answerable if r["completed"])),
@@ -501,6 +510,7 @@ async def evaluate(cases: list[dict], db_path: Path) -> tuple[list[dict], list[s
             "sql_calls": summary["sql_calls"], "sql_errors": summary["sql_errors"],
             "write_sql_attempt": summary["write_sql_attempt"], "suggestions": summary["suggestions"],
             "cost_usd": run["cost_usd"], "usage": run["usage"], "answer": summary["text"],
+            "repeated_answer": is_repeated_answer(summary["text"]),
         }
         mark = "PASS" if record["answer_correct"] else "FAIL"
         print(f"    {mark} {record['total_s']}s tools={len(record['tools'])}"
@@ -538,6 +548,7 @@ def render_markdown(kpi: dict, static: dict, records: list[dict], started_at: st
         f"| 조회 규칙 준수율 (SQL 전 describe_table) | {_fmt(kpi.get('rule_adherence_rate'), True)} |",
         f"| SQL 오류율 | {_fmt(kpi.get('sql_error_rate'), True)} |",
         f"| 쓰기 SQL 시도 | {_fmt(kpi.get('write_sql_attempts'))}건 |",
+        f"| 중복 답변 (같은 글 두 번) | {_fmt(kpi.get('repeated_answers'))}건 |",
         f"| 문서 출처 표기율 | {_fmt(kpi.get('citation_rate'), True)} |",
         f"| 후속질문 제공률 | {_fmt(kpi.get('suggestion_rate'), True)} |",
         f"| 평균 Tool 호출 | {_fmt(kpi.get('avg_tool_calls'))}회 |",
@@ -554,12 +565,12 @@ def render_markdown(kpi: dict, static: dict, records: list[dict], started_at: st
         lines += ["", f"> 실행 환경 오류로 {len(skipped)}건을 실행하지 못했습니다: {', '.join(skipped)}. "
                   "위 운영 지표는 실행한 질문만 집계했습니다."]
     if records:
-        lines += ["", "## 질문별 결과", "", "| ID | 회차 | 분류 | 정답 | 시간 | Tool | 규칙 | 후속질문 |",
-                  "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+        lines += ["", "## 질문별 결과", "", "| ID | 회차 | 분류 | 정답 | 시간 | Tool | 규칙 | 후속질문 | 중복 |",
+                  "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
         for r in records:
             rule = "—" if r["describe_before_sql"] is None else ("O" if r["describe_before_sql"] else "X")
             lines.append(f"| {r['id']} | {r.get('run', 1)} | {r['category']} | {'O' if r['answer_correct'] else 'X'} | "
-                         f"{r['total_s']}s | {len(r['tools'])} | {rule} | {len(r['suggestions'] or [])} |")
+                         f"{r['total_s']}s | {len(r['tools'])} | {rule} | {len(r['suggestions'] or [])} | {'X' if r.get('repeated_answer') else '—'} |")
     return "\n".join(lines) + "\n"
 
 
@@ -574,6 +585,7 @@ _COMPARE_ROWS = [
     ("조회 규칙 준수율", "rule_adherence_rate", True),
     ("SQL 오류율", "sql_error_rate", True),
     ("쓰기 SQL 시도 (건)", "write_sql_attempts", False),
+    ("중복 답변 (건)", "repeated_answers", False),
     ("문서 출처 표기율", "citation_rate", True),
     ("후속질문 제공률", "suggestion_rate", True),
     ("질문당 모델 호출", "avg_model_calls", False),
