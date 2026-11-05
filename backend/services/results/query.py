@@ -26,6 +26,7 @@ from services.service_logging import logged_service_operation
 logger = logging.getLogger(__name__)
 
 PREVIEW_SAMPLE_ROWS = 5
+EXTREME_DIMENSION_MAX_ITEMS = 6
 PREVIEW_GROUP_VALUES = 10
 TABLE_DEFAULT_PAGE_SIZE = 10
 TABLE_MAX_PAGE_SIZE = 100
@@ -105,17 +106,29 @@ def _extreme_rows(frame: pd.DataFrame, series: pd.Series, dimensions: list[Any])
     if not dimensions or numeric.notna().sum() == 0:
         return {}
     extremes: dict[str, Any] = {}
+
+    def row_values(index: Any) -> dict[str, Any]:
+        cells = ((str(name), _series_value(frame.at[index, name])) for name in dimensions)
+        return {name: value for name, value in cells if value is not None}
+
     for kind, value in (("max", numeric.max()), ("min", numeric.min())):
         rows = numeric.index[numeric == value]
-        extremes[f"{kind}_at"] = {str(name): _series_value(frame.at[rows[0], name]) for name in dimensions}
+        extremes[f"{kind}_at"] = row_values(rows[0])
         # 같은 값이 여러 행이면 첫 행만 대상으로 썼다(2026-11-04 "part_1이 216으로 가장 많고" — 6개 Part가 216 동률).
         if len(rows) > 1:
             extremes[f"{kind}_count"] = int(len(rows))
-            extremes[f"{kind}_ties"] = [
-                {str(name): _series_value(frame.at[index, name]) for name in dimensions}
-                for index in rows[:PREVIEW_SAMPLE_ROWS]
-            ]
+            extremes[f"{kind}_ties"] = [row_values(index) for index in rows[:PREVIEW_SAMPLE_ROWS]]
     return extremes
+
+
+def _extreme_dimensions(frame: pd.DataFrame, dimensions: list[Any]) -> list[Any]:
+    """최대·최소 행을 가리킬 기준 컬럼. 모든 행에서 같은 값은 대상을 구분하지 못해 뺀다.
+
+    기준 컬럼이 많은 결과(swap 22열)는 이 값이 미리보기의 40%를 차지했고, 이후 모델 호출마다 다시 전송된다.
+    """
+
+    varying = [name for name in dimensions if frame[name].nunique(dropna=True) > 1]
+    return varying[:EXTREME_DIMENSION_MAX_ITEMS] or dimensions[:1]
 
 
 def _repeated_columns(meta: ResultMeta, frame: pd.DataFrame) -> list[dict[str, str]]:
@@ -145,6 +158,7 @@ def build_preview(meta: ResultMeta, frame: pd.DataFrame) -> dict[str, Any]:
 
     roles = {column.name: column.role for column in meta.columns}
     dimensions = [name for name in frame.columns if roles.get(str(name)) != "measure"]
+    extreme_dimensions = _extreme_dimensions(frame, dimensions)
     sample_rows = [
         {str(name): _series_value(value) for name, value in zip(frame.columns, row)}
         for row in frame.head(PREVIEW_SAMPLE_ROWS).itertuples(index=False)
@@ -163,7 +177,7 @@ def build_preview(meta: ResultMeta, frame: pd.DataFrame) -> dict[str, Any]:
                 "avg": _series_value(series.mean()),
                 "sum": _series_value(series.sum(min_count=1)),
                 "null_count": int(series.isna().sum()),
-                **_extreme_rows(frame, series, dimensions),
+                **_extreme_rows(frame, series, extreme_dimensions),
             }
             continue
         distinct_counts[str(name)] = int(series.nunique(dropna=True))

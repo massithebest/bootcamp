@@ -348,6 +348,25 @@ def test_preview_is_bounded_and_has_no_full_rows(store) -> None:
     assert [c["name"] for c in preview["columns"]] == ["work_month", "line", "qty"]
 
 
+def test_extreme_rows_name_only_columns_that_tell_rows_apart(store) -> None:
+    # 22열 swap 결과에서 max_at·min_at이 미리보기의 40%를 차지했고 이후 모델 호출마다 다시 전송됐다.
+    names = ["제품", "년월", "버전", "사이트", "등급", "고객", "방향", "상대", "구분", "수량"]
+    rows = [
+        ["P1", "202609", "V1", "S1", "A", "C1", "GIVE", "P2", "G1", 10],
+        ["P2", "202609", "V1", "S2", "B", "C2", "RECEIVE", "P1", "G2", 15],
+        ["P3", "202609", "V1", "S3", "C", "C3", None, None, "G3", 20],
+    ]
+    meta = _save(store, names, rows)
+
+    stats = read_preview(meta.result_id, access_scope=SCOPE)["statistics"]["수량"]
+
+    # 모든 행이 같은 년월·버전과 빈 값은 빼고, 값이 갈리는 앞쪽 6개까지만 남긴다("구분"은 7번째라 빠진다).
+    assert stats["max_at"] == {"제품": "P3", "사이트": "S3", "등급": "C", "고객": "C3"}
+    assert stats["min_at"] == {"제품": "P1", "사이트": "S1", "등급": "A", "고객": "C1", "방향": "GIVE", "상대": "P2"}
+    one_row = _save(store, ["공장", "수량"], [["F1", 5]])
+    assert read_preview(one_row.result_id, access_scope=SCOPE)["statistics"]["수량"]["max_at"] == {"공장": "F1"}
+
+
 def test_preview_statistics_report_tied_extremes(store) -> None:
     # 6개 Part가 216 동률인데 첫 행(part_1)만 '가장 많다'고 답했다(2026-11-04).
     rows = [[f"part_{i}", 216 if i <= 6 else 215] for i in range(1, 11)]

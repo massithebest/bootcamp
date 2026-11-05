@@ -123,8 +123,10 @@ def test_present_procedure_is_documented_in_every_presenting_file() -> None:
         assert "present_" in text and "result_id" in text, path
         assert "행·차트 data 배열" in text, path
         assert "present_table" in text and "최대 2회" in text, path
-        assert "위·아래·다음 표/차트" in text and "표에는…" in text and "차트에서는…" in text, path
-        assert "도입 설명 → present_* 호출 → 결과 해석" in text, path
+    # 배치·위치 표현은 Skill을 읽기 전에도 전달되는 CLAUDE.md 한 곳에 둔다. Skill에 복제하면 호출마다 토큰만 늘어난다.
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+    assert "위·아래·다음 표/차트" in claude and "표에는…" in claude and "차트에서는…" in claude
+    assert "도입 설명 → present_* 호출 → 결과 해석" in claude
 
 
 def test_present_tool_descriptions_forbid_position_words_and_raw_tree() -> None:
