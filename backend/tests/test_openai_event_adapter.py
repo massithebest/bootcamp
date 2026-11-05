@@ -203,7 +203,6 @@ def test_display_tools_and_follow_ups_in_one_response_keep_call_order(monkeypatc
             ("list_tables", {}, "call_a"),
             ("list_kpis", {}, "call_b"),
             ("suggest_follow_ups", {"questions": QUESTIONS}, "call_next"),
-            text="확인합니다.",
         ),
         text_turn("끝"),
     )
@@ -217,10 +216,33 @@ def test_display_tools_and_follow_ups_in_one_response_keep_call_order(monkeypatc
     calls = [e.tool_name for e in events if e.type == "tool_call"]
     results = [e.tool_call_id for e in events if e.type == "tool_result"]
     assert calls == ["list_tables", "list_kpis"] and results == ["call_a", "call_b"]
-    assert [e.type for e in events][0] == "text" and events[-1].type == "done"
+    assert events[-1].type == "done"
     assert events[-1].data["suggestions"] == QUESTIONS and events[-1].data["turn_id"]
     # 다음 요청은 한 assistant 메시지의 Tool 호출 3개 뒤에 결과 3개가 호출 순서대로 이어져야 게이트웨이가 받는다.
     messages = gateway.bodies[1]["messages"]
     assistant = next(m for m in messages if m["role"] == "assistant" and m.get("tool_calls"))
     assert [c["id"] for c in assistant["tool_calls"]] == ["call_a", "call_b", "call_next"]
     assert [m["tool_call_id"] for m in messages if m["role"] == "tool"] == ["call_a", "call_b", "call_next"]
+
+
+def test_answer_written_with_follow_ups_ends_the_run_without_repeating(monkeypatch) -> None:
+    # gpt-4.1이 답변과 후속질문을 한 응답에 쓰고 다음 호출에서 답변을 다시 썼다(2026-11-05).
+    monkeypatch.setattr(config, "AZURE_OPENAI_DEPLOYMENT", DEPLOYMENT)
+    monkeypatch.setattr(config, "AZURE_OPENAI_MAX_TOKENS", None)
+    gateway = FakeGateway(
+        tool_turn("suggest_follow_ups", {"questions": QUESTIONS}, "call_next", text="FAC002가 가장 큽니다."),
+        text_turn("같은 답변을 다시 씁니다."),
+    )
+
+    async def turn(message: str, model):
+        return [e async for e in run_openai_agent(message, "stop-conv", None, "scope", model=model)]
+
+    events = asyncio.run(turn("질문", gateway.model()))
+
+    assert len(gateway.bodies) == 1
+    assert "".join(e.content or "" for e in events if e.type == "text") == "FAC002가 가장 큽니다."
+    assert events[-1].data["turn_id"] and events[-1].data["suggestions"] == QUESTIONS
+    # 실행을 끝낸 뒤의 기록으로 다음 질문을 이어 갈 수 있어야 한다.
+    following = FakeGateway(text_turn("다음 답변"))
+    asyncio.run(turn("다음 질문", following.model()))
+    assert [m["role"] for m in following.bodies[0]["messages"]][-3:] == ["assistant", "tool", "user"]

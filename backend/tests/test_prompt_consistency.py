@@ -50,16 +50,10 @@ def test_system_prompt_defines_pt_factory_planning_scope() -> None:
 
 
 def test_system_prompt_does_not_list_tools() -> None:
-    """도구 목록은 CLAUDE.md 책임이다 — 두 곳에 있으면 드리프트가 생긴다."""
+    """도구 목록은 Tool 명세 책임이다 — 두 곳에 있으면 드리프트가 생긴다."""
 
     for name in SHORT_TOOL_NAMES:
         assert name not in SYSTEM_PROMPT, f"SYSTEM_PROMPT 에 도구 이름이 있다: {name}"
-
-
-def test_claude_md_tool_table_matches_tool_names() -> None:
-    rows = re.findall(r"^\|\s*`(\w+)`\s*\|", CLAUDE_MD.read_text(encoding="utf-8"), re.M)
-
-    assert set(rows) == SHORT_TOOL_NAMES
 
 
 def test_claude_md_lists_actual_skills() -> None:
@@ -169,7 +163,7 @@ def test_claude_md_keeps_internal_ids_out_and_does_not_turn_include_rules_into_f
     # 후속질문이 "특정 제품의 ~"로 대상을 비워 둬 누르면 확인 질문만 돌아왔다.
     assert "대상을 비워 두지 않는다" in text
     # 이미 큰 순서로 답한 공장별 합계를 "많은 순서로 설명해 주세요"로 다시 묻는 후속질문이 나왔다.
-    assert "새 기준" in text and "많은 순서로 설명해 주세요" in text
+    assert "새 기준" in text and "정렬" in text
     # 최솟값을 "20,260개"로만 쓰고 대상(part_7)을 빠뜨렸고, 세그먼트 간 같은 Part ID를 짝지어 비교하는 후속질문이 나왔다.
     assert "그 대상(예: part_7)도 함께 쓴다" in text and "caveats·query_rules를 지킨다" in text
     # 시뮬레이션 답변이 표 5행을 "part_to_route_step: source 2건, matched 2건"처럼 영문 그대로 다시 나열했다.
@@ -252,7 +246,7 @@ def test_presented_results_use_readable_labels_and_are_not_repeated() -> None:
     for text in (claude, skill):
         assert "한국어 별칭" in text and "'2026-05'" in text
     # 차트와 같은 결과로 표를 한 번 더 띄웠다.
-    assert "같은 `result_id`로 `present_table`을 또 호출하지" in claude
+    assert "다시 띄우지 않는다(차트의 \"표로 보기\"가 있다)" in claude
 
 
 def test_grouped_comparisons_of_stored_results_are_aggregated_on_the_server() -> None:
@@ -425,8 +419,6 @@ def test_extreme_value_targets_come_from_result_rows() -> None:
     assert "max_count" in SYSTEM_PROMPT and "동률을 밝힌다" in SYSTEM_PROMPT
     # 근거에 "최대 계획수량의 대상은 결과 통계에 표시된 행 기준으로 확인했습니다"처럼 확인 방법을 적었다(2026-11-03).
     assert "어디서 확인했는지" in SYSTEM_PROMPT
-    # 표시 Tool·후속질문을 하나씩 호출해 그때마다 지침 약 1.4만 토큰을 다시 보냈다(2026-11-05).
-    assert "한 응답에서 함께 호출하고 하나씩 나눠 호출하지 않는다" in CLAUDE_MD.read_text(encoding="utf-8")
     # 두 세그먼트 비교에 '가장 많고'를 썼고(5/5), swap 쌍의 값을 수취 행 하나의 값처럼 썼다(2/5, 2026-11-03).
     assert "비교 대상이 둘뿐이면" in SYSTEM_PROMPT
     # 근거가 "표에는 제품, 사이트, 등급, …를 담았습니다"처럼 표의 열 구성을 설명했다(10/10, 2026-11-04).

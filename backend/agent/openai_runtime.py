@@ -23,14 +23,19 @@ from agents import (
     Agent,
     AgentsException,
     FunctionTool,
+    FunctionToolResult,
+    ItemHelpers,
     MaxTurnsExceeded,
     ModelRetrySettings,
     ModelSettings,
     OpenAIChatCompletionsModel,
     RunConfig,
+    RunHooks,
     Runner,
+    ToolsToFinalOutputResult,
     set_tracing_disabled,
 )
+from agents.items import ModelResponse
 from agents.result import RunResultStreaming
 from agents.retry import RetryDecision, RetryPolicyContext
 from openai import APIError, AsyncAzureOpenAI, AsyncOpenAI
@@ -48,7 +53,7 @@ from agent.public_messages import (
 from agent.skills import AGENT_SDK_DIR, get_skill, list_skills
 from agent.system_prompt import SYSTEM_PROMPT
 from agent.tool_events import TOOL_FAILURE_PAYLOAD
-from agent.tool_specs import ToolSpec, tool_specs
+from agent.tool_specs import SUGGESTION_TOOL_NAME, ToolSpec, tool_specs
 from api.schemas import AgentEvent
 from core import config
 
@@ -221,18 +226,38 @@ def model_settings(retry_wait: RetryWait | None = None) -> ModelSettings:
     # max_completion_tokens 를 써야 하는 것도 같은 이유다(프록시와 같은 상한 설정 사용).
     cap = config.AZURE_OPENAI_MAX_TOKENS
     return ModelSettings(
-        # 표시 Tool·후속질문을 한 응답에 함께 호출해 모델 호출을 줄인다. 호출마다 지침 약 1.4만 토큰을 다시 보낸다.
-        parallel_tool_calls=True,
+        parallel_tool_calls=False,
         include_usage=True,
         retry=(retry_wait or RetryWait()).settings(),
         extra_args={"max_completion_tokens": cap} if cap else None,
     )
 
 
+class StopAfterAnsweredFollowUps(RunHooks):
+    """답변 글과 `suggest_follow_ups`를 한 응답에 함께 쓰면 그 응답에서 실행을 끝낸다.
+
+    gpt-4.1은 그 응답에 답변을 쓰고 다음 호출에서 답변을 다시 써 화면에 두 번 나왔다(2026-11-05).
+    답변 글 없이 후속질문만 호출한 응답은 지금처럼 다음 호출에서 답변을 받는다.
+    """
+
+    def __init__(self) -> None:
+        self._response_has_text = False
+
+    async def on_llm_end(self, context: Any, agent: Any, response: ModelResponse) -> None:
+        self._response_has_text = any(
+            ItemHelpers.extract_last_text(item) for item in response.output if getattr(item, "type", None) == "message"
+        )
+
+    def decide(self, _context: Any, results: list[FunctionToolResult]) -> ToolsToFinalOutputResult:
+        follow_ups = any(result.tool.name == SUGGESTION_TOOL_NAME for result in results)
+        return ToolsToFinalOutputResult(is_final_output=follow_ups and self._response_has_text, final_output=None)
+
+
 def build_agent(
     access_scope: str | None,
     model: OpenAIChatCompletionsModel,
     retry_wait: RetryWait | None = None,
+    stop: StopAfterAnsweredFollowUps | None = None,
 ) -> Agent:
     return Agent(
         name=AGENT_NAME,
@@ -240,6 +265,7 @@ def build_agent(
         model=model,
         model_settings=model_settings(retry_wait),
         tools=[*(_function_tool(spec, access_scope) for spec in tool_specs()), _load_skill_tool()],
+        tool_use_behavior=(stop or StopAfterAnsweredFollowUps()).decide,
     )
 
 
@@ -252,10 +278,12 @@ def run_streamed(
 ) -> RunResultStreaming:
     """한 턴을 스트리밍 실행한다. `input_items`는 새 메시지 또는 이전 기록 + 새 메시지."""
 
-    agent = build_agent(access_scope, model or build_model(), retry_wait)
+    stop = StopAfterAnsweredFollowUps()
+    agent = build_agent(access_scope, model or build_model(), retry_wait, stop)
     return Runner.run_streamed(
         agent,
         input_items,
+        hooks=stop,
         max_turns=config.AGENT_MAX_TURNS,
         run_config=RunConfig(tracing_disabled=True),
     )

@@ -36,7 +36,7 @@ Python 3.11 FastAPI 서비스다. `/api/chat`은 `AGENT_RUNTIME`으로 고른 �
 ## 런타임 지침 계층
 
 - `agent/system_prompt.py`: 짧은 역할·안전 원칙.
-- `agent/agent_sdk/CLAUDE.md`: Tool·Skill 인덱스와 공통 규칙.
+- `agent/agent_sdk/CLAUDE.md`: Skill 목록과 공통 규칙.
 - `agent/agent_sdk/.claude/skills/*/SKILL.md`: 업무별 절차.
 
 스키마와 업무 정의를 여러 계층에 복제하지 않는다. Tool을 바꾸면 wrapper,
