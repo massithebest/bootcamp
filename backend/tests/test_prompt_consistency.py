@@ -146,10 +146,7 @@ def test_present_tool_descriptions_forbid_position_words_and_raw_tree() -> None:
     assert "long 형식" in chart and "group_by_column=지표 이름 컬럼" in chart
     assert "단위가 다른 지표는 한 차트에 묶지 말고" in chart
     assert "위/아래" in table and "표에는" in table and "result_id" in table
-    assert "결론 문장에는 핵심 수치" in chart and "결론 문장에는 핵심 수치" in table
     assert "비슷한 컬럼으로 가정해 조회하지 말고" in tools["describe_table"].description
-    assert "아직 검토되지 않은 테이블 정의 기준" in tools["describe_table"].description
-    assert "일반 지식으로 후보를 만들어 선택지로 내지 말고" in tools["describe_table"].description
     # result_id 는 Tool 인자 전용이며 답변 본문에 노출하지 않는다.
     assert "답변 본문에 적지 않는다" in tools["execute_sql"].description
     # 컬럼 후보를 pragma_table_info 로 직접 조회하다 가드에 막혀 "오류"로 보였다.
@@ -229,25 +226,15 @@ def test_data_tool_descriptions_distinguish_sql_simulation_and_documents() -> No
     assert "임의의 종류" in tools["run_simulation"].description
     assert "화면 버튼·변경 위치·조회 방법" in tools["search_documents"].description
     assert "실제 저장 수치 조회나 simulation 실행을 대신하지 않는다" in tools["search_documents"].description
-    assert "뜻을 되묻기 전에 그 용어를 keyword 로 list_tables" in tools["search_documents"].description
-    assert "이어 붙여 흐름을 만들지 말고" in tools["search_documents"].description
-    assert "한 줄씩 다시 나열하지 않고" in tools["present_table"].description
     assert "문제(미일치 등)가 있는 항목만 짚는다" in tools["run_simulation"].description
     # 입력 검증 답변이 통과한 5개 관계 이름을 모두 나열하고 요약 카드의 입력 규모 4개 값을 근거에서 다시 썼다.
     assert "통과한 관계 이름을" in tools["run_simulation"].description
     assert "점검한 관계는 Part→Route 연결" in tools["run_simulation"].description
     assert "요약 카드에 보인 지표 값" in tools["run_simulation"].description
-    assert "해당 기간 데이터가 없다" in tools["execute_sql"].description
     # "이번 달" 0행에 기준 월·데이터가 있는 범위를 알리지 않고 묻지도 않은 채 끝났다.
-    assert "해석한 실제 월" in tools["execute_sql"].description and "MIN·MAX" in tools["execute_sql"].description
-    assert "어느 기간으로 볼지 묻고 멈춘다" in tools["execute_sql"].description
     # PKT swap 답변 근거에 "view=swapped 조건으로 조회"처럼 시뮬레이션 파라미터가 그대로 나왔다.
     assert "swap이 발생한 행만" in tools["run_simulation"].description
-    assert "정렬 순서만 바꾸거나" in tools["suggest_follow_ups"].description
     # 제품 2개뿐인 결과에 "Lot 수 기준 상위 제품만", "납기 기준으로 정렬해줘" 후속질문이 나왔다.
-    assert "다시 정렬·잘라 보는 질문" in tools["suggest_follow_ups"].description
-    assert "ID를 짝지은 세그먼트 비교" in tools["suggest_follow_ups"].description
-    assert "최대·최소 값에는 그 대상도 함께 쓴다" in tools["present_table"].description
 
 
 def test_presented_results_use_readable_labels_and_are_not_repeated() -> None:
@@ -258,17 +245,13 @@ def test_presented_results_use_readable_labels_and_are_not_repeated() -> None:
     # 공장별 비교 답변이 표·차트의 6개 값을 "공장별 월 계획수량 합계는 다음 값입니다"로 다시 나열했다.
     assert "결론·근거 어디에서도 모두 이어 쓰지 않" in SYSTEM_PROMPT
     assert "계산에 사용한 값은 다음과 같습니다" in claude
-    assert "계산에 사용한 값은 다음과 같습니다" in tools["present_chart"].description
-    assert "계산에 사용한 값은 다음과 같습니다" in tools["present_table"].description
     # 본문 근거에 "(PLAN_OPT_CD IS NULL OR PLAN_OPT_CD <> 'X') 조건을 적용"처럼 SQL 식이 그대로 나왔다.
-    for text in (claude, skill, tools["execute_sql"].description):
+    for text in (claude, skill):
         assert "SQL 식" in text and "계획수량이 0보다 큰 행" in text
     # 차트 축·범례가 FAC_ID, plan_qty, change_rate_pct, 202605처럼 내부 이름 그대로 나왔다.
-    for text in (claude, skill, tools["execute_sql"].description):
+    for text in (claude, skill):
         assert "한국어 별칭" in text and "'2026-05'" in text
     # 차트와 같은 결과로 표를 한 번 더 띄웠다.
-    assert "같은 result_id로 present_table을 또 호출하지 않는다" in tools["present_chart"].description
-    assert "present_chart로 이미 보여 줬으면" in tools["present_table"].description
     assert "같은 `result_id`로 `present_table`을 또 호출하지" in claude
 
 
@@ -298,17 +281,13 @@ def test_grouped_comparisons_of_stored_results_are_aggregated_on_the_server() ->
     # 제품 ID를 되물으면서 '예: ["PROD_0001"]'처럼 파라미터 형식을 그대로 보였다(2026-11-03).
     simulation_skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "simulation" / "SKILL.md").read_text(encoding="utf-8")
     assert "목록 형식" in tools["run_simulation"].description and "목록 형식" in simulation_skill
-    assert "'swap_direction을 방향으로 사용' 같은 문장도 쓰지 않는다" in tools["aggregate_result"].description
     # 사이트·방향별 비교에서 결론이 표의 4개 값을 모두 나열했고, 이미 답한 순유입을 다시 묻는 후속질문이 나왔고,
     # 비교 질문인데 표만 보여 줬다.
-    assert "모든 행 값을 나열하지 않고" in tools["present_table"].description
-    assert "결론·근거에서 모두 나열하지 않고" in tools["present_chart"].description
     assert "행 값(예: 사이트·방향별 4개 값)을 결론에 나열하지 않는다" in claude
-    assert "이미 해석한 파생 값" in tools["suggest_follow_ups"].description and "이미 해석한 파생 값" in claude
-    assert "빼거나 더하면 바로 나오는 값" in tools["suggest_follow_ups"].description and "빼거나 더하면 바로 나오는 값" in claude
-    assert "한 문장에 이어 쓰는 것도 나열이다" in tools["aggregate_result"].description
+    assert "이미 해석한 파생 값" in claude
+    assert "빼거나 더하면 바로 나오는 값" in claude
     # 나열 금지를 넣자 결론이 "가장 큰 합계는 SITE_A의 RECEIVE"처럼 수치 없이 대상만 썼다.
-    assert "값 없이 대상만 쓰지 않고" in tools["aggregate_result"].description and "그렇다고 수치를" in claude
+    assert "그렇다고 수치를" in claude
     assert "present_chart(chart_type=bar, x_column=첫 기준" in tools["aggregate_result"].description
     assert "`present_chart`(막대, x=첫 기준" in claude and "`present_chart`(막대, x=첫 기준" in simulation
 
@@ -319,10 +298,10 @@ def test_single_value_columns_are_dropped_and_distributions_show_shares() -> Non
     skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "sql-analysis" / "SKILL.md").read_text(encoding="utf-8")
 
     # PROD_0016만 조회한 공장별 표에 세 행 모두 같은 "제품" 열이 남았다.
-    for text in (claude, skill, tools["execute_sql"].description):
+    for text in (claude, skill):
         assert "WHERE로 한 값만 남긴 컬럼" in text
     # "공장별로 어떻게 나눠져 있어?"에 두 공장 차이만 답하고 가장 작은 공장과 비중을 빠뜨렸다.
-    for text in (claude, skill, tools["execute_sql"].description):
+    for text in (claude, skill):
         assert "비중(%)" in text
     assert "차이만 쓰고 나머지 대상을 빠뜨리지 않는다" in claude
 
@@ -332,13 +311,12 @@ def test_catalog_name_matches_are_hedged_and_conclusions_are_not_repeated() -> N
     claude = CLAUDE_MD.read_text(encoding="utf-8")
 
     # "계획수립옵션 = 계획옵션코드"라고 단정했고, 끝의 "정리하면"이 결론을 되풀이했다.
-    assert "같은 뜻인지는 확인되지 않았다" in claude and "같은 뜻인지는 확인되지 않았다" in tools["search_documents"].description
-    assert "정리하면" in claude and "정리하면" in tools["search_documents"].description
+    assert "같은 뜻인지는 확인되지 않았다" in claude
+    assert "정리하면" in claude
     assert "결론을 다시 요약하지 않는다" in SYSTEM_PROMPT
     # "정리하면"을 막자 "즉, 질문하신 ~에 대한 기준은 ~입니다"로 결론을 되풀이했다.
-    assert "즉, 질문하신" in claude and "즉, 질문하신" in tools["search_documents"].description
+    assert "즉, 질문하신" in claude
     # "답변은 결론과 근거에서 끝낸다"를 넣은 뒤 문서 답변이 suggest_follow_ups를 호출하지 않았다.
-    assert "suggest_follow_ups는 그대로 호출한다" in tools["search_documents"].description
     assert "`suggest_follow_ups`는 그대로 호출한다" in claude
 
 
@@ -349,7 +327,7 @@ def test_multi_value_questions_list_values_and_state_the_period() -> None:
 
     # "등급이 여러 개로 나누어진 제품"에 20행 모두 "등급 수 3"인 표를 보여 줬고, 규칙에 없는 GRADE_CD 비어 있지 않음 조건을
     # "테이블 조회 규칙에 따라"라고 했으며, 전체 기간(2026년 1~6월)을 밝히지 않았다.
-    for text in (claude, skill, tools["execute_sql"].description):
+    for text in (claude, skill):
         assert "모든" in text and "한 문장으로 답한다" in text
         assert "MIN·MAX" in text
     assert "GRADE_CD IS NOT NULL" in tools["execute_sql"].description
@@ -358,7 +336,7 @@ def test_multi_value_questions_list_values_and_state_the_period() -> None:
     # 값 목록을 더한 뒤에도 20행 모두 "등급 개수 3" 열을 표에 남겼다.
     assert "columns에서 빼고" in tools["present_table"].description
     # 규칙을 더한 뒤 등급 컬럼이 GRADE_CD 하나뿐인데도 "어느 기준의 등급인지" 되묻고 멈췄다.
-    assert "맞는 컬럼이 하나뿐이면" in tools["describe_table"].description and "맞는 컬럼이 하나뿐이면" in claude
+    assert "맞는 컬럼이 하나뿐이면" in claude
 
 
 def test_rag_final_answers_require_a_source_or_url() -> None:
@@ -387,10 +365,7 @@ def test_evidence_avoids_sql_expressions_and_passed_relation_lists() -> None:
     # 근거에 `WORK_YM = '202605'`·`SUM(PLAN_QTY)`를 그대로 쓴 답이 6회 중 5회였다(OpenAI 실행부, 2026-11-03).
     for text in (SYSTEM_PROMPT, claude, tools["present_sql_preview"].description):
         assert "WORK_YM = '202605'" in text and "SUM(PLAN_QTY)" in text
-    assert "SUM() 등)이 아니라" in tools["execute_sql"].description
     # 통과한 점검 관계 5개를 "표 기준으로 …에서 모두 미일치가 없었습니다"로 이어 쓴 답이 6회 중 4회였다.
-    assert "관계 이름을 이어 쓰면 나열" in tools["present_simulation"].description
-    assert "행 이름을 한 문장에 이어 쓰는 것도" in tools["present_table"].description
 
 
 def test_no_data_answers_end_with_the_period_question() -> None:
@@ -413,7 +388,7 @@ def test_answers_keep_key_figures_skip_duplicate_tables_and_keep_required_column
     assert "2행 이상을 나열하거나 표를 요청하면" not in claude
     assert "차트로 보여 주지 않는 2행 이상 결과" in claude and "차트로 보여 주지 않는 2행 이상 결과" in skill
     # "계획 대비 실적 비교는 SALES_BATCH_CD 필수 포함" 규칙을 읽고도 공장 합계만 보여 줬다(0/5).
-    assert "SALES_BATCH_CD" in claude and "요청 기준 합계" in tools["describe_table"].description
+    assert "SALES_BATCH_CD" in claude
 
 
 def test_plan_versus_actual_tables_are_wide_and_lead_with_the_gap() -> None:
@@ -459,6 +434,17 @@ def test_extreme_value_targets_come_from_result_rows() -> None:
     assert "무엇이 담겼는지" in SYSTEM_PROMPT and "표에 담은 열·항목을 설명하지 않는다" in claude
     # "차트에서는 월별 추이를 확인할 수 있습니다"처럼 표·차트를 가리키기만 하는 문장이 남았다(6/12, 2026-11-04).
     assert "가리키는 문장" in SYSTEM_PROMPT and "보라고 가리키기만 하는 문장은 쓰지 않는다" in claude
-    assert "표에 담은 열·항목을 설명하지 않는다" in {t.name: t for t in tool_specs()}["present_table"].description
     simulation_skill = (Path(AGENT_SDK_CWD) / ".claude" / "skills" / "simulation" / "SKILL.md").read_text(encoding="utf-8")
     assert "표에 담은 필드를 나열하지 않는다" in simulation_skill and "어떤 필드인지 밝히" not in simulation_skill
+
+
+def test_rules_trimmed_from_tool_descriptions_stay_in_the_guide() -> None:
+    # Tool 설명은 모델 호출마다 전송되므로 CLAUDE.md와 겹치는 답변 규칙을 지웠다(2026-11-05). 규칙 자체는 남아야 한다.
+    claude = CLAUDE_MD.read_text(encoding="utf-8")
+    for rule in (
+        "한국어 별칭", "WHERE로 한 값만 남긴 컬럼", "비중(%)", "MIN·MAX", "해당 기간 데이터가 없다", "SQL 식",
+        "되묻기 전에", "가장 가까운 항목은", "정리하면", "맞는 컬럼이 하나뿐이면", "필수로 포함", "등록된 데이터가 없다",
+        "빼거나 더하면", "이미 해석한 파생 값", "차트로 보여드렸습니다", "계산에 사용한 값은", "표로 보기",
+        "한 문장에 이어 쓰는 것도 나열이다", "표에 담은 열·항목을 설명하지 않는다", "아직 검토되지 않은 정의 기준",
+    ):
+        assert rule in claude, rule
