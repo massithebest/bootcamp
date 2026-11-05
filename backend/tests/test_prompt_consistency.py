@@ -450,6 +450,8 @@ def test_extreme_value_targets_come_from_result_rows() -> None:
     assert "max_count" in SYSTEM_PROMPT and "동률을 밝힌다" in SYSTEM_PROMPT
     # 근거에 "최대 계획수량의 대상은 결과 통계에 표시된 행 기준으로 확인했습니다"처럼 확인 방법을 적었다(2026-11-03).
     assert "어디서 확인했는지" in SYSTEM_PROMPT
+    # 표시 Tool·후속질문을 하나씩 호출해 그때마다 지침 약 1.4만 토큰을 다시 보냈다(2026-11-05).
+    assert "한 응답에서 함께 호출하고 하나씩 나눠 호출하지 않는다" in CLAUDE_MD.read_text(encoding="utf-8")
     # 두 세그먼트 비교에 '가장 많고'를 썼고(5/5), swap 쌍의 값을 수취 행 하나의 값처럼 썼다(2/5, 2026-11-03).
     assert "비교 대상이 둘뿐이면" in SYSTEM_PROMPT
     # 근거가 "표에는 제품, 사이트, 등급, …를 담았습니다"처럼 표의 열 구성을 설명했다(10/10, 2026-11-04).

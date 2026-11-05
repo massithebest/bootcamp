@@ -26,7 +26,7 @@ from agent.openai_event_adapter import VISIBLE_TOOL_NAMES, OpenAIEventAdapter
 from agent.openai_runtime import run_openai_agent
 from agent.tool_events import TOOL_FAILURE_PAYLOAD
 from core import config
-from tests.openai_fakes import DEPLOYMENT, FakeGateway, text_turn, tool_turn
+from tests.openai_fakes import DEPLOYMENT, FakeGateway, text_turn, tool_turn, tools_turn
 
 
 SQL_ARGS = {"sql": "SELECT 1", "purpose": "공장별 합계"}
@@ -183,3 +183,44 @@ def test_run_agent_dispatches_to_the_openai_runtime(monkeypatch) -> None:
 
     assert calls == [("질문", "conv", None, "scope")]
     assert [e.type for e in events] == ["done"]
+
+
+def test_display_tools_and_follow_ups_in_one_response_keep_call_order(monkeypatch) -> None:
+    # 모델 호출을 줄이려고 표시 Tool과 후속질문을 한 응답에서 함께 호출한다(2026-11-05).
+    async def slow_first(**_kwargs):
+        await asyncio.sleep(0.05)
+        return {"status": "ok", "tables": []}
+
+    async def fast_second(**_kwargs):
+        return {"status": "ok", "kpis": []}
+
+    monkeypatch.setattr("agent.tool_specs.list_tables", slow_first)
+    monkeypatch.setattr("agent.tool_specs.list_kpis", fast_second)
+    monkeypatch.setattr(config, "AZURE_OPENAI_DEPLOYMENT", DEPLOYMENT)
+    monkeypatch.setattr(config, "AZURE_OPENAI_MAX_TOKENS", None)
+    gateway = FakeGateway(
+        tools_turn(
+            ("list_tables", {}, "call_a"),
+            ("list_kpis", {}, "call_b"),
+            ("suggest_follow_ups", {"questions": QUESTIONS}, "call_next"),
+            text="확인합니다.",
+        ),
+        text_turn("끝"),
+    )
+
+    async def go():
+        return [e async for e in run_openai_agent("질문", None, None, "scope", model=gateway.model())]
+
+    events = asyncio.run(go())
+
+    assert len(gateway.bodies) == 2
+    calls = [e.tool_name for e in events if e.type == "tool_call"]
+    results = [e.tool_call_id for e in events if e.type == "tool_result"]
+    assert calls == ["list_tables", "list_kpis"] and results == ["call_a", "call_b"]
+    assert [e.type for e in events][0] == "text" and events[-1].type == "done"
+    assert events[-1].data["suggestions"] == QUESTIONS and events[-1].data["turn_id"]
+    # 다음 요청은 한 assistant 메시지의 Tool 호출 3개 뒤에 결과 3개가 호출 순서대로 이어져야 게이트웨이가 받는다.
+    messages = gateway.bodies[1]["messages"]
+    assistant = next(m for m in messages if m["role"] == "assistant" and m.get("tool_calls"))
+    assert [c["id"] for c in assistant["tool_calls"]] == ["call_a", "call_b", "call_next"]
+    assert [m["tool_call_id"] for m in messages if m["role"] == "tool"] == ["call_a", "call_b", "call_next"]

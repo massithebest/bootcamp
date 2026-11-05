@@ -86,7 +86,7 @@ def test_text_turn_calls_the_gateway_deployment_with_runtime_settings() -> None:
     assert request.headers["api-key"] == "test-key"
     assert body["model"] == DEPLOYMENT and body["stream"] is True
     assert body["stream_options"] == {"include_usage": True}
-    assert body["parallel_tool_calls"] is False
+    assert body["parallel_tool_calls"] is True
     assert "temperature" not in body and "max_tokens" not in body
     assert body["messages"][0]["content"] == openai_runtime.build_instructions()
     assert body["messages"][-1] == {"role": "user", "content": "안녕?"}

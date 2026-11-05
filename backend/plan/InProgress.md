@@ -47,7 +47,7 @@ Backend가 소유하는 범위는 다음과 같다.
 - 공통: Tool 이름·설명·입력 schema·handler·화면 노출 여부는 `agent/tool_specs.py::tool_specs()` 하나에서 만들고(설명 2,048자 이하),
   공개 오류 문구는 `agent/public_messages.py`, Tool 이벤트 조립은 `agent/tool_events.py`를 두 실행부가 함께 쓴다.
 - `openai`(`agent/openai_runtime.py`): system 에는 `SYSTEM_PROMPT` + Skill 목록, `agent_sdk/CLAUDE.md` 본문은 대화 첫 user 메시지의
-  질문 바로 앞(`with_guide`). Skill 본문은 숨김 Tool `load_skill`. Tool 은 전부 non-strict, `parallel_tool_calls=False`,
+  질문 바로 앞(`with_guide`). Skill 본문은 숨김 Tool `load_skill`. Tool 은 전부 non-strict, `parallel_tool_calls=True`(표시 Tool·후속질문을 한 응답에 묶어 모델 호출을 줄인다),
   `include_usage=True`, 출력 상한은 `max_completion_tokens`. 트레이싱은 import 시점과 실행마다 끈다. `AGENT_MAX_TURNS`(기본 25).
   클라이언트 재시도는 끄고 `RetryWait`가 408·409·429·5xx·네트워크 오류를 1~32초 backoff로 재시도하며 대기 중에는 응답 지연 한도를
   세지 않는다. 오류 코드 `monthly_token_cap`은 재시도하지 않고 `LLM_TOKEN_CAP_MESSAGE`로 바로 끝낸다. 이벤트 대기 초과·최대 호출 수 초과·게이트웨이 오류·모델 응답 오류는 공개 문구로 `error` → `done`(turn_id 없음),

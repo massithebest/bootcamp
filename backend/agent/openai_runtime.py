@@ -221,7 +221,8 @@ def model_settings(retry_wait: RetryWait | None = None) -> ModelSettings:
     # max_completion_tokens 를 써야 하는 것도 같은 이유다(프록시와 같은 상한 설정 사용).
     cap = config.AZURE_OPENAI_MAX_TOKENS
     return ModelSettings(
-        parallel_tool_calls=False,
+        # 표시 Tool·후속질문을 한 응답에 함께 호출해 모델 호출을 줄인다. 호출마다 지침 약 1.4만 토큰을 다시 보낸다.
+        parallel_tool_calls=True,
         include_usage=True,
         retry=(retry_wait or RetryWait()).settings(),
         extra_args={"max_completion_tokens": cap} if cap else None,

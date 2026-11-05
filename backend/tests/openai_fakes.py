@@ -46,6 +46,16 @@ def tool_turn(name: str, args: dict, call_id: str = "call_1", text: str | None =
     return chunks + [_chunk({}, "tool_calls"), _chunk(usage=USAGE)]
 
 
+def tools_turn(*calls: tuple[str, dict, str], text: str | None = None) -> list[dict]:
+    """Tool 여러 개를 한 응답에서 호출한다. `calls`는 (이름, 인자, call_id)다."""
+
+    chunks = [_chunk({"role": "assistant", "content": text or ""})]
+    for index, (name, args, call_id) in enumerate(calls):
+        function = {"name": name, "arguments": json.dumps(args, ensure_ascii=False)}
+        chunks.append(_chunk({"tool_calls": [{"index": index, "id": call_id, "type": "function", "function": function}]}))
+    return chunks + [_chunk({}, "tool_calls"), _chunk(usage=USAGE)]
+
+
 #: 게이트웨이 오류 응답 본문. 내부 정보가 공개 문구·로그에 새지 않는지 확인하는 표지다.
 GATEWAY_ERROR_DETAIL = "upstream secret detail"
 
