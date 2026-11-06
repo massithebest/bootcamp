@@ -18,19 +18,40 @@ cte_sql: |
     ON t.dataset = r.dataset
    AND t.stnfam = r.stnfam
   GROUP BY p.dataset, p.part, p.route
-sources: [part, route_step, tool]
+sources:
+  - part
+  - route_step
+  - tool
 when_to_use:
   - Part별 전체 공정 Step 수를 조회할 때
   - Route가 요구하는 설비 Family가 tool master에 연결되는지 확인할 때
   - SEG_A와 SEG_B의 Route 복잡도를 비교할 때
-output_grain: [dataset, part, route]
+output_grain:
+  - dataset
+  - part
+  - route
 output_columns:
-  - {name: dataset, role: category, desc: 세그먼트 구분}
-  - {name: part, role: category, desc: Part ID}
-  - {name: route, role: category, desc: Route ID}
-  - {name: step_count, role: measure, unit: step, desc: Route의 공정 Step 수}
-  - {name: required_tool_family_count, role: measure, unit: family, desc: Route가 참조하는 고유 STNFAM 수}
-  - {name: matched_tool_family_count, role: measure, unit: family, desc: tool master에 연결된 고유 STNFAM 수}
+  - name: dataset
+    role: category
+    desc: 세그먼트 구분
+  - name: part
+    role: category
+    desc: Part ID
+  - name: route
+    role: category
+    desc: Route ID
+  - name: step_count
+    role: measure
+    unit: step
+    desc: Route의 공정 Step 수
+  - name: required_tool_family_count
+    role: measure
+    unit: family
+    desc: Route가 참조하는 고유 STNFAM 수
+  - name: matched_tool_family_count
+    role: measure
+    unit: family
+    desc: tool master에 연결된 고유 STNFAM 수
 query_rules:
   - 특정 세그먼트 질문은 바깥 SELECT에서 dataset을 필수로 제한한다
   - Route 복잡도 순위는 step_count를 기준으로 정렬하고 동률이면 part를 함께 정렬한다
@@ -57,7 +78,7 @@ sample_queries:
       WHERE required_tool_family_count <> matched_tool_family_count
       ORDER BY dataset, part
 active: true
-status: draft
-owner: ""
-updated: 2026-09-15
+status: verified
+owner: 관리자
+updated: 2026-11-06
 source: scripts/generate_mock_database.py 합성 생성 결과 검증

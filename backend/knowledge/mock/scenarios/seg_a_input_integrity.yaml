@@ -6,19 +6,23 @@ question: SEG_A의 제품별 초기 WIP와 공정 Step 수를 조회하고 입�
 steps:
   - action: recipe
     ref: initial_wip_by_part
-    params: {dataset: SEG_A}
+    params:
+      dataset: SEG_A
     expectation: 2개 Part의 초기 WIP Lot 합계가 2255건이다.
   - action: recipe
     ref: part_route_tool_summary
-    params: {dataset: SEG_A}
+    params:
+      dataset: SEG_A
     expectation: 2개 Part와 926개 Route Step이 조회되고 설비 Family 연결 차이가 없다.
   - action: recipe
     ref: wip_integrity_diagnostics
-    params: {dataset: SEG_A}
+    params:
+      dataset: SEG_A
     expectation: 세 연결 누락 지표가 0이고 dataset 생략 및 Route 조인 위험을 원본 오류와 구분한다.
   - action: simulation
     ref: 입력_정합성_검증
-    params: {dataset: SEG_A}
+    params:
+      dataset: SEG_A
     expectation: 다섯 핵심 관계의 unmatched_rows가 모두 0이다.
 expected:
   table_counts:
@@ -40,7 +44,7 @@ expected:
     orders_to_part: 0
     wip_curstep_to_route_step: 0
 active: true
-status: draft
-owner: ""
-updated: 2026-09-15
+status: verified
+owner: 관리자
+updated: 2026-11-06
 source: scripts/generate_mock_database.py 합성 생성 결과의 고정 인수 기준
