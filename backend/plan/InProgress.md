@@ -153,9 +153,13 @@ Backend가 소유하는 범위는 다음과 같다.
 - `POST /api/knowledge/changes` `{kind, key?, yaml|data}` → 201 상세. `key` 없으면 신규 항목.
   `GET /changes/{id}` 상세는 요약에 `yaml, data, current_yaml, history[]`를 더한다.
   history: `{revision, action, actor_id, actor_name, note, self_approved, at}`,
-  action은 create·save·submit·withdraw·approve·reject.
+  action은 create·save·submit·withdraw·approve·reject·verify.
 - `PUT /changes/{id}` `{expected_revision, yaml|data}`, `POST /changes/{id}/{submit|withdraw|
   approve|reject}` `{expected_revision, note}`. approve·reject는 `knowledge:approve`와 note가 필요하다.
+- `POST /entries/{kind}/{key}/verify` `{note}` → 200 상세. 내용을 바꾸지 않고 `verified`로 기록한다(`knowledge:approve`,
+  이력 action `verify`). 없는 항목 404, 이미 검토 완료·진행 중 요청 409, 빈 근거 422.
+- 텍스트 문서 `POST /documents/{id}/{review|activate|deactivate|archive}`도 `knowledge:approve`가 필요하다. 본문은
+  `{expected_revision, version?, note}`이고 `actor`를 받지 않으며 처리자는 principal 이름으로 기록한다.
 - 오류: 403 권한·작성자 아님·자기 승인, 404, 409 revision 충돌·진행 중 요청 존재·기준 변경·
   상태 불일치·이미 있는 키, 422 검증 실패, 503 저장소·반영 실패(경로 미노출).
 - `GET /api/knowledge/entries`는 scenario를 포함하고 각 행에 `pending_change{id,state}|null`을 더한다.

@@ -197,6 +197,63 @@ def test_approval_writes_yaml_and_applies_to_runtime(client, knowledge):
     assert "wip" in get_store().table_names()
 
 
+def as_draft(knowledge, relative="catalog/tables/wip.yaml"):
+    path = knowledge / relative
+    path.write_text(path.read_text(encoding="utf-8").replace("status: verified", "status: draft"), encoding="utf-8")
+    reset_store()
+
+
+def verify(client, kind="table", key="wip", note="업무 정의 확인", headers=ADMIN):
+    return client.post(f"/api/knowledge/entries/{kind}/{key}/verify", json={"note": note}, headers=headers)
+
+
+def test_verify_marks_reviewed_without_changing_content(client, knowledge):
+    as_draft(knowledge)
+    before = source(client, "table", "wip")["data"]
+    assert before.get("status", "draft") == "draft"
+
+    response = verify(client)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["state"] == "approved" and body["author"]["id"] == "admin"
+    assert [(h["action"], h["note"], h["actor_id"]) for h in body["history"]] == [("verify", "업무 정의 확인", "admin")]
+    written = yaml.safe_load((knowledge / "catalog/tables/wip.yaml").read_text(encoding="utf-8"))
+    assert written["status"] == "verified"
+    after = source(client, "table", "wip")["data"]
+    ignored = {"status", "updated", "owner"}
+    assert {k: v for k, v in after.items() if k not in ignored} == {k: v for k, v in before.items() if k not in ignored}
+    assert get_store().describe_table("wip")["verified"] is True
+
+
+def test_verify_needs_approve_permission_and_a_note(client, knowledge):
+    as_draft(knowledge)
+    assert verify(client, headers=USER).status_code == 403
+    assert verify(client, note="  ").status_code == 422
+    assert yaml.safe_load((knowledge / "catalog/tables/wip.yaml").read_text(encoding="utf-8")).get("status", "draft") == "draft"
+    assert client.get("/api/knowledge/changes").json() == []
+
+
+def test_verify_rejects_verified_missing_unknown_and_pending_entries(client, knowledge):
+    as_draft(knowledge)
+    assert verify(client, key="nope").status_code == 404
+    assert verify(client, kind="document", key="wip").status_code == 404
+    pending = create(client, "table", "wip", lambda d: d.update(description="수정 중"))
+    assert verify(client).status_code == 409
+    assert act(client, pending, "withdraw", USER).status_code == 200
+    assert verify(client).status_code == 200
+    assert verify(client).status_code == 409
+
+
+def test_verify_works_for_a_glossary_term(client, knowledge):
+    as_draft(knowledge, "glossary.yaml")
+    term = yaml.safe_load((knowledge / "glossary.yaml").read_text(encoding="utf-8"))[0]["term"]
+
+    assert verify(client, kind="glossary", key=term).status_code == 200
+    written = yaml.safe_load((knowledge / "glossary.yaml").read_text(encoding="utf-8"))
+    assert written[0]["status"] == "verified"
+
+
 def test_author_cannot_smuggle_verified_status(client):
     yaml_text = dedent("""
         table: orders

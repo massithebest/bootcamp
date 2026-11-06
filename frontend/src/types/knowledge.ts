@@ -37,15 +37,15 @@ export type ChangeAction = "submit" | "withdraw" | "approve" | "reject";
 export const CHANGE_STATE_LABELS: Record<ChangeState, string> = {
   draft: "초안", submitted: "검토 대기", approved: "승인됨", rejected: "반려됨", withdrawn: "철회됨",
 };
-export const CHANGE_ACTION_LABELS: Record<ChangeAction | "create" | "save", string> = {
-  create: "요청 생성", save: "초안 저장", submit: "검토 요청", withdraw: "요청 철회", approve: "승인", reject: "반려",
+export const CHANGE_ACTION_LABELS: Record<ChangeAction | "create" | "save" | "verify", string> = {
+  create: "요청 생성", save: "초안 저장", submit: "검토 요청", withdraw: "요청 철회", approve: "승인", reject: "반려", verify: "검토 완료",
 };
 export interface ChangeSummary {
   id: string; kind: StructuredKind; key: string; is_new: boolean; state: ChangeState; revision: number;
   author: { id: string; name: string }; created_at: string; updated_at: string;
 }
 export interface ChangeHistoryItem {
-  revision: number; action: ChangeAction | "create" | "save"; actor_id: string; actor_name: string;
+  revision: number; action: ChangeAction | "create" | "save" | "verify"; actor_id: string; actor_name: string;
   note: string; self_approved: boolean; at: string;
 }
 export interface ChangeDetail extends ChangeSummary {

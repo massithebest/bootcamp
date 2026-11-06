@@ -64,8 +64,8 @@ export async function saveDocument(fields: DocumentFields, key?: string, revisio
   window.dispatchEvent(new Event("knowledge-changed"));
   return result;
 }
-export async function changeDocument(key: string, action: "review" | "activate" | "deactivate" | "archive", revision: number, actor: string, version?: number, note = "") {
-  const result = await request(`/documents/${id(key)}/${action}`, isKnowledgeDocument, undefined, "POST", { expected_revision: revision, actor, version, note });
+export async function changeDocument(key: string, action: "review" | "activate" | "deactivate" | "archive", revision: number, version?: number, note = "") {
+  const result = await request(`/documents/${id(key)}/${action}`, isKnowledgeDocument, undefined, "POST", { expected_revision: revision, version, note });
   window.dispatchEvent(new Event("knowledge-changed"));
   return result;
 }
@@ -85,4 +85,5 @@ export const fetchChanges = (filter: { state?: ChangeState; mine?: boolean } = {
 export const fetchChange = (changeId: string, signal?: AbortSignal) => request(`/changes/${id(changeId)}`, changeDetail, signal);
 export const createChange = async (kind: StructuredKind, content: ChangeContent, key?: string) => notify(await request("/changes", changeDetail, undefined, "POST", { kind, ...(key ? { key } : {}), ...content }));
 export const updateChange = async (changeId: string, revision: number, content: ChangeContent) => notify(await request(`/changes/${id(changeId)}`, changeDetail, undefined, "PUT", { expected_revision: revision, ...content }));
+export const verifyKnowledgeEntry = async (kind: StructuredKind, key: string, note: string) => notify(await request(`/entries/${kind}/${id(key)}/verify`, changeDetail, undefined, "POST", { note }));
 export const actOnChange = async (changeId: string, action: ChangeAction, revision: number, note = "") => notify(await request(`/changes/${id(changeId)}/${action}`, changeDetail, undefined, "POST", { expected_revision: revision, note }));

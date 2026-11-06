@@ -1,15 +1,15 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { fetchChanges, fetchKnowledgeEntries, fetchKnowledgeEntry, fetchMe } from "@/lib/knowledge-api";
+import { fetchChanges, fetchKnowledgeEntries, fetchKnowledgeEntry, fetchMe, verifyKnowledgeEntry } from "@/lib/knowledge-api";
 import { formatTime } from "@/lib/format-time";
 import { useKnowledgeResource } from "@/hooks/use-knowledge-resource";
-import { KNOWLEDGE_LABELS, PERMISSION_WRITE, STATUS_LABELS, STRUCTURED_KINDS, type ChangeSummary, type KnowledgeEntry, type KnowledgeTarget, type StructuredKind } from "@/types/knowledge";
+import { KNOWLEDGE_LABELS, PERMISSION_APPROVE, PERMISSION_WRITE, STATUS_LABELS, STRUCTURED_KINDS, type ChangeSummary, type KnowledgeEntry, type KnowledgeTarget, type StructuredKind } from "@/types/knowledge";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buttonClass, controlClass, EntryStatus, ResourceState } from "./shared";
 import { StructuredDetail } from "./structured-detail";
 import { ChangeStateBadge } from "./editor/change-badge";
-import { EntryEditor, type EditorTarget, type EntryEditorHandle } from "./editor/entry-editor";
+import { EntryEditor, primaryButton, type EditorTarget, type EntryEditorHandle } from "./editor/entry-editor";
 import { UserSwitcher } from "./editor/user-switcher";
 import { DOCUMENT_ACTION_LABELS, useDocumentEditor, type DocumentForm } from "./use-document-editor";
 
@@ -28,7 +28,7 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
   const documentEditor = useDocumentEditor({ selection, reload, setSelection });
   const {
     doc, form, setForm, formRef, loading: documentLoading, error: documentError,
-    notice, setNotice, busy, actor, setActor, note, setNote,
+    notice, setNotice, busy, note, setNote,
     dirty: documentDirty, historical, editable, save, act, discard,
   } = documentEditor;
   const [entry, setEntry] = useState<KnowledgeEntry>();
@@ -47,6 +47,27 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
   const [session, setSession] = useState(0);
   const editorRef = useRef<EntryEditorHandle>(null);
   const canWrite = !!me.data?.knowledge_management && me.data.permissions.includes(PERMISSION_WRITE);
+  const canApprove = !!me.data?.knowledge_management && me.data.permissions.includes(PERMISSION_APPROVE);
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  const [verifyNote, setVerifyNote] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string>();
+  async function verifyEntry() {
+    if (!entry || entry.type === "document") return;
+    setVerifying(true);
+    setVerifyError(undefined);
+    try {
+      await verifyKnowledgeEntry(entry.type as StructuredKind, entry.id, verifyNote);
+      setVerifyOpen(false);
+      setVerifyNote("");
+      setNotice("검토 완료로 기록했습니다. 내용은 바뀌지 않았습니다.");
+      setReload(v => v + 1);
+    } catch (reason) {
+      setVerifyError(reason instanceof Error ? reason.message : "검토 완료로 기록하지 못했습니다.");
+    } finally {
+      setVerifying(false);
+    }
+  }
   const titleRef = useRef<HTMLHeadingElement>(null);
   const dirty = documentDirty || (edit !== null && editorDirty);
   const loading = documentLoading || entryLoading;
@@ -89,7 +110,7 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
   const changeRow = (c: ChangeSummary) => <li key={c.id}><button type="button" aria-current={edit?.type === "change" && edit.id === c.id ? "true" : undefined} className={`w-full space-y-1.5 border-l-2 px-3 py-3 text-left transition-colors hover:bg-surface-2 ${edit?.type === "change" && edit.id === c.id ? "border-accent bg-accent-weak" : "border-transparent"}`} onClick={() => openEditor({ type: "change", id: c.id }, null)}><span className="flex items-start justify-between gap-2"><span className="text-2xs font-medium text-ink-2">{KNOWLEDGE_LABELS[c.kind]}{c.is_new ? " · 새 지식" : ""}</span><ChangeStateBadge state={c.state} /></span><span className="block break-words text-ui font-semibold text-ink">{c.key}</span><span className="block text-2xs text-ink-2">작성 {c.author.name} · <span className="tabular-nums">{formatTime(c.updated_at)}</span></span></button></li>;
   const field = (name: keyof DocumentForm, label: string, max: number, multiline = false) => <label className="block space-y-1 text-ui" key={name}><span className="text-ink-2">{label}{name !== "tagsText" && " *"}</span>{multiline ? <textarea name={name} className={`${controlClass} min-h-64 resize-y`} required readOnly={!editable} maxLength={max} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })} /> : <input name={name} className={controlClass} required={name !== "tagsText"} readOnly={!editable} maxLength={max} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })} />}</label>;
   return <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-    <div className="shrink-0 border-b border-line px-5 py-3"><div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2"><div className="min-w-0"><p className="text-ui text-ink-2">공용 지식 · 활성화와 승인은 모든 대화의 이후 검색에 적용됩니다.</p><p className="mt-1 text-2xs text-ink-3">구조화 지식은 수정 요청을 만들고 승인 권한자가 승인하면 반영됩니다. 텍스트 지식의 작성자와 검토자 이름은 기록용입니다.</p></div>{me.data && <UserSwitcher me={me.data} />}</div></div>
+    <div className="shrink-0 border-b border-line px-5 py-3"><div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2"><div className="min-w-0"><p className="text-ui text-ink-2">공용 지식 · 활성화와 승인은 모든 대화의 이후 검색에 적용됩니다.</p><p className="mt-1 text-2xs text-ink-3">구조화 지식은 수정 요청을 만들고 승인 권한자가 승인하면 반영됩니다. 미검토 지식의 검토 완료와 텍스트 지식의 적용은 승인 권한자가 합니다.</p></div>{me.data && <UserSwitcher me={me.data} />}</div></div>
     <div className="flex min-h-0 flex-1 overflow-hidden">
       <section aria-label="지식 목록" className={`${hasPane ? "hidden lg:flex" : "flex"} thin-scroll w-full shrink-0 flex-col gap-3 overflow-y-auto border-r border-line p-4 lg:w-72`}>
         <DropdownMenu><DropdownMenuTrigger disabled={busy} render={<button type="button" className={buttonClass} />}>+ 새 지식 추가</DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={() => navigate("new")}>텍스트 지식 등록</DropdownMenuItem>{canWrite && <><DropdownMenuSeparator /><DropdownMenuGroup><DropdownMenuLabel>구조화 지식</DropdownMenuLabel>{STRUCTURED_KINDS.map(k => <DropdownMenuItem key={k} onClick={() => startNew(k)}>{KNOWLEDGE_LABELS[k]} 추가</DropdownMenuItem>)}</DropdownMenuGroup></>}</DropdownMenuContent></DropdownMenu>
@@ -120,7 +141,7 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
           {selection && <h2 ref={titleRef} tabIndex={-1} className="text-ui-lg font-semibold outline-none">{selection === "new" ? "텍스트 지식 등록" : entry?.title ?? selectedVersion?.title ?? "지식 상세"}</h2>}
           <ResourceState loading={loading} error={error} retry={() => requestLeave(() => setReload(v => v + 1))} />
           {notice && <p role="status" className="border-l-2 border-ok-ink bg-ok-weak p-3 text-ui">{notice}</p>}
-          {entry && <><div className="flex flex-wrap items-center justify-between gap-3"><EntryStatus entry={entry} />{entry.pending_change ? <span className="flex flex-wrap items-center gap-3 text-ui text-ink-2">진행 중인 변경 요청 <ChangeStateBadge state={entry.pending_change.state} /><button type="button" className={buttonClass} onClick={() => openEditor({ type: "change", id: entry.pending_change!.id }, selection === "new" ? null : selection)}>요청 열기</button></span> : canWrite && entry.type !== "document" ? <button type="button" className={buttonClass} onClick={() => openEditor({ type: "entry", kind: entry.type as StructuredKind, key: entry.id }, selection === "new" ? null : selection)}>수정 요청</button> : <span className="text-2xs text-ink-3">{me.data ? "작성 권한이 없어 볼 수만 있습니다." : ""}</span>}</div><p className="text-ui text-ink-2">구조화 지식 · 담당: {entry.owner || "미기록"} · 출처: {entry.source || "미기록"}</p><StructuredDetail data={entry.detail ?? {}} /></>}
+          {entry && <><div className="flex flex-wrap items-center justify-between gap-3"><EntryStatus entry={entry} /><span className="flex flex-wrap items-center gap-3">{canApprove && entry.type !== "document" && entry.status === "draft" && !entry.pending_change && <button type="button" className={primaryButton} onClick={() => { setVerifyNote(""); setVerifyError(undefined); setVerifyOpen(true); }}>검토 완료</button>}{entry.pending_change ? <span className="flex flex-wrap items-center gap-3 text-ui text-ink-2">진행 중인 변경 요청 <ChangeStateBadge state={entry.pending_change.state} /><button type="button" className={buttonClass} onClick={() => openEditor({ type: "change", id: entry.pending_change!.id }, selection === "new" ? null : selection)}>요청 열기</button></span> : canWrite && entry.type !== "document" ? <button type="button" className={buttonClass} onClick={() => openEditor({ type: "entry", kind: entry.type as StructuredKind, key: entry.id }, selection === "new" ? null : selection)}>수정 요청</button> : <span className="text-2xs text-ink-3">{me.data ? "작성 권한이 없어 볼 수만 있습니다." : ""}</span>}</span></div><p className="text-ui text-ink-2">구조화 지식 · 담당: {entry.owner || "미기록"} · 출처: {entry.source || "미기록"}</p><StructuredDetail data={entry.detail ?? {}} /></>}
           {(selection === "new" || doc) && !loading && <>
             {doc && selectedVersion && <><div className="flex flex-wrap items-center gap-3"><EntryStatus entry={{ status: selectedVersion.status, active: doc.active_version !== null, archived: doc.archived }} /><span className="text-2xs text-ink-2">표시 v{selectedVersion.version} · 검색 버전 {doc.active_version ? `v${doc.active_version}` : "없음"}</span>{historical && <button className={buttonClass} onClick={() => navigate({ kind: "document", id: doc.id })}>최신 버전 열기</button>}</div>{historical && <p className="text-ui text-ink-2">인용한 버전의 보존된 내용입니다. 최신 내용 및 현재 검색 상태와 다를 수 있습니다.</p>}</>}
             <form ref={formRef} onSubmit={e => { e.preventDefault(); void save(); }} className="space-y-4">
@@ -134,7 +155,8 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
             </form>
             {doc && selectedVersion && <>
               {doc.active_version !== null && doc.active_version !== selectedVersion.version && <details className="border-t border-line pt-4" open><summary className="cursor-pointer text-ui font-semibold">현재 사용본과 수정본 비교</summary><div className="mt-3 grid gap-3 xl:grid-cols-2">{[doc.versions.find(v => v.version === doc.active_version), selectedVersion].map((v, index) => v && <div key={index} className="min-w-0 rounded border border-line p-3"><p className="text-ui font-semibold">{index === 0 ? "현재 사용" : "수정"} v{v.version} · {v.title}</p><p className="text-2xs text-ink-3">{v.category} · {v.tags.join(", ")} · {v.owner} · {v.source}</p><pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words font-sans text-ui">{v.content}</pre></div>)}</div></details>}
-              {!historical && !doc.archived && <section className="space-y-3 border-t border-line pt-4" aria-label="검토 및 적용"><h3 className="text-ui font-semibold">검토 및 적용</h3><p className="text-2xs text-ink-2">기술 테스트 통과만으로 검토 완료하지 않습니다. 담당자가 업무 정의와 출처를 확인하세요.</p><label className="block text-ui">작업자 / 검토자<input className={`${controlClass} mt-1`} value={actor} maxLength={100} onChange={e => setActor(e.target.value)} /></label><label className="block text-ui">검토 근거<textarea className={`${controlClass} mt-1`} value={note} maxLength={2000} onChange={e => setNote(e.target.value)} /></label><div className="flex flex-wrap gap-2"><button className={buttonClass} disabled={busy || dirty || !actor.trim() || !note.trim() || selectedVersion.status !== "draft"} onClick={() => void act("review")}>검토 완료</button><button className={buttonClass} disabled={busy || dirty || !actor.trim() || selectedVersion.status !== "verified" || doc.active_version === selectedVersion.version} onClick={() => void act("activate")}>이 버전 활성화</button><button className={buttonClass} disabled={busy || dirty || !actor.trim() || doc.active_version === null} onClick={() => void act("deactivate")}>비활성화</button><button className={buttonClass} disabled={busy || dirty || !actor.trim()} onClick={() => { if (window.confirm("보관하면 이후 검색에서 제외되고 편집할 수 없습니다. 보관할까요?")) void act("archive"); }}>보관</button></div></section>}
+              {!historical && !doc.archived && !canApprove && <p className="border-t border-line pt-4 text-2xs text-ink-2">검토와 적용은 승인 권한자만 할 수 있습니다.</p>}
+              {!historical && !doc.archived && canApprove && <section className="space-y-3 border-t border-line pt-4" aria-label="검토 및 적용"><h3 className="text-ui font-semibold">검토 및 적용</h3><p className="text-2xs text-ink-2">기술 테스트 통과만으로 검토 완료하지 않습니다. 담당자가 업무 정의와 출처를 확인하세요.</p><label className="block text-ui">검토 근거<textarea className={`${controlClass} mt-1`} value={note} maxLength={2000} onChange={e => setNote(e.target.value)} /></label><div className="flex flex-wrap gap-2"><button className={buttonClass} disabled={busy || dirty || !note.trim() || selectedVersion.status !== "draft"} onClick={() => void act("review")}>검토 완료</button><button className={buttonClass} disabled={busy || dirty || selectedVersion.status !== "verified" || doc.active_version === selectedVersion.version} onClick={() => void act("activate")}>이 버전 활성화</button><button className={buttonClass} disabled={busy || dirty || doc.active_version === null} onClick={() => void act("deactivate")}>비활성화</button><button className={buttonClass} disabled={busy || dirty} onClick={() => { if (window.confirm("보관하면 이후 검색에서 제외되고 편집할 수 없습니다. 보관할까요?")) void act("archive"); }}>보관</button></div></section>}
               {selectedVersion.status === "verified" && <p className="text-2xs text-ink-2">검토: {selectedVersion.reviewer} · {selectedVersion.reviewed_at}<br />근거: {selectedVersion.review_note}</p>}
               <details className="border-t border-line pt-4"><summary className="cursor-pointer text-ui font-semibold">버전 및 변경 이력 ({doc.versions.length}개 버전)</summary><div className="my-3 flex flex-wrap gap-2">{doc.versions.map(v => <button key={v.version} className={buttonClass} onClick={() => navigate({ kind: "document", id: doc.id, version: v.version })}>v{v.version} · {STATUS_LABELS[v.status]}</button>)}</div><ul className="space-y-2">{doc.history.map(h => <li key={h.revision} className="text-2xs text-ink-2">{h.at} · {DOCUMENT_ACTION_LABELS[h.action] ?? h.action} {h.version && `v${h.version}`} · {h.actor}<p>{h.note}</p></li>)}</ul></details>
             </>}
@@ -144,6 +166,19 @@ export const KnowledgeManager = forwardRef<KnowledgeManagerHandle>(function Know
         </div>
       </section>
     </div>
+    <Dialog open={verifyOpen} onOpenChange={open => { if (!open && !verifying) setVerifyOpen(false); }}>
+      <DialogContent showCloseButton={!verifying}>
+        <DialogTitle>이 지식을 검토 완료로 기록할까요?</DialogTitle>
+        <DialogDescription>내용은 바꾸지 않고 검토 상태만 바꿉니다. 실제 테이블·업무 정의·단위를 확인했을 때만 기록하세요. 테스트 통과는 근거가 아닙니다.</DialogDescription>
+        <label className="block space-y-1 text-ui"><span className="text-ink-2">검토 근거<span className="ml-1.5 text-2xs text-ink-3">필수</span></span>
+          <textarea className={controlClass} rows={4} maxLength={2000} value={verifyNote} onChange={e => setVerifyNote(e.target.value)} placeholder="확인한 자료나 검토 내용을 적습니다." /></label>
+        {verifyError && <p role="alert" className="text-ui text-block-ink">{verifyError}</p>}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={primaryButton} disabled={verifying || !verifyNote.trim()} onClick={() => void verifyEntry()}>검토 완료로 기록</button>
+          <button type="button" className={buttonClass} disabled={verifying} onClick={() => setVerifyOpen(false)}>취소</button>
+        </div>
+      </DialogContent>
+    </Dialog>
     <Dialog open={pending !== null} onOpenChange={open => { if (!open && !busy) setPending(null); }}><DialogContent showCloseButton={!busy}><DialogTitle>저장하지 않은 변경</DialogTitle><DialogDescription>이동하기 전에 초안을 저장하거나 변경을 취소하세요.</DialogDescription><div className="flex flex-wrap gap-2"><button className={buttonClass} disabled={busy} onClick={async () => { const next = pending; if (await (edit ? editorRef.current?.save() : save())) { setPending(null); next?.(); } }}>저장 후 이동</button><button className={buttonClass} disabled={busy} onClick={() => { const next = pending; discard(); setEditorDirty(false); setPending(null); next?.(); }}>변경 취소 후 이동</button><button className={buttonClass} disabled={busy} onClick={() => setPending(null)}>계속 편집</button></div></DialogContent></Dialog>
   </div>;
 });

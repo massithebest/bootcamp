@@ -543,7 +543,10 @@ table·KPI·recipe·simulation·glossary·scenario YAML은 관리 화면에서 �
 - 승인·반려는 근거 메모가 필수다. 작성자 본인 승인은 기본 차단이며
   `KNOWLEDGE_ALLOW_SELF_APPROVAL=true`일 때만 허용하고 이력에 `self_approved`를 남긴다.
 - 승인은 `status: verified`, `updated: 오늘`을 기록하고 비어 있는 `owner`는 작성자로
-  채운다. 작성자가 낸 `status`·`updated`는 무시된다(`verified`는 승인만 만든다).
+  채운다. 작성자가 낸 `status`·`updated`는 무시된다(`verified`는 승인이나 아래 검토 완료만 만든다).
+- 내용을 바꾸지 않고 검토만 끝내면 승인 권한자가 상세 화면의 "검토 완료"로 기록한다(근거 메모 필수).
+  진행 중인 요청이 있거나 이미 `verified`면 막는다. 이력은 승인된 요청 하나(`verify`)로 남고 파일은 승인과
+  같이 정규화된다. 테스트 통과는 근거가 아니다.
 - 기준 YAML이 요청 생성 이후 바뀌었으면(내용 해시 불일치) 제출·승인을 409로 막는다.
   최신 내용으로 다시 작성한다.
 - 비활성화는 삭제가 아니라 `active: false` 변경 요청이다. 삭제 기능은 없다.

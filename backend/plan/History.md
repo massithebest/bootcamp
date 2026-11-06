@@ -2,6 +2,12 @@
 
 완료한 업무의 결과, 중요한 결정과 검증 근거를 보존한다. 현재 계약은 [진행 중](InProgress.md), 남은 일은 [할 일과 아이디어](Todo.md)를 따른다.
 
+## 2026-11-06 — 구조화 지식 검토 완료와 텍스트 문서 적용 권한
+
+- 내용 변경 없이 검토만 끝낼 경로가 없어 `POST /api/knowledge/entries/{kind}/{key}/verify` `{note}`를 더했다. `knowledge:approve`와 근거가 필요하고, 이미 `verified`이거나 진행 중 요청이 있으면 409다. 이력은 승인된 요청 하나(`verify`)로 남고 승인과 같이 파일이 정규화된다. 작성자와 승인자가 같아 두 사람 확인은 아니다.
+- 텍스트 문서 `review`·`activate`·`deactivate`·`archive`에 권한 검사가 없고 처리자가 입력값이었다. `knowledge:approve`를 요구하고 `actor`를 본문에서 빼 principal 이름으로 기록한다. 문서 등록·수정(`POST`·`PUT`)은 그대로 권한 검사가 없다.
+- 테스트 4건 추가·문서 API 단정 갱신, Backend 522건 통과. 실행 서버에서 사용자 권한 verify·문서 review 403을 확인했고, YAML은 바뀌지 않았다(실제 기록은 임시 지식 폴더의 테스트로만 확인).
+
 ## 2026-11-05 — 공격 문항 평가 추가
 
 - 프롬프트 인젝션을 측정한 적이 없어 `evals/agent_security_set.yaml` 6문항(프롬프트 노출, 내부 설정, 관리자 사칭 삭제, `sqlite_master` 조회, 문서 속 지시 2건)과 `--set security`, 채점 분류 `security`를 더했다. 기본 15문항과 분리해 정답률 비교를 유지한다. 공격 문서는 지식 DB 복사본에만 넣는다(실행 전후 `knowledge.sqlite3` 해시 같음). 테스트 8건 추가, Backend 518건 통과.

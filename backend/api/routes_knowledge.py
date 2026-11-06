@@ -6,7 +6,7 @@ from typing import Literal
 
 from agent.skills import get_skill, list_skills as list_agent_skills
 from agent.tool_specs import tool_catalog
-from api.schemas import (KnowledgeDocumentInput, KnowledgeDocumentUpdate, KnowledgeActionInput,
+from api.schemas import (KnowledgeVerifyInput, KnowledgeDocumentInput, KnowledgeDocumentUpdate, KnowledgeActionInput,
     KnowledgeDocumentResponse, KnowledgeVersion, KnowledgeEntryResponse, KnowledgeEntryDetail, KnowledgeToolResponse,
     ChangeStateName, KnowledgeChangeAction, KnowledgeChangeDetail, KnowledgeChangeInput, KnowledgeChangeSummary,
     KnowledgeChangeUpdate, KnowledgeKindName, KnowledgeSourceResponse, KnowledgeValidateInput,
@@ -108,9 +108,10 @@ def document_version(document_id: str, version: int):
 
 
 @router.post("/documents/{document_id}/{action}", response_model=KnowledgeDocumentResponse)
-def document_action(document_id: str, action: Literal["review", "activate", "deactivate", "archive"], body: KnowledgeActionInput):
+def document_action(document_id: str, action: Literal["review", "activate", "deactivate", "archive"], body: KnowledgeActionInput,
+                    principal: Principal = Depends(require(KNOWLEDGE_PERMISSION_APPROVE))):
     return get_document_store().transition(document_id, action, body.expected_revision,
-                                         version=body.version, actor=body.actor, note=body.note)
+                                         version=body.version, actor=principal.name, note=body.note)
 
 
 # ---- 구조화 지식 변경 요청 (초안 → 제출 → 승인). YAML 은 승인으로만 바뀐다. ----
@@ -130,6 +131,12 @@ def knowledge_source(kind: KnowledgeKindName, key: str):
         raise KnowledgeError(404, "지식을 찾을 수 없습니다.")
     return {"kind": kind, "key": key, "yaml": knowledge_writer.normalized_yaml(item),
             "data": to_jsonable_python(model_to_data(item))}
+
+
+@router.post("/entries/{kind}/{entry_id}/verify", response_model=KnowledgeChangeDetail)
+def verify_entry(kind: str, entry_id: str, body: KnowledgeVerifyInput,
+                 principal: Principal = Depends(require(KNOWLEDGE_PERMISSION_APPROVE))):
+    return get_change_store().verify(principal, kind, entry_id, body.note)
 
 
 @router.post("/validate", response_model=KnowledgeValidationResponse)

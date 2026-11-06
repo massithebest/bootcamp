@@ -293,6 +293,43 @@ class ChangeStore:
                 logger.info("지식 변경 승인 반영: kind=%s self_approved=%s", row["kind"], self_approved)
         return self.get(change_id)
 
+    @logged_service_operation
+    def verify(self, principal: Principal, kind: str, key: str, note: str) -> dict:
+        """내용을 바꾸지 않고 현재 항목을 검토 완료로 기록한다. 이력은 승인된 변경 요청 하나로 남는다."""
+
+        if kind not in KIND_SPECS:
+            raise KnowledgeError(404, "알 수 없는 지식 종류입니다.")
+        note = note.strip()
+        if not note:
+            raise KnowledgeError(422, "검토 근거를 입력하세요.")
+        with self.connection(write=True) as conn:
+            current = writer.find_item(writer.load_disk_store(), kind, key)
+            if current is None:
+                raise KnowledgeError(404, "지식을 찾을 수 없습니다.")
+            if current.status == "verified":
+                raise KnowledgeError(409, "이미 검토 완료된 지식입니다.")
+            marks = ",".join("?" for _ in OPEN_STATES)
+            if conn.execute(
+                f"SELECT 1 FROM change_requests WHERE kind=? AND key=? AND state IN ({marks})",
+                (kind, key, *OPEN_STATES),
+            ).fetchone():
+                raise KnowledgeError(409, "이 지식에 진행 중인 변경 요청이 있습니다. 먼저 처리하세요.")
+            change_id, now = uuid4().hex, _now()
+            row = {
+                "kind": kind, "key": key, "is_new": False, "base_hash": writer.content_hash(current),
+                "payload": writer.normalized_yaml(current), "author_name": principal.name,
+            }
+            conn.execute(
+                "INSERT INTO change_requests VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (change_id, kind, key, 0, "approved", 1, row["base_hash"], row["payload"],
+                 principal.id, principal.name, now, now),
+            )
+            self._add_history(conn, change_id, 1, "verify", principal, note)
+            # 파일 반영이 실패하면 예외로 이 트랜잭션이 롤백되어 요청이 남지 않는다.
+            self._apply(row)
+            logger.info("지식 검토 완료 반영: kind=%s", kind)
+        return self.get(change_id)
+
     @staticmethod
     def _check_base(row: dict) -> None:
         base = writer.load_disk_store()

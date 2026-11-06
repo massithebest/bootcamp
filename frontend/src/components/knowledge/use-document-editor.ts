@@ -47,7 +47,6 @@ export function useDocumentEditor({ selection, reload, setSelection }: Options) 
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [actor, setActor] = useState("");
   const [note, setNote] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -57,7 +56,6 @@ export function useDocumentEditor({ selection, reload, setSelection }: Options) 
     setDoc(undefined);
     setForm(EMPTY_FORM);
     setBaseline(EMPTY_FORM);
-    setActor("");
     setNote("");
     if (!selection || selection === "new" || selection.kind !== "document") {
       setLoading(false);
@@ -130,8 +128,8 @@ export function useDocumentEditor({ selection, reload, setSelection }: Options) 
   }
 
   async function act(action: "review" | "activate" | "deactivate" | "archive") {
-    if (!doc || !selectedVersion || !actor.trim() || (action === "review" && !note.trim())) {
-      setError("기록할 작업자와 검토 시 검토 근거를 입력하세요.");
+    if (!doc || !selectedVersion || (action === "review" && !note.trim())) {
+      setError("검토 근거를 입력하세요.");
       return;
     }
     setBusy(true);
@@ -141,7 +139,6 @@ export function useDocumentEditor({ selection, reload, setSelection }: Options) 
         doc.id,
         action,
         doc.revision,
-        actor,
         selectedVersion.version,
         note,
       );
@@ -169,8 +166,6 @@ export function useDocumentEditor({ selection, reload, setSelection }: Options) 
     notice,
     setNotice,
     busy,
-    actor,
-    setActor,
     note,
     setNote,
     dirty,

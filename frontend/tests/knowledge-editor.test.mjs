@@ -96,6 +96,8 @@ test('status, validation and history render text alongside color', () => {
   const failing = renderToStaticMarkup(createElement(ValidationSummary, { errors: [{ path: 'columns[0].name', line: null, message: '필수입니다' }, { path: '', line: 3, message: 'YAML 문법 오류' }], ok: false, checking: false }));
   assert.match(failing, /확인이 필요한 항목 2개/); assert.match(failing, /3행/);
   assert.match(renderToStaticMarkup(createElement(ValidationSummary, { errors: [], ok: false, checking: true })), /검증 중/);
+  const verified = renderToStaticMarkup(createElement(ChangeHistory, { items: [{ revision: 1, action: 'verify', actor_id: 'a', actor_name: '관리자', note: '정의 확인', self_approved: false, at: '2026-01-01T00:00:00Z' }] }));
+  assert.match(verified, /검토 완료/);
   const history = renderToStaticMarkup(createElement(ChangeHistory, { items: [{ revision: 3, action: 'approve', actor_id: 'a', actor_name: '관리자', note: '근거 확인', self_approved: true, at: '2026-09-21T12:50:15.242501+00:00' }] }));
   assert.match(history, /승인/); assert.match(history, /작성자 본인 승인/); assert.match(history, /근거 확인/);
   assert.doesNotMatch(history, /242501|\+00:00/, 'timestamps are formatted, not raw ISO');

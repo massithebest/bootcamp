@@ -86,8 +86,12 @@ def test_management_api_validation_history_and_safe_errors(store, monkeypatch):
     assert client.post("/api/knowledge/documents", json={**FIELDS, "title": " "}).status_code == 422
     doc = client.post("/api/knowledge/documents", json=FIELDS).json()
     url = f"/api/knowledge/documents/{doc['id']}"
-    assert client.post(url + "/review", json={"expected_revision": 1, "version": 1, "actor": "x", "note": ""}).status_code == 422
-    doc = client.post(url + "/review", json={"expected_revision": 1, "version": 1, "actor": "x", "note": "確認"}).json()
+    admin = {"X-User-Id": "admin"}
+    assert client.post(url + "/review", json={"expected_revision": 1, "version": 1, "note": "確認"}).status_code == 403
+    assert client.post(url + "/review", json={"expected_revision": 1, "version": 1, "actor": "x", "note": "確認"}, headers=admin).status_code == 422
+    assert client.post(url + "/review", json={"expected_revision": 1, "version": 1, "note": ""}, headers=admin).status_code == 422
+    doc = client.post(url + "/review", json={"expected_revision": 1, "version": 1, "note": "確認"}, headers=admin).json()
+    assert doc["versions"][0]["reviewer"] == config.KNOWLEDGE_PRINCIPALS["admin"]["name"]
     assert client.put(url, json={**FIELDS, "expected_revision": 1}).status_code == 409
     assert client.get(url + "/versions/1").json()["content"] == FIELDS["content"]
     assert client.get(url + "/versions/99").status_code == 404

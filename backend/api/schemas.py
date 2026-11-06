@@ -125,7 +125,6 @@ class KnowledgeActionInput(BaseModel):
     model_config = {"extra": "forbid", "str_strip_whitespace": True}
     expected_revision: int = Field(ge=1)
     version: int | None = Field(default=None, ge=1)
-    actor: str = Field(min_length=1, max_length=100)
     note: str = Field(default="", max_length=2000)
 
 
@@ -221,6 +220,12 @@ class KnowledgeChangeUpdate(_ContentInput):
     expected_revision: int = Field(ge=1)
 
 
+class KnowledgeVerifyInput(BaseModel):
+    model_config = {"extra": "forbid", "str_strip_whitespace": True}
+
+    note: str = Field(min_length=1, max_length=2000)
+
+
 class KnowledgeChangeAction(BaseModel):
     model_config = {"extra": "forbid", "str_strip_whitespace": True}
 
@@ -263,7 +268,7 @@ class KnowledgeChangeSummary(BaseModel):
 
 class KnowledgeChangeHistory(BaseModel):
     revision: int
-    action: Literal["create", "save", "submit", "withdraw", "approve", "reject"]
+    action: Literal["create", "save", "submit", "withdraw", "approve", "reject", "verify"]
     actor_id: str
     actor_name: str
     note: str
