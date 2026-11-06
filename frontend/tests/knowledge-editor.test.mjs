@@ -4,7 +4,7 @@ import { createServer } from 'vite';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-let server, api, lineDiff, formatTime, blank, FieldEditor, DiffView, ChangeStateBadge, ChangeHistory, ValidationSummary, UserSwitcher;
+let server, api, queue, lineDiff, formatTime, blank, FieldEditor, DiffView, ChangeStateBadge, ChangeHistory, ValidationSummary, UserSwitcher;
 const originalFetch = globalThis.fetch;
 const storage = new Map();
 before(async () => {
@@ -13,6 +13,7 @@ before(async () => {
   server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom' });
   api = await server.ssrLoadModule('/src/lib/knowledge-api.ts');
   lineDiff = await server.ssrLoadModule('/src/lib/line-diff.ts');
+  queue = await server.ssrLoadModule('/src/lib/knowledge-queue.ts');
   ({ formatTime } = await server.ssrLoadModule('/src/lib/format-time.ts'));
   blank = await server.ssrLoadModule('/src/components/knowledge/editor/blank-value.ts');
   ({ FieldEditor } = await server.ssrLoadModule('/src/components/knowledge/editor/field-editor.tsx'));
@@ -148,4 +149,14 @@ test('validation, guide and me responses are checked before use', async () => {
   globalThis.fetch = async url => { requested = String(url); return Response.json([]); };
   await api.fetchChanges({ state: 'submitted', mine: true });
   assert.match(requested, /\/changes\?state=submitted&mine=true$/);
+});
+
+test('review queue lists unreviewed entries once and skips archived ones', () => {
+  const entry = (id, fields) => ({ id, status: 'draft', archived: false, pending_change: null, ...fields });
+  const ids = queue.unreviewedEntries([
+    entry('draft'), entry('text-draft', { type: 'document' }), entry('editing', { pending_change: { id: 'c', state: 'draft' } }),
+    entry('verified', { status: 'verified' }), entry('archived', { archived: true }),
+    entry('submitted', { pending_change: { id: 'c', state: 'submitted' } }),
+  ]).map(e => e.id);
+  assert.deepEqual(ids, ['draft', 'text-draft', 'editing']);
 });

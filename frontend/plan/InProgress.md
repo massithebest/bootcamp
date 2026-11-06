@@ -129,6 +129,7 @@ Frontend는 상대 workspace 문서를 읽지 않고 아래 입력 계약만 전
 - `POST /changes/{id}/{submit|withdraw|approve|reject}` `{expected_revision, note}`. approve·reject는
   `knowledge:approve`와 note가 필요하다. 승인하면 서버가 YAML을 쓰고 즉시 반영한다.
 - `POST /entries/{kind}/{key}/verify` `{note}` → 200 상세. 승인 권한자에게 미검토·요청 없는 구조화 지식의 "검토 완료"로 보인다.
+- "검토 대기" 목록은 제출된 변경 요청과 미검토 지식(`status: draft`, 보관·제출된 요청 제외)을 함께 보여 준다.
 - 텍스트 문서 검토·적용도 승인 권한자에게만 보인다. 본문에서 `actor`를 빼고 처리자는 서버가 principal 이름으로 기록한다.
 - 오류(`{"detail"}`): 403 권한 없음·작성자 아님·자기 승인, 404, 409 revision 충돌·진행 중 요청
   존재·기준 변경·상태 불일치, 422 검증 실패, 503 저장소·반영 실패. 화면은 상태 코드별 문구만 쓴다.
